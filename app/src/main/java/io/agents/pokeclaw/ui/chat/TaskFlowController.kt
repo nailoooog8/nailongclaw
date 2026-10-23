@@ -21,6 +21,7 @@ import io.agents.pokeclaw.agent.PipelineRouter
 import io.agents.pokeclaw.agent.TaskPromptEnvelope
 import io.agents.pokeclaw.agent.llm.ModelConfigRepository
 import io.agents.pokeclaw.service.ClawAccessibilityService
+import io.agents.pokeclaw.service.ClawNotificationListener
 import io.agents.pokeclaw.service.ForegroundService
 import io.agents.pokeclaw.service.AutoReplyManager
 import io.agents.pokeclaw.tool.ToolRegistry
@@ -119,9 +120,12 @@ class TaskFlowController(
 
     companion object {
         private const val TAG = "TaskFlowController"
+        private const val MONITOR_BIND_WAIT_MS = 5_000L
     }
 
     private var sendTaskRetryCount = 0
+    private var monitorGateRetryCount = 0
+    private var monitorGateWaiting = false
     private var lastMonitorStatusNote: String? = null
     private var assistantResponsePublished = false
     private val pipelineRouter = PipelineRouter(activity)
@@ -322,19 +326,82 @@ class TaskFlowController(
         }
 
         typedInput?.let { addUser(it) }
-        val missing = AppCapabilityCoordinator.missingMonitorRequirements(activity)
-        if (missing.isNotEmpty()) {
-            Toast.makeText(
-                activity,
-                "Enable ${missing.joinToString(" & ") { it.label }} in Settings first",
-                Toast.LENGTH_LONG
-            ).show()
-            openSettings()
-            onTaskTerminal?.invoke(TaskEvent.Failed("Missing required permissions for monitoring."))
-            return
-        }
 
-        val contact = trimmedLabel
+        val snapshot = AppCapabilityCoordinator.snapshot(activity)
+        when (
+            MonitorStartGate.decide(
+                accessibility = snapshot.accessibilityState,
+                notificationAccess = snapshot.notificationAccessState,
+                waitInFlight = monitorGateWaiting,
+                alreadyWaited = monitorGateRetryCount >= 1,
+            )
+        ) {
+            MonitorStartGate.Decision.START -> {
+                monitorGateRetryCount = 0
+                activateMonitor(target, trimmedLabel)
+            }
+            MonitorStartGate.Decision.WAIT -> waitForMonitorBindings(target)
+            MonitorStartGate.Decision.REJECT_BUSY -> addSystem(
+                "Accessibility and Notification access are still connecting — one moment."
+            )
+            MonitorStartGate.Decision.REJECT_DISABLED ->
+                rejectMonitorStart("Enable ${missingRequirementLabels()} in Settings first")
+            MonitorStartGate.Decision.REJECT_TIMED_OUT -> rejectMonitorStart(
+                "${missingRequirementLabels()} didn't connect. " +
+                    "Go to Settings and toggle it off then on."
+            )
+        }
+    }
+
+    /**
+     * The bindings are enabled in Android settings but the app has not seen
+     * `onServiceConnected` / `onListenerConnected` yet. QA E3 traced this to the OS
+     * failing to rebind enabled services after the app process dies on some OEM
+     * ROMs — so this wait only recovers the case where the rebind is merely late.
+     * When the OS never binds at all, it times out and the user is sent to Settings
+     * with an accurate message, instead of being bounced there silently. Mirrors
+     * what [sendTask]'s CONNECTING branch already does for the task path.
+     */
+    private fun waitForMonitorBindings(target: MonitorTargetSpec) {
+        monitorGateWaiting = true
+        monitorGateRetryCount++
+        addSystem("Accessibility and Notification access are connecting, please wait...")
+        executor.submit {
+            val needsAccessibility =
+                AppCapabilityCoordinator.accessibilityState(activity) != ServiceBindingState.READY
+            val needsNotificationAccess =
+                AppCapabilityCoordinator.notificationAccessState(activity) != ServiceBindingState.READY
+            val accessibilityUp = !needsAccessibility ||
+                ClawAccessibilityService.awaitRunning(MONITOR_BIND_WAIT_MS)
+            val notificationAccessUp = !needsNotificationAccess ||
+                ClawNotificationListener.awaitConnected(MONITOR_BIND_WAIT_MS)
+            activity.runOnUiThread {
+                monitorGateWaiting = false
+                if (accessibilityUp && notificationAccessUp) {
+                    startMonitor(target)
+                } else {
+                    rejectMonitorStart(
+                        "${missingRequirementLabels()} didn't connect. " +
+                            "Go to Settings and toggle it off then on."
+                    )
+                }
+            }
+        }
+    }
+
+    private fun rejectMonitorStart(message: String) {
+        monitorGateRetryCount = 0
+        Toast.makeText(activity, message, Toast.LENGTH_LONG).show()
+        addSystem("⚠️ $message")
+        openSettings()
+        onTaskTerminal?.invoke(TaskEvent.Failed("Monitoring did not start: $message"))
+    }
+
+    private fun missingRequirementLabels(): String =
+        AppCapabilityCoordinator.missingMonitorRequirements(activity)
+            .joinToString(" & ") { it.label }
+
+    private fun activateMonitor(target: MonitorTargetSpec, contact: String) {
         val app = target.app
         sink.awaitingReply = false
         sink.taskRunning = false
