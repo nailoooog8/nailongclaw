@@ -45,6 +45,10 @@ of assertions if you do not know about it:
   permissions` while the screen is locked.** The ROM asks for confirmation and
   auto-aborts it when the keyguard is up. Unlock first
   (`input keyevent KEYCODE_WAKEUP` + `wm dismiss-keyguard`), then install.
+  Note (2026-10-23 复验): on this face-unlock device `wm dismiss-keyguard`
+  alone leaves `mDreamingLockscreen=true`; a swipe up afterwards
+  (`input swipe 540 1800 540 600`) actually clears it. Verify with
+  `dumpsys window | grep mDreamingLockscreen` before assuming you are unlocked.
 - **`INSTALL_FAILED_VERSION_DOWNGRADE` is the local build's fault.** The
   version code defaults to 33 (`app/build.gradle.kts:115`); the signed build on
   the device was 37. Export `POKECLAW_VERSION_CODE=<higher>` for local QA
@@ -88,6 +92,38 @@ of assertions if you do not know about it:
   uiautomator → tap.** Sending while the keyboard is up is the single most
   common cause of a silently dropped message: the tap dismisses the IME, the
   layout recomputes, and the button is no longer where it was.
+- **The documented adb debug-task command is dead (2026-10-23).**
+  `ComposeChatActivity.kt:236` documents
+  `adb shell am start -n io.agents.pokeclaw/.ui.chat.ComposeChatActivity --es task "…"`,
+  but the activity is `android:exported="false"` (`AndroidManifest.xml:62`), so
+  it now fails with `SecurityException: Permission Denial: starting Intent …
+  not exported from uid 10395` — the intent never reaches `handleIntentAutomation`
+  and no task starts (the screen just sits on the empty state). Reproduce tasks
+  by typing into the composer and tapping the FAB (recipe above), or add an
+  exported debug entry if headless task triggering is still wanted.
+- **`adb input text` needs nested quotes or only the first word lands.**
+  `adb shell input text 'List every app'` reaches the device shell as separate
+  arguments and only `List` is typed (the rest is silently dropped). Use
+  `adb shell input text "'List every app'"` so the device shell sees one
+  argument. Non-ASCII is still impossible (see above) — for a Chinese prompt,
+  drive the real keyboard or paste via the focused field.
+- **`uiautomator dump` fails for roughly the first 30s of a local-model task.**
+  While the window is busy (model loading + first inference round) the dump
+  returns nothing usable, and a poller silently reads a stale or empty tree.
+  The FAB's red window only starts after the first tool call (~32–36s after
+  send, see F2), so a sampler that gives up — or reports `none` — during the
+  busy phase misses the entire red window. Start polling after the first tool
+  card appears, or tolerate gaps instead of concluding "no state".
+- **Release builds log almost nothing to logcat, and the app's own log file is
+  unreadable from adb.** `XLog.setDEBUG(BuildConfig.DEBUG)`
+  (`ClawApplication.kt:35`) gates every `Log.*` call and also `XLog.d`'s file
+  write; only `XLog.i/e/w` still append to `AppLogStore`
+  (`cache/app_logs/pokeclaw-app.log`). But that file is in app-private storage:
+  `run-as` answers "package not debuggable" and there is no root, so the only
+  exit is Settings → About → Share Debug Report (release smoke step 5). Task
+  event tracing (`onToolCall`/`onToolResult` are `XLog.d`) is therefore
+  impossible on a release build — verify task behaviour through the UI
+  (FAB contentDescription, tool cards, final answer), not through logs.
 
 ### Pre-Tag Release Smoke — MANDATORY before pushing any vX.Y.Z tag
 
@@ -787,33 +823,103 @@ When in doubt, rerun the smaller bundle first, then expand only if something dri
 - [x] **E2. Task mode via Quick Task tap [PASS — 2026-10-23]**: tap a Quick Task → input fills + auto-switches to Task mode
   - ✅ 同一套判据：点模板后输入框被填上**且**边框由灰转橙、占位符变为任务模式文案。
   - ✅ **任务模式跨发送保持**：连续 4 次发送后占位符仍是任务模式文案。这对 E2 是必要的——否则用户点一次模板、之后每次手打都要重切。
-- [ ] **E3. Monitor via Quick Tasks panel**: scroll to BACKGROUND → tap Monitor card → centered dialog → enter contact → Start → monitoring activates
+- [x] **E3. Monitor via Quick Tasks panel [PASS — 2026-10-23 真机复验，release 40：全链路通过，含「开始监听 → 监听真正启动」]**: scroll to BACKGROUND → tap Monitor card → centered dialog → enter contact → Start → monitoring activates
+  - ✅ **前四步全部真机 PASS（两次运行，设备 `10AG4J1THX00524` / V2502DA / release 39 / 中文 locale）**：Quick Tasks 面板 → 滚到「后台运行」区 → 点「消息监听与自动回复」卡片 → 居中对话框弹出，内容完整——标题「消息监听与自动回复」、`目标联系人` 输入框 + 占位提示「例如：妈妈、张三、13800138000」、`应用` 下拉（默认 WhatsApp，`MonitorTargetSpec.supportedApps` 共 7 项）、`语气风格` 三-chip（随和 / 正式 / 幽默）、`开始监听` 按钮。
+  - ✅ **联系人输入可用**：`BasicTextField` 能正常接收输入（`adb input text "'Mom'"` → 无障碍树取到 `Mom`）。注意 `startMonitor` 只校验 `trimmed.isNotBlank()`，**不校验联系人是否存在于通讯录**——所以本条不需要真实联系人即可判定。
+  - ❌ **第五步「monitoring activates」被挡死**：点「开始监听」后应用**不启动监听，而是跳转到自己的 `SettingsActivity`**。两次运行（18:54:56、19:15:01）行为完全一致。
+  - **根因**：`TaskFlowController.startMonitor` 第一道门是 `AppCapabilityCoordinator.missingMonitorRequirements(activity)`（`TaskFlowController.kt:325-335`），它要求 `accessibilityState` 和 `notificationAccessState` **都必须是 READY**。跳转时应用自报的状态是：
+    | 权限 | 应用自报 | 系统真实状态 |
+    |---|---|---|
+    | 无障碍服务 | `Connecting` / `Disconnected`（反复横跳） | `enabled_accessibility_services` 含该组件、`accessibility_enabled=1`、`dumpsys accessibility` 报 `Bound services:{Service[label=PokeClaw…]}` |
+    | 通知使用权 | `Disconnected`（持续） | 系统「通知使用权」页对 PokeClaw 显示 **允许**；`enabled_notification_listeners` 含该组件 |
+    → **当时的结论「权限是给了的，是应用没认出来」只对了一半，根因已于同日定位（见下）**。`isRunning()` / `isConnected()` 都是进程内静态 `instance != null`（`ClawAccessibilityService.java:49-51`、`ClawNotificationListener.java:115-117`），由 `onServiceConnected()` / `onListenerConnected()` 置位；本进程里这两个 instance 始终没被置上——**但原因不是检测失灵，是 OS 根本没把服务绑到这个进程**：
+    - `dumpsys activity exit-info`：19:12:54 `APP CRASH(NATIVE)`（SIGSEGV, rss 2.7GB, pid 26926）→ 进程 28809 于 **19:12:55** 自动重启（E3 第二次运行 19:15:01 就在这个进程里）。
+    - `dumpsys activity services io.agents.pokeclaw`：`ClawAccessibilityService` 的 ServiceRecord `createTime` 指向 **19:47:34**——**19:15 时系统侧一条绑定记录都没有**，`hasBound=true` 是 34.5 分钟后才发生的事。通知监听更糟：无 ServiceRecord，且不在 `dumpsys notification` 的 `Live notification listeners (21)` 里，33 分钟未绑上。
+    - ⚠️ **`dumpsys accessibility` 的 `Bound services:{Service[label=PokeClaw…]}` 当时误导了判断**：进程死后 rebind 静默失败时这行可以是陈旧条目。判断「绑没绑」的唯一可靠信号是 `dumpsys activity services` 的 ServiceRecord + `hasBound=true`。
+    - **应用无法自愈**：无公开 API 请求重绑；`WRITE_SECURE_SETTINGS` 是 signature|privileged。实测原值写回与 delete+put 完整切换 `enabled_notification_listeners` 都不能让系统重绑（值已恢复，无损伤）。
+    - **还有第二种失效模式（同日 20:00 后实测）**：系统侧绑定稳定存在、`hasBound=true`，应用经 `onResume` 重新计算的标签仍报 `Disconnected`（20:08:54，绑定已稳定约 2 分钟）。但同一个应用在 20:29:54 又让一条非白名单任务通过了无障碍门——说明它看到的绑定状态在 DEGRADED ↔ READY 之间**数分钟量级地振荡**，采样落在哪个相位纯看时机。取证期间另发现 `uiautomator dump` 本身会在 1-3 秒后触发一次重绑（已用纯 dumpsys 对照排除），所以**任何夹了 UI dump 的绑定观测都不可信**。
+  - **为什么一直没人发现**：`sendTask` 对同样状态的容忍度要高得多——`CONNECTING` 分支会用 `ClawAccessibilityService.awaitRunning(5000)` 等 5 秒再重试（`TaskFlowController.kt:191-204`），另有 `canRunWithoutAccessibility` 白名单放行非交互类任务（`TaskFlowController.kt:296-304`）。**任务路径能跑，监听路径不能**，同一份坏状态两条路待遇不同。
+  - **底层不稳定性的直接证据**（与权限门无关，但是同一个病根）：19:10 那条 `Open com.android.settings and then scroll to the bottom of the page` 任务里，`打开应用 → Opened app: com.android.settings` **成功**，紧接着 `滚动查找` 和两次 `系统按键` 全部报 `Accessibility service is not running`——**同一个任务内，服务连上又断了**。这也解释了 18:19 那次运行为什么最终 stall（工具连续无进展 → watchdog 触发）。
+  - ⚠️ **UX 缺陷（独立于权限门）—— ✅ 已修 2026-10-23**：`startMonitor` 失败时原来只弹一个 Toast 就跳设置页，**聊天记录里不留任何痕迹**——`onTaskTerminal?.invoke(TaskEvent.Failed(...))` 接到的是 `sendExternalAutomationTerminalCallback`（`ComposeChatActivity.kt:101`），不是聊天 UI，所以不落气泡。用户点了一下就被传送走，事后无据可查。现在 `rejectMonitorStart` 会先 `addSystem("⚠️ …")` 再跳设置页，与 `sendTask` 各门禁失败路径一致。
+  - ⚠️ **设备状态的自责声明**：本轮我为排查做过 `settings delete` / `settings put` 和 force-stop（19:04、19:07），这些操作本身可能干扰绑定。但**「同一任务内服务连上又断」发生在 19:10，且 18:39 那次（本轮任何 delete/put 之前）就已是 `open_app` 成功 + 后续工具报 not running**，所以该现象不能全归咎于我的操作。
+  - ✅ **第 ② 层（应用侧门禁过严）已修 2026-10-23**：`startMonitor` 不再一看非 READY 就跳设置页。新纯逻辑 `MonitorStartGate`（`ui/chat/MonitorStartGate.kt`）按两个绑定状态决策：`DISABLED`（= 系统里真关了，`bindingState` 第一道判的就是它）才直接去设置页；`CONNECTING` 与 `DEGRADED`（都意味着「系统说开着、应用没收到回调」）先给 5 秒窗口等 `awaitRunning` / `awaitConnected`，再重跑一次门（`TaskFlowController.waitForMonitorBindings`）。这正是 `sendTask` CONNECTING 分支已有的容忍度（`TaskFlowController.kt:181-204`）。单测 `MonitorStartGateTest` 8 例钉住关键不变量（E3 的 DEGRADED+DEGRADED → WAIT；BUSY 必须先于 TIMED_OUT 判定），全量 **304 / 0 失败**。
+  - ✅ **真机复验 PASS（2026-10-23 21:02，release 40 = `PokeClaw_v0.8.3_20261023_203834.apk`，versionCode 40，`adb install -r` Success）**：两次运行，一次失败一次成功，合起来把整条链验证完了——
+    - **第一次（20:50:03）**：无障碍服务这次装完立刻重绑了（ServiceRecord 与进程同时创建），但通知监听仍没绑。点「开始监听」后转录出现 `Accessibility and Notification access are connecting, please wait...`（等待路径生效），5 秒后 `⚠️ Notification Access didn't connect. Go to Settings and toggle it off then on.`——**准确点名了真正缺失的服务**（不是笼统的「权限不足」），且全程留在聊天记录里。这正是修复后的设计行为。
+    - **恢复动作（用户手动）**：设置 → 通知 → PokeClaw → 关掉再打开「授予通知使用权」。关掉后 `enabled_notification_listeners` 变空，打开后恢复——**监听立刻绑上了**（live 列表出现 PokeClaw、ServiceRecord 出现）。
+    - **第二次（21:02:45）**：同一路径重跑，门直接放行，转录出现 `Setting up auto-reply for Mom on WhatsApp...` → `✓ Auto-reply is now active for Mom on WhatsApp.`，快捷任务面板「后台运行」区变为**「运行中」+「监控运行中 — 点击顶部栏可停止」**。**E3 全链路 PASS。**
+    - 结论：E3 的阻断从来不是「权限没给」，而是**通知监听服务没被系统绑上**；应用新提示的恢复路径（toggle off/on）就是本机唯一验证有效的路径。修复后的门禁在坏状态下给出准确诊断、在好状态下正常放行——两种相位都测到了。
+  - 📌 **要单独立项**：根因有两层——① vivo/iQOO ROM 在本机的服务重绑不可靠（Device Notes 已记 force-stop 会撤销无障碍，本次进一步发现**即使 secure setting 完好，重绑也可能不生效**）；② ~~应用侧 `missingMonitorRequirements` 比任务路径更严且无等待/重试~~（已修，见上）。第 ① 层需要决定是否加「引导用户去系统页手动开关」的兜底，以及是否让绑定状态从系统侧重新导出（而非只信进程内 `instance`）。
 - [x] **E4. Task sends correctly [PASS — 2026-10-23]**: type a task in Task mode → tap send → task executes, response in chat bubble
   - ✅ 设备 `10AG4J1THX00524` / V2502DA / 411 dp，release 包 `PokeClaw_v0.8.3_20261023_150757.apk`（versionCode 39，`adb install -r` Success）。**4 次任务全部跑通**：
     | 任务 | 工具卡 | 最终回答 |
     |---|---|---|
     | 手机上安装了哪些应用？ | `获取应用列表 → Found 137 apps: …` | ✅ 带模型页脚 |
     | 检查通知栏 | `Get Notifications → Notification Access is not enabled…` | ✅ 如实说明权限缺失 |
-    | List all installed apps | `Found 137 apps: …` | ✅ |
-    | What is the battery level | （见下方 ⚠️） | ✅ `Battery: 91%, charging, 32.0°C` |
+    | List all installed apps | （无卡——直连工具路，答案即 `Found 137 apps: …`，见下方 ✅） | ✅ |
+    | What is the battery level | （无卡——直连工具路，见下方 ✅） | ✅ `Battery: 91%, charging, 32.0°C` |
   - ✅ **模型拿到的是真数据**：`adb shell dumpsys battery` 实测 `level: 91`、`status: 2`（充电中）、`temperature: 315`（31.5°C），与模型回答的 91% / charging 一致（温度差 0.5–1.5°C，疑为不同传感器或取整）。
   - ⚠️ **一条未解释的异常**：手打的 `Check sthe battery level…`（3:27）走的是**聊天路**——没有工具卡，模型页脚格式是 `gemma-4-E2B-it (CPU)`，而任务路是 `Gemma 4 E2B — 2.6GB`。此后又连续 4 次证明任务模式会保持，所以最可能是**布局跳动期间点到了「💬 对话」tab**（当时快捷任务面板与输入法反复重排版，见下方操作坑），但**这只是假设，不是结论**——没有复现，也没有日志可查（本机看不到应用日志，见上文 Device Notes）。
-  - ⚠️ **电池那条没有工具卡**：模型确实调了工具（电量数值为真），但消息列表里既无系统行也无工具卡。原因未查。
+  - ✅ **电池那条没有工具卡的原因已查明（2026-10-23 代码侧定案）**：`TaskFlowController.sendTask` 首先用 `DirectDeviceDataGuard.deterministicToolCall(text)` 拦英文关键词（`DirectDeviceDataGuard.kt:85-118`：battery / wifi / bluetooth / storage / notif / clipboard / installed apps / temperature…），命中即走 `executeDirectToolTask`（`TaskFlowController.kt:146-150, 269-294`）——同步执行工具、只发布答案，**不发 ToolAction/ToolResult，也不碰 taskRunning**。所以「What is the battery level」「List all installed apps」这两条英文任务：无系统行、无工具卡、2 秒内结束、FAB 全程不会红（不是缺陷，是 Tier 1 设计）。中文任务（如「手机上安装了哪些应用？」）不含英文关键词，才会进 agent loop 出工具卡。表格里 `Found 137 apps: …` 是直连路的**答案文本**，不是工具卡。
 
 ## F. Task Lifecycle UI
 
-- [ ] **F1. Top bar during task — 与实现不符，条目本身要改**: 原文写「while task runs → orange 'Task running...' + red 'Stop' button visible」。
-  - ❌ **顶部条里没有这个元素**。`ChatTopBar`（`ChatScreen.kt:409`）只有标题「PokeClaw」、菜单图标、本地/云端两个 tab——没有任何运行中指示。**唯一的中止控件是发送键（FAB）**：`isTaskRunning` 为真时 `containerColor` 变 `Color(0xFFF44336)`、图标变 `Icons.Default.Close`、`contentDescription` 变「停止」（`ChatScreen.kt:1074-1092`）。
-  - **所以 F1 描述的是一个不存在的 UI**，F2 才是对的那条。本条应改写为「顶部条不变，停止控件在发送键」，否则下一个人会去找一个不存在的东西。
-- [ ] **F2. Send button becomes stop — 代码已接通，真机未观测到**: while task runs → send button turns red X → tapping it cancels task
-  - **代码侧已核实**：`TaskFlowController` 在 `LoopStart` / `ToolAction` / `ToolResult` / `Progress` 四个事件上都置 `sink.taskRunning = true`（`TaskFlowController.kt:383/398/422/427`），经 `TaskFlowUiState(taskRunningState = _isTaskRunning)` 写到 `ComposeChatActivity._isTaskRunning`，再以 `isTaskRunning = _isTaskRunning.value` 喂给 `ChatScreen`。
-  - ⚠️ **真机未观测到，不得记 PASS**：4 次任务、累计约 4 分钟采样（`adb exec-out screencap` 每 0.3–0.4s 一帧，覆盖发送前后各数十秒），FAB **从未**变成红色。
-  - ✅ **采样点本身是对的**（排除了「我测错地方」）：同一像素点 `(1178,2627)` 的受控 A/B —— 空输入时 `(105,102,99)`（`colors.background` + alpha 0.35），任务模式有文本时 `(218,137,99)`（accent 橙）。FAB 确实会随状态变色，只是运行中没变红。
-  - ⚠️ **两种可能未能区分**：①`_isTaskRunning` 真的没传到 UI（真缺陷，用户无法中止任务）；②窗口太短——实测电池类任务**端到端不到 2 秒**（发送后第一帧采样就已看到回答），红色态可能只存在几百毫秒。**要区分需要一个人为拖长的任务**（例如让 watchdog 跑起来，或一个必然多轮的任务），本次没做。
-- [ ] **F3. Floating button during task**: while task runs in another app → floating circle shows pill with step/tokens + "Tap to stop"
-- [ ] **F4. Floating button stop**: tap floating button during task → task cancels
-- [ ] **F5. Second task works**: complete task 1 → start task 2 → floating button, top bar, stop button all work
-- [ ] **F6. No stuck typing indicator**: after task completes → "..." is replaced by answer or removed
+- [x] **F1. Top bar during task — 条目已按实现改写并关闭 [CLOSED — 2026-10-23]**: 原文写「while task runs → orange 'Task running...' + red 'Stop' button visible」。
+  - ❌ **顶部条里没有这个元素**——原文描述的是旧 UI。`ChatTopBar`（`ChatScreen.kt:409`）只有标题「PokeClaw」、菜单图标、本地/云端两个 tab，没有任何运行中指示。**唯一的中止控件是发送键（FAB）**：`isTaskRunning` 为真时 `containerColor` 变 `Color(0xFFF44336)`、图标变 `Icons.Default.Close`、`contentDescription` 变「停止」（`ChatScreen.kt:1075-1098`）。
+  - ✅ **改写后的判据（「顶部条不变，停止控件在发送键」）已由 F2 真机复验 PASS**（2026-10-23，3 次受控运行；红色态有点击级像素证据，点击中止有行为证据，见 F2）。本条保留原文与改写说明，避免下一个人再去找一个不存在的东西。
+- [x] **F2. Send button becomes stop [PASS — 2026-10-23 复验]**: while task runs → send button turns red X → tapping it cancels task
+  - **代码侧已核实（全链路无断点）**：`TaskFlowController` 在 `LoopStart` / `ToolAction` / `ToolResult` / `Progress` 四个事件上都置 `sink.taskRunning = true`（`TaskFlowController.kt:383/398/422/427`），经 `TaskFlowUiState(taskRunningState = _isTaskRunning)` 写到 `ComposeChatActivity._isTaskRunning`（`ComposeChatActivity.kt:93-98`），再以 `isTaskRunning = _isTaskRunning.value`（`ComposeChatActivity.kt:151`）喂给 `ChatScreen` → `ChatInputBar`（`ChatScreen.kt:299-301`）→ FAB：`containerColor = Color(0xFFF44336)`、图标 `Icons.Default.Close`、`contentDescription`「停止」、点击走 `onStopAllTasks`（`ChatScreen.kt:1075-1098`）。
+  - ✅ **真机复验 PASS（3 次受控运行，同一台 V2502DA / release 39）**。任务用必然多轮的 `List every application on this phone grouped by category`（agent loop；3 次工具调用：获取应用列表 → kb_write → 完成任务；全程约 63–70s；英文关键词见下方 📌）：
+    | 运行 | 发送时刻 | FAB=「停止」观测窗 | 结果 |
+    |---|---|---|---|
+    | A | 17:12:18 | 17:12:54–17:13:16+（连续 9 帧，≥22s） | 17:13:28 答案到达，回到「发送」 |
+    | B | 17:20:24 | 17:20:56–17:21:22（连续 8 帧，≥26s） | 17:21:27 答案到达 |
+    | C（中止测试） | 17:53:21 | 17:53:53 首次见红，当即点击 | 4s 内回到「发送」；之后 4 分钟再无答案 |
+  - ✅ **红色是量出来的，不是认出来的**：B 运行见红瞬间（17:20:56）截屏，FAB 图标中心（与 E1/E2 A/B 同一点 `(1178,2624)`）四边 `rgb(225,82,65)`、中心 `rgb(230,119,107)`（白色 ✕ 压红底）；同一台机器空闲态截屏同点 `rgb(105,102,99)`——与 10-23 白天 A/B 记录的「空输入灰 `(105,102,99)`」逐位一致。contentDescription 全程为「停止」。截图与取色脚本：设备 `/sdcard/s.png`，主机 `C:\tmp\fab_red.png` / `fab_idle.png` / `pngpix.js`（Node+zlib 手写 PNG 解码）。
+  - ✅ **点击中止成立（C 运行）**：红 FAB 点击 → `onStopAllTasks` → `ActiveTaskShellController.stopAllTasks` → `appViewModel.stopTask` → `TaskOrchestrator.cancelCurrentTask`。任务被真正掐断（未再产出答案），typing indicator 无残留，界面停在「工具卡在、答案不在」的干净中止态。
+  - ⚠️ **纠正此前两个错误判断**：①「窗口太短」不成立——红色态稳定持续约 26–30s，不是几百毫秒；②此前 4 次阴性**本次未能复现**，状态确实渲染到了 UI。最可能的漏采原因：红色态在**发送后约 32–36s**（本地模型加载 + 首轮推理完成、第一个工具调用发生）才出现，只覆盖工具执行段；若采样窗口与发送时刻错开、或轮询在头 30s 的忙窗口里反复拿到失败 dump（见 Device Notes），就会整段错过。10-23 白天的阴性结果保留记录，但不再作为依据。
+  - 📌 **红色不覆盖任务全程，两种任务永远不会有红色**：发送后到首个工具调用前约 30s 是 `awaitingReply` 相位（FAB 显示「等待」/MoreHoriz，`ChatScreen.kt:1088`）；Tier 1 直连工具任务（电池类等，`DirectDeviceDataGuard.deterministicToolCall` 命中后走 `executeDirectToolTask`，`TaskFlowController.kt:146-150, 269-294`）**设计上就不置 taskRunning**，2s 内结束、无中止需求。测 F2 必须用 agent-loop 多轮任务。
+- [ ] **F3. Floating button during task [BLOCKED — 2026-10-23 复验：悬浮球根本不存在，不是「这次没采到」]**: while task runs in another app → floating circle shows pill with step/tokens + "Tap to stop"
+  - ❌ **判据在现版本上不可达，且不是采样问题**：悬浮窗窗口从未被创建过。设备侧两次运行 + 代码侧全链路定位，结论一致。
+  - **代码侧根因（决定性）**：`AppViewModel.showFloatingCircle()`（`AppViewModel.kt:146-162`）是**全仓库唯一**给 `FloatingCircleManager` 传 Application 引用的地方，而它**零调用方**（`grep -rn showFloatingCircle` 只命中定义本身）。于是：
+    1. `show()` 只被 `showFloatingCircle()` 调用 → 从未执行 → `appRef`（`FloatingCircleManager.kt:64`）永远是 `null`，`EasyFloat.with(...)` 从未被调用；
+    2. `TaskOrchestrator` 在 agent loop 里调的是 `FloatingCircleManager.ensureShowing()`（`TaskOrchestrator.kt:367`）→ 该函数第一件事就是 `val app = appRef`，为 null 时走 `XLog.w("ensureShowing: no appRef, cannot re-show")` 直接返回（`FloatingCircleManager.kt:183-189`）。
+    → **窗口从头到尾不存在**，`setRunningState` / `updateTokenStatus` 拿到的 `EasyFloat.getFloatView(FLOAT_TAG)` 恒为 null，全部静默 return。
+  - **真机证据一（跨应用运行，任务确实在跑）**：18:18:36 发送 `Open com.android.settings and then scroll to the bottom of the page`（英文 + 含 ` and then ` → 走 `PipelineRouter.Route.AgentLoop`，见下方 📌）。工具卡 `打开应用 → Opened app: com.android.settings` 证明 agent 真的导航到了别的应用；`topResumedActivity` 从 18:19:13 起连续 6 次采样都是 `com.android.settings/.Settings`。此时：
+    - `dumpsys window windows` 里 `io.agents.pokeclaw` **只有一个** `Window #13 ... type=1`（ComposeChatActivity），没有任何第二个窗口——同一次 dump 里 `Window #9 ShellDropTarget type=2038 appop=SYSTEM_ALERT_WINDOW` 在列，说明**第三方 overlay 窗口本来就会被 dumpsys 列出**，不是被过滤掉；
+    - 18:20:04 截屏（1260×2800，Node+zlib 手写 PNG 解码）扫描 `colorBrandPrimary` = `rgb(88,86,214)`（`cardRunning` 的背景色，`colors.xml:55`）：**0 像素**。任务此刻仍在跑（watchdog 的 120s 不活动超时约在 18:21:14 才触发），所以不是「任务已结束所以球消失了」。
+  - **真机证据二（覆盖任务全生命周期）**：18:39:06 再发一条同类任务，每 2 秒采一次 `dumpsys window windows` 并过滤 `io.agents.pokeclaw` 的非 `type=1` 窗口，**45 次采样 overlay_windows 全程为 0**（含发送后的 TASK_NOTIFY 相位与首个工具调用前的忙窗口）。
+  - ⚠️ **这条运行的前台切换已查明与 agent 导航无关，只用于 overlay 计数**：该次任务的工具卡是 `打开应用 → Failed to open app: com.android.camera2. Make sure the app is installed`（设备上装的是 `com.android.camera`，无 `camera2`；`OpenAppTool.resolveAppName` 把 "camera" 映射到了不存在的 `com.android.camera2`），紧接着 `系统按键 → Pressed Back button`。所以 18:39:53 前台变成 `com.android.settings` **不是 agent 打开了别的应用**，最可能是 Back 让聊天页出栈后系统回落到上一任务（ Settings 是 18:19 那次运行留下的）。该进程随后在 18:39:54 被 **LOW_MEMORY** 杀掉（`dumpsys activity exit-info io.agents.pokeclaw`：`reason=3 (LOW_MEMORY) rss=2.8GB`，本地模型 2.6GB）。因此这条运行**只用「overlay 窗口计数」这一项**（45 次采样全程为 0，与因果无关），**不用作「任务跑在别的应用里」的证据**。上一条（真机证据一）不受影响——它的工具卡是 `Opened app: com.android.settings`（成功），前台切换发生在进程存活期间，归因无歧义。
+  - 📌 **复现此条所需的任务文本配方**（与 F2 同源，另加两条约束）：必须同时满足 ①不含 `DirectDeviceDataGuard.deterministicToolCall` 的英文关键词（battery / wifi / bluetooth / storage / notif / installed apps / temperature / clipboard…），否则走 `executeDirectToolTask` 直连路、不置 taskRunning；②含 ` and ` / ` then ` / ` after `，否则被 `PipelineRouter.route()` 的 Tier 1 正则截走（`PipelineRouter.kt:48-56`：复合任务直接跳过 Tier 1）。本次用 `Open com.android.settings and then scroll to the bottom of the page`。
+  - 📌 **采样必须走悬浮窗自己的窗口**：`uiautomator dump` 只给活动窗口，pill 是 overlay；且本机 release 包看不到应用日志（§Device Notes），所以只能靠 `dumpsys window` 数窗口 + 截屏取色，不能靠 OCR 小字（H24 的教训）。
+  - 📌 **要单独立项的范围决策**：把悬浮球接上需要决定入口（谁调 `showFloatingCircle()`）、权限引导（`SYSTEM_ALERT_WINDOW` 本机已 allow，但新装机没有）、以及 pill 在聊天页前台时是否隐藏（`ComposeChatActivity.onCreate:127` 现在会 hide 掉它）。**这不是 QA 缺陷修复，是功能接线**，动手前应先定批准语义。
+- [ ] **F4. Floating button stop [BLOCKED — 2026-10-23：没有球可点；且点击回调也是空实现]**: tap floating button during task → task cancels
+  - ❌ **两个独立的断点，任意一个都足以让本条失效**：
+    1. 窗口不存在（同 F3 根因：`showFloatingCircle()` 零调用方 → `appRef` 为 null → `ensureShowing()` 直接返回）；
+    2. **即使窗口被创建出来，点它也不会中止任务**：点击回调走 `onStopTask()`（`FloatingCircleManager.kt:119-124`），而 `var onStopTask: () -> Unit = {}`（`FloatingCircleManager.kt:506`）的默认值是空 lambda，唯一给它赋值的地方还是 `AppViewModel.kt:153`——同样零调用方。所以现状是「点下去什么都不发生」。
+  - **代码侧已核实的预期路径**（供接线后回归用）：`FloatingCircleManager.onStopTask` → `AppViewModel.stopTask()` → `TaskOrchestrator.cancelCurrentTask()`（`TaskOrchestrator.kt:178-189`：`markStopping()` + `agentService.cancel()` + `ForegroundService.updateTaskStatus("Stopping task...")`）。**它与 F2 的 FAB 路径最终收敛到同一个 `cancelCurrentTask()`**（FAB 走 `ActiveTaskShellController.stopAllTasks()` → `appViewModel.stopTask()`，`ActiveTaskShellController.kt:58-63`），差别只在 FAB 额外停掉 AutoReply 监听并立刻 `ForegroundService.resetToIdle()`。
+  - **取消后的复位链路也已核实**：`TaskOrchestrator.onComplete` 识别到取消类答案（`agent_task_cancel` / `agent_task_cancelled` / `channel_msg_task_cancelled`）→ `TaskEvent.Cancelled` + `ForegroundService.resetToIdle` + `FloatingCircleManager.setErrorState()`（`TaskOrchestrator.kt:447-468`），pill 转 ERROR 态 5s 后自动回 IDLE 并 hide。这条链路本身是完整的，坏的只是「怎么让窗口出现」和「点了谁去调」。
+  - **本条无法真机判定**：没有可点的目标。判据中的「task cancels」已由 F2 的 C 运行在同一 `cancelCurrentTask()` 上验过（4s 内 FAB 回位、之后 4 分钟无答案），但**「从悬浮球触发」这一环在本版本上不可达**。
+- [x] **F5. Second task works [PARTIAL PASS — 2026-10-23 真机：任务 2/3 均被接受，会话锁正常释放；悬浮球一项随 F3/F4 阻塞]**: complete task 1 → start task 2 → floating button, top bar, stop button all work
+  - **判据拆开逐项对**（原文把三个不同的东西混成一句，而 F1 已经证明「top bar 没有运行中指示」是旧 UI 描述）：
+    | 分项 | 结论 | 依据 |
+    |---|---|---|
+    | 任务 2 能被接受（无 "Another task is still running"） | ✅ PASS | 见下方三次运行 |
+    | FAB 停止控件在任务 2 上工作 | ✅ PASS | 任务 3 发送后 33s 见红（18:36:38），持续约 34s，18:37:12 随答案回「发送」 |
+    | 会话锁 / LLM session 已释放 | ✅ PASS | agent-loop 任务 3 正常加载模型并跑完 |
+    | floating button | ⛔ 阻塞 | 随 F3/F4：窗口不存在 |
+    | top bar 运行中指示 | ✅ 已由 F1 关闭 | `ChatTopBar` 无该元素，唯一中止控件是 FAB |
+  - ✅ **真机三次连续运行（同一进程，设备 `10AG4J1THX00524` / V2502DA / release 39）**：
+    | # | 发送时刻 | 任务 | 类型 | 结果 |
+    |---|---|---|---|---|
+    | 1 | 18:31:21 | `List every application on this phone grouped by category` | agent loop | 完成：`kb_write → Written: apps_list.md`，答案 6:32 下午到达，FAB 回「发送」 |
+    | 2 | 18:35:05 | `What is the current battery level and is it charging` | Tier 1 直连 | 完成：`Battery: 87%, charging, 33.1°C`，FAB 全程「发送」（Tier 1 设计上不置 taskRunning，见 F2 的 📌） |
+    | 3 | 18:36:05 | `List every application on this phone grouped by category` | agent loop | 18:36:38 FAB 转「停止」→ 18:37:03 仍「停止」→ 18:37:12 回「发送」，`kb_write` 结果卡在位 |
+  - ✅ **会话锁这一项是本次真正的新信息**：任务 1 完成后立刻发任务 3（agent loop）能正常加载模型并进入工具调用段，说明 `TaskSessionStore` 的锁和 `LlmSessionManager` 的 session 都释放了。**F2 只验了「运行中能不能停」，没验「停/完成之后下一条能不能起」**——本条补上了后半截。
+  - ⚠️ **反向证据（ stall 之后会卡，别和本条混淆）**：本次更早一次运行里，任务 `打开应用 → Opened app: com.android.settings` 之后模型不再产出，watchdog 报 `Error: Task stalled (inactivity timeout)`；随后应用回到前台时出现 `Failed to load model: Local model session already in use`，再发一条任务 90 秒内前台没有任何变化（既没工具卡也没切应用）。**也就是说：任务正常完成 → 锁释放（PASS）；任务被 watchdog 掐断 → 锁疑似未释放**。后者是 F7/F8 的验收面，本轮未定位根因，不在本条计 PASS/FAIL。
+  - ⚠️ **进程在 18:39:54 被 LOW_MEMORY 杀掉**（`reason=3`，rss 2.8GB，本地模型 2.6GB），本轮第 4 条任务的采样因此作废（见 F3 的脏数据说明）。这解释了为什么跨应用样本只有一条是干净的。
+- [x] **F6. No stuck typing indicator [PASS — 2026-10-23]**: after task completes → "..." is replaced by answer or removed
+  - ✅ **完成路径**：3 次受控运行（见 F2）结束后，消息列表均无残留 "…" 气泡——typing indicator 被最终答案替换（`completeAssistantTurn` 先替换同一位置的 indicator，`TaskFlowController.kt:73-80`）。
+  - ✅ **中止路径**（F2 的 C 运行）：点击红 FAB 后 typing indicator 同样被清除（`handleTaskEvent(Cancelled)` → `removeTypingIndicator`，`TaskFlowController.kt:370-375`），界面停在「工具卡在、答案不在、无残留」的状态。
 - [ ] **F7. Task Watchdog — Inactivity recovery [RELEASE-OK]**: A task hanging inside an un-responsive tool or stalled LLM round without progress for >120s triggers watchdog auto-recovery → watchdog aborts agent execution, releases the task session in TaskSessionStore, resets ForegroundService to idle, marks floating circle error state, sends "✗ Task stalled (inactivity timeout)" to channel, and returns to chatroom if autoReturnToChat is set → subsequent tasks are immediately accepted without "Another task is still running"
 - [ ] **F8. Task Watchdog — Total duration limit recovery [RELEASE-OK]**: A task looping continuously for >600s total duration triggers watchdog max-duration timeout → watchdog aborts task execution, releases session lock, resets ForegroundService to idle, sends "✗ Task exceeded maximum duration limit", and frees task slot for new tasks
 
@@ -1733,7 +1839,251 @@ adb shell run-as io.agents.pokeclaw strings /data/data/io.agents.pokeclaw/files/
 
 Format: `[date] [status] [test-id] description`
 
-### 2026-10-20 — CI1 the emulator smoke harness reported red for a healthy app
+### 2026-10-23 — E3 passes on release 40, and the recovery path is the one the app now names
+
+Installed `PokeClaw_v0.8.3_20261023_203834.apk` (versionCode 40) on
+`10AG4J1THX00524` and re-ran E3 twice. Both phases of the bug were exercised in
+one session: the gate with a genuinely unbound service, and the gate with
+everything bound.
+
+[2026-10-23] [PASS]    E3   Full chain: Quick Tasks → 后台运行 → Monitor card →
+                               centered dialog → contact "Mom" → 开始监听 →
+                               `Setting up auto-reply for Mom on WhatsApp...` →
+                               `✓ Auto-reply is now active for Mom on WhatsApp.`
+                               → the panel's Background section flips to 运行中 /
+                               「监控运行中 — 点击顶部栏可停止」. Second run,
+                               21:02:45, release 40
+[2026-10-23] [PASS]    —    First run (20:50:03) exercised the *broken* phase and
+                               validated the fix's new behaviour exactly as
+                               designed: after the install the accessibility
+                               service rebound immediately (ServiceRecord created
+                               with the process) but the notification listener
+                               was still unbound. The tap produced
+                               `Accessibility and Notification access are
+                               connecting, please wait...` then, 5s later,
+                               `⚠️ Notification Access didn't connect. Go to
+                               Settings and toggle it off then on.` — naming the
+                               service that was actually missing, recorded in the
+                               transcript. Old build: instant jump to Settings with
+                               a generic toast and no record
+[2026-10-23] [NOTE]    —    **The recovery the app's new message names is the one
+                               that works on this device**: the user toggled
+                               授予通知使用权 off (`enabled_notification_listeners`
+                               went empty) and on (restored), and the listener
+                               bound immediately — it appeared in
+                               `Live notification listeners` and got a
+                               ServiceRecord. Note what this proves: before the
+                               toggle the switch was ON and the setting listed the
+                               component, yet nothing was bound. The grant was
+                               never the problem; the rebind was
+[2026-10-23] [NOTE]    —    Post-install rebind asymmetry, restated with the new
+                               data: accessibility rebinds promptly after an
+                               install (record created with the process, 20:47:17),
+                               the notification listener does not — it stayed
+                               unbound across the whole session until the manual
+                               toggle. Two services, two rebind policies, one ROM
+
+### 2026-10-23 — the monitor gate got the task path's tolerance; the root cause is still open
+
+E3's block was a *policy* gap, not a missing permission: `missingMonitorRequirements`
+demanded READY for both services and `startMonitor` believed it instantly, while
+`sendTask` had waited 5s and retried for years. Ported that tolerance, and only that.
+
+[2026-10-23] [FIX]     E3   `MonitorStartGate` (new, pure logic) decides START / WAIT /
+                               REJECT_DISABLED / REJECT_TIMED_OUT / REJECT_BUSY from the
+                               two binding states. `ServiceBindingState.DISABLED` *is*
+                               "switched off in Android settings" (`bindingState` checks
+                               `enabled` first), so that case still goes straight to
+                               Settings — waiting cannot fix a switch that is off.
+                               CONNECTING **and DEGRADED** (both mean "system says on,
+                               app hasn't seen the callback") get one 5s window via
+                               `awaitRunning` / `awaitConnected`, then the gate re-runs
+[2026-10-23] [FIX]     —    A rejected Start now writes a system line to the transcript
+                               before jumping to Settings. Previously the only trace was
+                               a Toast plus a page jump; `onTaskTerminal` routes to
+                               `sendExternalAutomationTerminalCallback`, not the chat UI
+[2026-10-23] [TEST]    —    `MonitorStartGateTest` 8 cases: both READY → START; CONNECTING
+                               and DEGRADED → WAIT (DEGRADED is the state E3 actually
+                               observed, so waiting must not be CONNECTING-only); either
+                               service DISABLED → REJECT_DISABLED without waiting;
+                               alreadyWaited → REJECT_TIMED_OUT; **BUSY must be tested
+                               before TIMED_OUT** — the retry is consumed the moment the
+                               wait starts, so without that ordering every tap inside
+                               the 5s window would read as a timeout and bounce the user
+                               to Settings while the original wait is still pending.
+                               Full suite 304 / 0 failures
+[2026-10-23] [OPEN]    E3   **The fix does not close E3.** If the OS never binds the service
+                               to this process (the root cause established below), the 5s
+                               wait cannot conjure the binding — it times out and the user
+                               still lands in Settings. What changes is the failure is now
+                               accurate and recorded instead of silently wrong. And there
+                               is no app-side closing move: no public API queries "is the
+                               service bound" or requests a rebind, and the secure settings
+                               that would force one need `WRITE_SECURE_SETTINGS`. The lever
+                               is not dying in the first place. E3 stays PARTIAL — no device
+                               re-verification yet
+
+### 2026-10-23 — the binding root cause: the OS never bound the services to the new process
+
+Follow-up on the E3 root cause, evidence gathered entirely from the system side
+(`dumpsys`, no root, no unlock). The conclusion overturns the earlier reading of
+`dumpsys accessibility`.
+
+[2026-10-23] [OPEN]    E3   **Root cause: the OS does not rebind enabled services after
+                               the app process dies on this vivo/iQOO ROM.** The app's
+                               flags are unset because the callbacks never fired — because
+                               nothing was bound. Not a detection bug
+[2026-10-23] [NOTE]    —    Process death chain (`dumpsys activity exit-info`):
+                               19:12:54 APP CRASH(NATIVE) SIGSEGV status=11 rss=2.7GB
+                               (pid 26926); 19:07:33 + 18:30:08 FORCE STOP;
+                               18:39:54 LOW_MEMORY rss=2.8GB. Current pid 28809 started
+                               **19:12:55** — one second after the native crash
+[2026-10-23] [NOTE]    —    Accessibility: the ServiceRecord in `dumpsys activity
+                               services` was created **19:47:34** (`hasBound=true`,
+                               `app=ProcessRecord{28809}`) — 34.5 minutes after process
+                               start. During the 19:15:01 E3 run there was **no binding
+                               record at all**, so `onServiceConnected` could not have
+                               fired. Trigger for the 19:47 bind unknown (device wake
+                               ~19:45 is a candidate)
+[2026-10-23] [NOTE]    —    Notification listener: **no ServiceRecord at all**, and
+                               absent from `Live notification listeners (21)` while
+                               `enabled_notification_listeners` lists it — still unbound
+                               33+ minutes after process start
+[2026-10-23] [NOTE]    —    Mid-task drop (19:10) is real, not a wait timeout: `OpenAppTool`
+                               requires the service via `getConnectedInstance(20_000)`
+                               (`BaseTool.kt:139`), which waits 20s. `open_app` succeeded
+                               and later tools in the same task did not — the service was
+                               live, then gone
+[2026-10-23] [FIX?]    —    **`dumpsys accessibility`'s `Bound services:{…}` can be a stale
+                               entry** when the rebind fails silently. The reliable signal
+                               is the ServiceRecord + `hasBound=true` in `dumpsys activity
+                               services`. This misreading is what produced the "the app
+                               doesn't know" framing
+[2026-10-23] [TEST]    —    Recovery experiments (reversible, shell): rewriting
+                               `enabled_notification_listeners` with the identical value →
+                               no rebind; full `delete` + `put` toggle → **still no rebind**
+                               (value restored, no permission damage). The app cannot do
+                               this itself anyway — `WRITE_SECURE_SETTINGS` is
+                               signature|privileged. A user toggle in the system UI remains
+                               the only recovery path that has worked
+[2026-10-23] [NOTE]    —    Memory corroborates the death chain: current idle RSS is
+                               210MB (`TOTAL RSS: 210616`), while every LOW_MEMORY/crash
+                               record shows 2.7–2.8GB — the local model in the app process
+                               is the peak driver. Fewer deaths ⇒ fewer rebind failures
+[2026-10-23] [DONE]    —    App-side confirmation taken (device unlocked by the user,
+                               Settings page open). At 20:08:54 — label recomputed by
+                               `onResume` → `refreshPermissions()`, not a stale render —
+                               the app reported 无障碍服务 = **Disconnected** while
+                               `dumpsys activity services` showed the accessibility
+                               ServiceRecord bound to pid 28809 with `hasBound=true`,
+                               stable for ~2 minutes. **Mode (b) is real: the system binds
+                               and the app's coordinator still says DEGRADED**
+[2026-10-23] [DONE]    —    …and the app's view does reach READY: at 20:29:54 a
+                               non-allowlisted task ("go to the home screen", a
+                               DirectTool route, not a DirectIntent) passed
+                               `sendTask`'s accessibility gate with no "connecting"
+                               system line and no Settings jump — which only the READY
+                               branch does. So `instance` was set at that moment. The
+                               binding state the app sees **oscillates** DEGRADED ↔ READY
+                               over minutes; two samples 21 minutes apart caught
+                               opposite phases
+[2026-10-23] [TRAP]    —    **`uiautomator dump` rebinds the accessibility service on
+                               this device.** Every dump is followed ~1-3s later by a new
+                               ServiceRecord (19:59:22 dump → 19:59:25 record; 20:07:02
+                               dump → 20:07:01 record; 20:09:12 dump → 20:09:11 record).
+                               Control: 12 dumpsys-only samples over 60s left the record
+                               hash unchanged with monotonic age (-3m9s → -4m8s).
+                               **Never interleave UI dumps with binding-state
+                               measurement** — the apparent "20-second rebind flapping"
+                               seen earlier in this session was this artifact, not device
+                               behaviour
+[2026-10-23] [NOTE]    —    The Tier-1 DirectTool failure path hides its error: the chat
+                               shows `Failed: ${route.description}` while the real error
+                               goes only to `ChannelManager` (remote channels)
+                               (`TaskOrchestrator.kt:256-258`). A failed `open_app` is
+                               indistinguishable from a failed anything in the transcript
+[2026-10-23] [NOTE]    —    External automation (`am start … RUN_TASK`) did not dispatch a
+                               task this session — no transcript entry, no gate
+                               evaluation. Probably `isExternalAutomationEnabled()` is
+                               off now. Sending via the chat UI works, but the FAB moves
+                               with the keyboard: closed = (1178, 2627), open =
+                               (1178, 1577). Tapping the closed-keyboard coordinate while
+                               the keyboard is up hits the IME and silently does nothing
+
+### 2026-10-23 — E3 the monitor dialog works, the permission gate in front of it does not
+
+E3's first four steps passed twice on `10AG4J1THX00524` (release 39, zh locale):
+Quick Tasks → BACKGROUND → Monitor card → centered dialog with contact field, app
+dropdown, tone chips and Start button. Contact entry works. The fifth step —
+"monitoring activates" — never ran: tapping Start teleports the user to the app's
+own Settings page instead.
+
+[2026-10-23] [BLOCKED]  E3   `missingMonitorRequirements` demands READY for both
+                               accessibility and notification access, and the app
+                               reports neither. The system says both ARE granted:
+                               the notification-listener page shows PokeClaw as
+                               允许, and `enabled_accessibility_services` still
+                               lists the component while `dumpsys accessibility`
+                               reports it bound. `isRunning()`/`isConnected()` are
+                               in-process `instance != null` statics that never got
+                               set in this process
+[2026-10-23] [FAIL]     —    The same bad state is invisible in task mode, which is
+                               why nobody noticed: `sendTask`'s CONNECTING branch
+                               waits 5s and retries, and `canRunWithoutAccessibility`
+                               allowlists non-interactive tasks. Two paths, one
+                               broken state, different tolerance
+[2026-10-23] [FAIL]     —    Mid-task service drop: `open_app` succeeded, then
+                               `scroll` and two `system_key` calls all answered
+                               "Accessibility service is not running" inside the
+                               same task. Same root cause as E3's block, and the
+                               likely reason the 18:19 run stalled into the watchdog
+[2026-10-23] [FAIL]     —    A rejected Start leaves no chat record. `onTaskTerminal`
+                               routes to `sendExternalAutomationTerminalCallback`,
+                               not the chat UI, so the user gets one Toast and a
+                               page jump with nothing in the transcript
+[2026-10-23] [NOTE]     —    Recovery is unreliable too: `settings delete` + `put`,
+                               `accessibility_enabled` 0/1, and a UI toggle of the
+                               system switch all failed to bring the app to READY.
+                               The Device Notes recipe for force-stop revocation
+                               restores the setting but not a working binding here
+
+### 2026-10-23 — F3/F4 the floating pill was never missing, it was never created
+
+Set out to close F3/F4/F5 on `10AG4J1THX00524` (V2502DA, release 39) on the
+theory that F2's lesson ("the stop control was documented wrong once") applied to
+the pill path too. It does — but the answer is stronger than a wrong description.
+
+[2026-10-23] [BLOCKED]  F3   Floating pill absent while a task ran in another
+                               app. `打开应用 → Opened app: com.android.settings`,
+                               `topResumedActivity` = Settings for 6 consecutive
+                               samples, `dumpsys window windows` listed exactly one
+                               pokeclaw window (the activity), and a screenshot
+                               decoded to 0 pixels of `colorBrandPrimary`. The task
+                               was still inside its 120s watchdog window, so this
+                               is not "the task already ended"
+[2026-10-23] [BLOCKED]  F4   Nothing to tap — same root cause. Second independent
+                               break: `onStopTask` is still the default `{}`, so
+                               even a created pill would no-op on tap. Both ends of
+                               the path (`showFloatingCircle()` entry and the
+                               callback assignment) live in one uncalled function
+[2026-10-23] [PASS]     F5   Second task works. Task 1 (agent loop) completed,
+                               then a Tier-1 task and another agent-loop task were
+                               both accepted with no "Another task is still
+                               running"; FAB went red ~33s into the third run and
+                               returned to send with the answer
+[2026-10-23] [FAIL]     —    A task killed by the inactivity watchdog leaves the
+                               model session locked: the next foreground produced
+                               `Failed to load model: Local model session already
+                               in use`, and a follow-up task did nothing for 90s.
+                               Normal completion releases the lock (F5); watchdog
+                               abort apparently does not. Root cause not located —
+                               belongs to F7/F8, not to F3-F5
+[2026-10-23] [NOTE]     —    The process died of `reason=3 (LOW_MEMORY)` at rss
+                               2.8GB one second after a foreground switch, and the
+                               tool cards later showed why the switch was not agent
+                               navigation (`open_app(com.android.camera2)` failed,
+                               then Back). That run was kept for overlay-window
+                               sampling only; one clean cross-app sample exists### 2026-10-20 — CI1 the emulator smoke harness reported red for a healthy app
 
 Run `39240300241` (API 35) failed; the other five API levels and `Build debug APK`
 passed. Not caused by the commit under test — that one touched only Markdown.
