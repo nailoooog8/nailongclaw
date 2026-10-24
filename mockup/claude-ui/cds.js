@@ -181,6 +181,13 @@
     // 标题改成中性文案：写死「给妈妈订高铁票」会让真实使用显得像被冒充。
     var title = document.querySelector('.topbar-title');
     if (title) title.textContent = '新任务';
+    // 抽屉记忆库行的「· 128 条」是设计稿的示例计数，真实模式下是谎报。
+    var memBtn = document.getElementById('memoryBtn');
+    if (memBtn) {
+      Array.prototype.forEach.call(memBtn.childNodes, function (n) {
+        if (n.nodeType === 3 && n.nodeValue.indexOf('记忆库') !== -1) n.nodeValue = '记忆库';
+      });
+    }
     // 静态示例 turn（工具卡 / MCP 卡 / 记忆 chips）只属于纯浏览器里的设计稿。
     // 三类示例现在都有真实数据源（工具卡 H23、MCP 卡 H27、chips 2026-10-24），
     // 真实界面里再摆一段虚构的「给妈妈订高铁票」对话就不是示例而是冒充了。
@@ -644,16 +651,86 @@
     if (e.key === 'Escape') closeNav();
   });
 
-  /* --------------------------------------------- 设置行
-     真实模式下是活的：PokeClawChat.openSettings 进原生设置页 ——
-     这块页面在手机宽度没有侧栏之外的出口，而 LLM / MCP / 无障碍
-     全部在设置里，主界面不能没有这扇门。设计稿里静默不动。 */
+  /* --------------------------------------------- 设置面板
+     Claude 的设置形态：从侧栏唤起的弹层 sheet。行点击经
+     PokeClawChat.openSettingsPage(section) 打开对应原生编辑页；
+     纯浏览器里这是设计稿的一部分，行静默不动。开合经
+     notifySettingsView 通知 Kotlin，Android BACK 键据此先关面板。 */
+  var settingsView = document.getElementById('settingsView');
+  var settingsScrim = document.getElementById('settingsScrim');
+
+  function openSettingsView() {
+    if (!settingsView) return;
+    settingsView.setAttribute('data-open', 'true');
+    if (settingsScrim) settingsScrim.setAttribute('data-open', 'true');
+    if (window.PokeClawChat && window.PokeClawChat.notifySettingsView) {
+      window.PokeClawChat.notifySettingsView(true);
+    }
+  }
+
+  function closeSettingsView() {
+    if (!settingsView) return;
+    settingsView.setAttribute('data-open', 'false');
+    if (settingsScrim) settingsScrim.setAttribute('data-open', 'false');
+    if (window.PokeClawChat && window.PokeClawChat.notifySettingsView) {
+      window.PokeClawChat.notifySettingsView(false);
+    }
+  }
+
+  function settingsViewIsOpen() {
+    return !!settingsView && settingsView.getAttribute('data-open') === 'true';
+  }
+
+  if (settingsScrim) {
+    settingsScrim.addEventListener('click', closeSettingsView);
+  }
+  var settingsCloseBtn = document.getElementById('settingsCloseBtn');
+  if (settingsCloseBtn) {
+    settingsCloseBtn.addEventListener('click', closeSettingsView);
+  }
+  if (settingsView) {
+    settingsView.addEventListener('click', function (e) {
+      var row = e.target.closest('.settings-row');
+      if (!row) return;
+      var section = row.getAttribute('data-section');
+      if (!section) return;
+      if (window.PokeClawChat && window.PokeClawChat.openSettingsPage) {
+        window.PokeClawChat.openSettingsPage(section);
+      }
+    });
+  }
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeSettingsView();
+  });
+
+  /* --------------------------------------------- 侧栏脚部行
+     抽屉里的「设置」打开页内设置面板（不再直达原生）——
+     面板里才有分区的原生编辑页入口。
+     「记忆库」「技能管理」是外移的直达行：真实模式下经桥进对应原生页，
+     设计稿里静默不动。 */
   var settingsBtn = document.getElementById('settingsBtn');
   if (settingsBtn) {
     settingsBtn.addEventListener('click', function () {
       closeNav();
-      if (window.PokeClawChat && window.PokeClawChat.openSettings) {
-        window.PokeClawChat.openSettings();
+      openSettingsView();
+    });
+  }
+  var memoryBtn = document.getElementById('memoryBtn');
+  if (memoryBtn) {
+    memoryBtn.addEventListener('click', function () {
+      closeNav();
+      if (window.PokeClawChat && window.PokeClawChat.openSettingsPage) {
+        window.PokeClawChat.openSettingsPage('memory');
+      }
+    });
+  }
+  var skillsBtn = document.getElementById('skillsBtn');
+  if (skillsBtn) {
+    skillsBtn.addEventListener('click', function () {
+      closeNav();
+      if (window.PokeClawChat && window.PokeClawChat.openSettingsPage) {
+        window.PokeClawChat.openSettingsPage('skills');
       }
     });
   }
@@ -799,6 +876,9 @@
     removeConfirmation: removeConfirmation,
     enterLiveMode: enterLiveMode,
     hasNativeBridge: hasNativeBridge,
+    openSettingsView: openSettingsView,
+    closeSettingsView: closeSettingsView,
+    settingsViewIsOpen: settingsViewIsOpen,
     rateLimit: triggerBackoff,
     resetRateLimit: function () {
       clearInterval(backoff.timer); backoff.timer = null;

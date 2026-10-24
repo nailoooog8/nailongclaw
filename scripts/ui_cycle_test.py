@@ -117,8 +117,12 @@ def open_settings() -> bool:
 
     From the preview home the path is the sidebar drawer: hamburger
     (aria-label 会话列表) -> 设置 row — both WebView nodes, visible in the
-    uiautomator dump. From the old chat screen the 设置 row is a Compose node
-    with the same label, so the final lookup is shared.
+    uiautomator dump. Since H30 the 设置 row opens the in-page settings
+    sheet, not the native page; the native SettingsActivity sits behind the
+    sheet's 全部设置 row. (The sheet is visibility:hidden while closed, so it
+    contributes no nodes to the dump and the lookups stay unambiguous.) From
+    the old chat screen the 设置 row is a Compose node with the same label,
+    so that path still lands on the native page directly.
     """
     go_home()
     time.sleep(1)
@@ -138,6 +142,13 @@ def open_settings() -> bool:
     if not pt:
         return False
     tap(pt)
+    time.sleep(1.5)
+    if "ClaudeUiPreviewActivity" in focus():
+        # The in-page settings sheet is up; the native page is one row deeper.
+        pt = find("全部设置")
+        if not pt:
+            return False
+        tap(pt)
     time.sleep(3)
     return "SettingsActivity" in focus()
 

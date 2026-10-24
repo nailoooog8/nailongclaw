@@ -20,6 +20,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import androidx.activity.OnBackPressedCallback
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.core.view.ViewCompat
@@ -36,7 +37,13 @@ import io.agents.pokeclaw.ui.chat.ChatHistoryManager
 import io.agents.pokeclaw.ui.chat.ChatSessionController
 import io.agents.pokeclaw.ui.chat.ChatSessionUiState
 import io.agents.pokeclaw.ui.chat.TaskFlowController
+import io.agents.pokeclaw.ui.settings.ChannelConfigActivity
+import io.agents.pokeclaw.ui.settings.LlmConfigActivity
+import io.agents.pokeclaw.ui.settings.McpServersActivity
+import io.agents.pokeclaw.ui.settings.MemoryActivity
 import io.agents.pokeclaw.ui.settings.SettingsActivity
+import io.agents.pokeclaw.ui.settings.ThemeActivity
+import io.agents.pokeclaw.ui.settings.UserSkillsActivity
 import io.agents.pokeclaw.utils.XLog
 import java.util.concurrent.Executors
 
@@ -72,6 +79,14 @@ class ClaudeUiPreviewActivity : BaseActivity() {
     private lateinit var webView: WebView
     private var qaReceiver: BroadcastReceiver? = null
     private val executor = Executors.newSingleThreadExecutor()
+
+    /**
+     * Whether the page's in-WebView settings sheet is open. The page is the
+     * source of truth and reports every transition through the
+     * `notifySettingsView` bridge method; this flag only drives BACK
+     * handling (close the sheet first, exit the activity second).
+     */
+    private var settingsViewOpen = false
 
     private val sink by lazy {
         WebChatSink(
@@ -203,23 +218,50 @@ class ClaudeUiPreviewActivity : BaseActivity() {
         }
 
         /**
-         * JS → Kotlin: open the native settings screen.
+         * JS → Kotlin: open one of the native settings editors.
          *
-         * The WebView page has no sidebar at phone widths (the mockup hides it
-         * under 760px), so the topbar gear is the only way out of this surface.
-         * Since it became the app's home screen (2026-10-24, SplashActivity
-         * routes here) that matters beyond convenience: LLM, MCP and the
-         * accessibility service all live behind SettingsActivity, and a home
-         * screen without a settings exit strands a fresh install.
+         * The page's settings sheet is presentation only — every row lands in
+         * the native activity that owns the real behaviour, so the config logic
+         * stays in exactly one place. `all` opens the full SettingsActivity
+         * (permissions, monitor, about — the parts the sheet deliberately does
+         * not duplicate). An unknown section is logged and dropped rather than
+         * guessed at.
          */
         @JavascriptInterface
-        fun openSettings() {
-            XLog.e(TAG, "[chat] openSettings()")
+        fun openSettingsPage(section: String?) {
+            val target = when (section) {
+                "model" -> LlmConfigActivity::class.java
+                "channels" -> ChannelConfigActivity::class.java
+                "mcp" -> McpServersActivity::class.java
+                "skills" -> UserSkillsActivity::class.java
+                "memory" -> MemoryActivity::class.java
+                "theme" -> ThemeActivity::class.java
+                "all" -> SettingsActivity::class.java
+                else -> {
+                    XLog.e(TAG, "[chat] openSettingsPage('$section') ignored — unknown section")
+                    return
+                }
+            }
+            XLog.e(TAG, "[chat] openSettingsPage($section)")
             runOnUiThread {
                 // `this` inside the bridge object is the bridge, not the
                 // activity — the Intent constructor needs the qualified label.
-                startActivity(Intent(this@ClaudeUiPreviewActivity, SettingsActivity::class.java))
+                startActivity(Intent(this@ClaudeUiPreviewActivity, target))
             }
+        }
+
+        /**
+         * JS → Kotlin: the page's settings sheet opened or closed.
+         *
+         * Only used for BACK handling: while the sheet is up, BACK should
+         * close it instead of leaving the app. The page notifies on every
+         * transition (open, X button, scrim tap, row navigation never closes
+         * it) so the flag cannot drift from what the user sees.
+         */
+        @JavascriptInterface
+        fun notifySettingsView(open: Boolean) {
+            XLog.e(TAG, "[chat] notifySettingsView($open)")
+            runOnUiThread { settingsViewOpen = open }
         }
     }
 
@@ -507,6 +549,24 @@ class ClaudeUiPreviewActivity : BaseActivity() {
             WindowInsetsCompat.CONSUMED
         }
         setContentView(chrome)
+
+        // BACK while the page's settings sheet is open closes the sheet
+        // instead of leaving the app. The flag is maintained by the page
+        // itself (notifySettingsView); the JS call lands asynchronously, so
+        // the sheet's own close handler reports the transition.
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (settingsViewOpen) {
+                    webView.evaluateJavascript(
+                        "window.__cds && window.__cds.closeSettingsView();", null
+                    )
+                } else {
+                    isEnabled = false
+                    onBackPressedDispatcher.onBackPressed()
+                    isEnabled = true
+                }
+            }
+        })
         // Scheduled AFTER setContentView, not inside the apply{} above: a
         // View that is not yet attached has no handler to drain its message
         // queue, so postDelayed there silently never runs. That produced a

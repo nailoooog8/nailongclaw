@@ -718,8 +718,11 @@ class SettingsActivity : BaseActivity() {
         //
         // Since the same day it is also the app's main screen (SplashActivity
         // routes there), so this entry is a shortcut back to it from wherever
-        // Settings was reached — the surface itself opens Settings through the
-        // PokeClawChat.openSettings bridge on its sidebar's 设置 row.
+        // Settings was reached. On the surface itself, the sidebar's 设置 row
+        // opens an in-page CDS settings sheet whose rows launch the native
+        // editors (model / channels / MCP / skills / memory / theme) through
+        // the PokeClawChat.openSettingsPage bridge — this full page is the
+        // sheet's 「全部设置」 row.
         //
         // ClaudeUiPreviewActivity is exported="false" on purpose, so `adb shell
         // am start` cannot reach it either (SecurityException: not exported from
