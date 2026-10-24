@@ -45,30 +45,67 @@ class ChannelConfigActivity : BaseActivity() {
                 return
             }
 
+        // CDS chrome: this page is the sheet's 渠道接入 row landing spot.
+        val cds = io.agents.pokeclaw.ui.cds.CdsUi.palette(this)
+        window.decorView.setBackgroundColor(cds.surface1)
+        val contentFrame = findViewById<android.view.ViewGroup>(android.R.id.content)
+        contentFrame?.setBackgroundColor(cds.surface1)
+        (contentFrame?.getChildAt(0) as? android.view.View)?.setBackgroundColor(cds.surface1)
+
         initToolbar(channelType)
-        initViews(channelType)
+        initViews(channelType, cds)
     }
 
     private fun initToolbar(channelType: ChannelType) {
+        val cds = io.agents.pokeclaw.ui.cds.CdsUi.palette(this)
+        val title = when (channelType) {
+            ChannelType.DISCORD -> getString(R.string.channel_config_discord_title)
+            ChannelType.TELEGRAM -> getString(R.string.channel_config_telegram_title)
+            ChannelType.WECHAT -> getString(R.string.channel_config_wechat_title)
+            ChannelType.QQ -> getString(R.string.channel_config_qq_title)
+            ChannelType.DOUYIN -> getString(R.string.channel_config_douyin_title)
+        }
         findViewById<CommonToolbar>(R.id.toolbar).apply {
-            setTitle(when (channelType) {
-                ChannelType.DISCORD -> getString(R.string.channel_config_discord_title)
-                ChannelType.TELEGRAM -> getString(R.string.channel_config_telegram_title)
-                ChannelType.WECHAT -> getString(R.string.channel_config_wechat_title)
-                ChannelType.QQ -> getString(R.string.channel_config_qq_title)
-                ChannelType.DOUYIN -> getString(R.string.channel_config_douyin_title)
-            })
+            setTitle(title)
+            io.agents.pokeclaw.ui.cds.CdsUi.styleToolbar(
+                this@ChannelConfigActivity, this, cds, title
+            )
             showBackButton(true) { finish() }
         }
     }
 
-    private fun initViews(channelType: ChannelType) {
+    private fun initViews(channelType: ChannelType, cds: io.agents.pokeclaw.ui.cds.CdsUi.Palette) {
         val tvTip = findViewById<TextView>(R.id.tvTip)
         val tvLabel1 = findViewById<TextView>(R.id.tvLabel1)
         val tvLabel2 = findViewById<TextView>(R.id.tvLabel2)
         etInput1 = findViewById(R.id.etInput1)
         etInput2 = findViewById(R.id.etInput2)
         val ivToggle = findViewById<ImageView>(R.id.ivTogglePassword)
+
+        // CDS text + input treatment over the XML defaults (the two CardView
+        // input wells become surface-3 fields; EditTexts keep bg @null inside).
+        tvTip.setTextColor(cds.textMuted)
+        tvLabel1.setTextColor(cds.textPrimary)
+        tvLabel2.setTextColor(cds.textPrimary)
+        findViewById<TextView>(R.id.tvLanConfigHint)?.setTextColor(cds.textMuted)
+        findViewById<ImageView>(R.id.ivCopyAddress)?.setColorFilter(cds.textMuted)
+        listOf(etInput1, etInput2).forEach {
+            it.setTextColor(cds.textPrimary)
+            it.setHintTextColor(cds.textMuted)
+        }
+        (etInput1.parent.parent as? androidx.cardview.widget.CardView)?.apply {
+            setCardBackgroundColor(cds.surface3)
+            cardElevation = 0f
+        }
+        (etInput2.parent.parent as? androidx.cardview.widget.CardView)?.apply {
+            setCardBackgroundColor(cds.surface3)
+            cardElevation = 0f
+        }
+        ivToggle.setColorFilter(cds.textMuted)
+        findViewById<KButton>(R.id.btnSave).apply {
+            setBgColor(cds.accent)
+            setTextColor(cds.onAccent)
+        }
 
         when (channelType) {
             ChannelType.DISCORD -> {

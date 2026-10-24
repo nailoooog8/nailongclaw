@@ -37,7 +37,6 @@ import io.agents.pokeclaw.ui.chat.ChatHistoryManager
 import io.agents.pokeclaw.ui.chat.ChatSessionController
 import io.agents.pokeclaw.ui.chat.ChatSessionUiState
 import io.agents.pokeclaw.ui.chat.TaskFlowController
-import io.agents.pokeclaw.ui.settings.ChannelConfigActivity
 import io.agents.pokeclaw.ui.settings.LlmConfigActivity
 import io.agents.pokeclaw.ui.settings.McpServersActivity
 import io.agents.pokeclaw.ui.settings.MemoryActivity
@@ -231,7 +230,10 @@ class ClaudeUiPreviewActivity : BaseActivity() {
         fun openSettingsPage(section: String?) {
             val target = when (section) {
                 "model" -> LlmConfigActivity::class.java
-                "channels" -> ChannelConfigActivity::class.java
+                // ChannelConfigActivity needs an EXTRA_CHANNEL_TYPE and finishes
+                // without one — the sheet row cannot pick a channel, so it lands
+                // on the full page that owns the per-channel rows instead.
+                "channels" -> SettingsActivity::class.java
                 "mcp" -> McpServersActivity::class.java
                 "skills" -> UserSkillsActivity::class.java
                 "memory" -> MemoryActivity::class.java

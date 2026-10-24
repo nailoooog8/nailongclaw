@@ -3,7 +3,6 @@
 
 package io.agents.pokeclaw.ui.settings
 
-import android.graphics.Color
 import android.graphics.Rect
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
@@ -30,7 +29,6 @@ import io.agents.pokeclaw.agent.llm.ActiveModelMode
 import io.agents.pokeclaw.agent.llm.LocalModelManager
 import io.agents.pokeclaw.agent.llm.ModelConfigRepository
 import io.agents.pokeclaw.base.BaseActivity
-import io.agents.pokeclaw.ui.chat.ThemeManager
 import io.agents.pokeclaw.utils.KVUtils
 import io.agents.pokeclaw.widget.CommonToolbar
 import io.agents.pokeclaw.widget.KButton
@@ -48,21 +46,17 @@ class LlmConfigActivity : BaseActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_llm_config)
 
-        // Apply dark theme from ThemeManager to match rest of app
-        val tc = ThemeManager.getColors()
-        window.statusBarColor = tc.toolbarBg
-        window.decorView.setBackgroundColor(tc.bg)
+        // CDS tokens: this page is the sheet's 模型与预算 row. The chat
+        // ThemeManager (ember) stays with the chat surfaces only.
+        val cds = io.agents.pokeclaw.ui.cds.CdsUi.palette(this)
+        window.decorView.setBackgroundColor(cds.surface1)
         val contentFrame = findViewById<android.view.ViewGroup>(android.R.id.content)
-        contentFrame?.setBackgroundColor(tc.bg)
-        (contentFrame?.getChildAt(0) as? View)?.setBackgroundColor(tc.bg)
+        contentFrame?.setBackgroundColor(cds.surface1)
+        (contentFrame?.getChildAt(0) as? View)?.setBackgroundColor(cds.surface1)
 
-        findViewById<CommonToolbar>(R.id.toolbar).apply {
-            setTitle("Models")
-            showBackButton(true) { finish() }
-            setBackgroundColor(tc.toolbarBg)
-            setTitleColor(tc.aiText)
-            findViewById<android.widget.ImageView>(R.id.ivBack)?.setColorFilter(tc.aiText)
-        }
+        val toolbar = findViewById<CommonToolbar>(R.id.toolbar)
+        io.agents.pokeclaw.ui.cds.CdsUi.styleToolbar(this, toolbar, cds, "模型")
+        toolbar.showBackButton(true) { finish() }
 
         // Include user's custom local model URL (#36) at the tail of the rendered list.
         val models = LocalModelManager.AVAILABLE_MODELS + listOfNotNull(LocalModelManager.customModel())
@@ -80,28 +74,35 @@ class LlmConfigActivity : BaseActivity() {
         val deviceSupport = LocalModelManager.deviceSupport(this)
         val catalog = LocalModelManager.catalog(this).associateBy { it.model.id }
 
-        // Apply theme to active model card text
-        activeModelName.setTextColor(tc.aiText)
-        activeModelMeta.setTextColor(Color.parseColor("#8b949e"))
-        defaultLocalName.setTextColor(tc.aiText)
-        defaultLocalMeta.setTextColor(Color.parseColor("#8b949e"))
-        defaultCloudName.setTextColor(tc.aiText)
-        defaultCloudMeta.setTextColor(Color.parseColor("#8b949e"))
+        // Active-model card text
+        activeModelName.setTextColor(cds.textPrimary)
+        activeModelMeta.setTextColor(cds.textMuted)
+        defaultLocalName.setTextColor(cds.textPrimary)
+        defaultLocalMeta.setTextColor(cds.textMuted)
+        defaultCloudName.setTextColor(cds.textPrimary)
+        defaultCloudMeta.setTextColor(cds.textMuted)
 
-        // Apply theme to all CardViews in XML layout
+        // Restyle every CardView + section header in the XML layout
         val scrollContent = findViewById<LinearLayout>(R.id.layoutModelList)?.parent as? LinearLayout
         if (scrollContent != null) {
+            // Nested caption/field labels ("Default local model", "API Key", …)
+            // are id-less TextViews at label sizes — recolor for dark mode but
+            // keep their metrics (the big emoji avatars are larger, so spared).
+            // Runs BEFORE the header pass so the direct-child group labels win.
+            styleNestedLabels(scrollContent, cds)
             for (i in 0 until scrollContent.childCount) {
                 val child = scrollContent.getChildAt(i)
                 if (child is TextView && child.id == View.NO_ID) {
                     // Section headers ("Active Model", "Available Models", "Cloud LLM")
-                    child.setTextColor(Color.parseColor("#8b949e"))
+                    io.agents.pokeclaw.ui.cds.CdsUi.styleGroupLabel(child, cds)
                 }
                 if (child is CardView) {
-                    child.setCardBackgroundColor(tc.toolbarBg)
+                    child.setCardBackgroundColor(cds.surface2)
+                    child.cardElevation = 0f
                 }
             }
         }
+        findViewById<TextView>(R.id.tvCustomHint)?.setTextColor(cds.textMuted)
 
         // Active model — show what is ACTUALLY active based on provider
         if (resolvedConfig.activeMode == ActiveModelMode.LOCAL) {
@@ -113,7 +114,7 @@ class LlmConfigActivity : BaseActivity() {
                 when (activeState.statusKind) {
                     LocalModelManager.StatusKind.READY -> getColor(R.color.colorSuccessPrimary)
                     LocalModelManager.StatusKind.WARNING -> getColor(R.color.colorWarningPrimary)
-                    LocalModelManager.StatusKind.NEUTRAL -> Color.parseColor("#8b949e")
+                    LocalModelManager.StatusKind.NEUTRAL -> cds.textMuted
                 }
             )
         } else {
@@ -128,7 +129,7 @@ class LlmConfigActivity : BaseActivity() {
                 activeModelName.text = "未选择模型"
                 activeModelMeta.text = "在下方配置云端模型"
                 activeModelStatus.text = "● 未配置"
-                activeModelStatus.setTextColor(Color.parseColor("#8b949e"))
+                activeModelStatus.setTextColor(cds.textMuted)
             }
         }
 
@@ -140,7 +141,7 @@ class LlmConfigActivity : BaseActivity() {
             when (defaultLocalState.statusKind) {
                 LocalModelManager.StatusKind.READY -> getColor(R.color.colorSuccessPrimary)
                 LocalModelManager.StatusKind.WARNING -> getColor(R.color.colorWarningPrimary)
-                LocalModelManager.StatusKind.NEUTRAL -> Color.parseColor("#8b949e")
+                LocalModelManager.StatusKind.NEUTRAL -> cds.textMuted
             }
         )
 
@@ -153,7 +154,7 @@ class LlmConfigActivity : BaseActivity() {
             defaultCloudName.text = "未设置默认云端模型"
             defaultCloudMeta.text = "在下方配置云端模型"
             defaultCloudStatus.text = "● 未配置"
-            defaultCloudStatus.setTextColor(Color.parseColor("#8b949e"))
+            defaultCloudStatus.setTextColor(cds.textMuted)
         }
 
         val activeLocalModelId = if (resolvedConfig.activeMode == ActiveModelMode.LOCAL) resolvedConfig.local.modelId else ""
@@ -180,9 +181,9 @@ class LlmConfigActivity : BaseActivity() {
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 ).apply { bottomMargin = dp(6) }
-                radius = dp(12).toFloat()
-                cardElevation = dp(1).toFloat()
-                setCardBackgroundColor(tc.toolbarBg)
+                radius = dp(10).toFloat()
+                cardElevation = 0f
+                setCardBackgroundColor(cds.surface2)
             }
 
             val row = LinearLayout(this).apply {
@@ -200,7 +201,7 @@ class LlmConfigActivity : BaseActivity() {
             val nameTV = TextView(this).apply {
                 text = model.displayName
                 textSize = 14f
-                setTextColor(tc.aiText)
+                setTextColor(cds.textPrimary)
                 if (isActive) setTypeface(typeface, android.graphics.Typeface.BOLD)
             }
             info.addView(nameTV)
@@ -209,7 +210,7 @@ class LlmConfigActivity : BaseActivity() {
                 val baseText = "${model.sizeBytes / 1_000_000} MB · ${model.minRamGb}GB+ RAM"
                 text = if (supportedOnDevice) baseText else "$baseText · This phone reports ${deviceSupport.deviceRamGb}GB"
                 textSize = 12f
-                setTextColor(if (supportedOnDevice) Color.parseColor("#8b949e") else getColor(R.color.colorWarningPrimary))
+                setTextColor(if (supportedOnDevice) cds.textMuted else getColor(R.color.colorWarningPrimary))
             }
             info.addView(descTV)
 
@@ -237,7 +238,7 @@ class LlmConfigActivity : BaseActivity() {
                         val useBtn = TextView(this).apply {
                             text = "使用"
                             textSize = 13f
-                            setTextColor(getColor(R.color.colorBrandPrimary))
+                            setTextColor(cds.accent)
                             setPadding(dp(12), dp(6), dp(12), dp(6))
                             setOnClickListener {
                                 val path = resolvedLocalPath
@@ -285,7 +286,7 @@ class LlmConfigActivity : BaseActivity() {
                     val dlBtn = TextView(this).apply {
                         text = "↓ 下载"
                         textSize = 13f
-                        setTextColor(getColor(R.color.colorInfoPrimary))
+                        setTextColor(cds.accent)
                         setPadding(dp(12), dp(6), dp(12), dp(6))
                         setOnClickListener {
                             if (isDownloading) {
@@ -345,7 +346,18 @@ class LlmConfigActivity : BaseActivity() {
         updateStorageInfo()
 
         // Cloud LLM — Provider tabs + model cards
-        setupCloudLlm(tc)
+        setupCloudLlm(cds)
+    }
+
+    /** Recolors id-less label TextViews (≤14sp) anywhere under `root`. */
+    private fun styleNestedLabels(root: android.view.ViewGroup, cds: io.agents.pokeclaw.ui.cds.CdsUi.Palette) {
+        for (i in 0 until root.childCount) {
+            val child = root.getChildAt(i)
+            if (child is TextView && child.id == View.NO_ID && child.textSize <= dp(14)) {
+                child.setTextColor(cds.textSecondary)
+            }
+            if (child is android.view.ViewGroup) styleNestedLabels(child, cds)
+        }
     }
 
     private fun updateStorageInfo() {
@@ -367,7 +379,7 @@ class LlmConfigActivity : BaseActivity() {
         findViewById<TextView>(R.id.tvStorageDetail).text = "已用 ${mbUsed} MB / 配额 ${allocated} MB"
     }
 
-    private fun setupCloudLlm(tc: ThemeManager.ChatColors) {
+    private fun setupCloudLlm(cds: io.agents.pokeclaw.ui.cds.CdsUi.Palette) {
         val tabLayout = findViewById<LinearLayout>(R.id.layoutProviderTabs)
         val modelListLayout = findViewById<LinearLayout>(R.id.layoutCloudModels)
         val layoutBaseUrl = findViewById<View>(R.id.layoutBaseUrl)
@@ -386,6 +398,18 @@ class LlmConfigActivity : BaseActivity() {
         }
 
         installKeyboardAwareScrolling(scrollView, listOf(etApiKey, etBaseUrl, etModelName))
+
+        // CDS input treatment on the credential fields
+        listOf(etApiKey, etBaseUrl, etModelName).forEach {
+            io.agents.pokeclaw.ui.cds.CdsUi.styleEditText(it, cds)
+        }
+        tvStatus?.setTextColor(cds.textMuted)
+        btnTest?.setTextColor(cds.accent)
+        btnClear?.setTextColor(cds.textMuted)
+        btnSave?.apply {
+            setBgColor(cds.accent)
+            setTextColor(cds.onAccent)
+        }
 
         // Clear API key button
         btnClear.setOnClickListener {
@@ -421,13 +445,15 @@ class LlmConfigActivity : BaseActivity() {
         fun updateTabStyles() {
             tabViews.forEach { (provider, tab) ->
                 if (provider == selectedProvider) {
-                    tab.setTextColor(Color.WHITE)
+                    // Selected tab = CDS fill-secondary ghost pill with primary text
+                    tab.setTextColor(cds.textPrimary)
+                    tab.setTypeface(tab.typeface, android.graphics.Typeface.BOLD)
                     tab.background = GradientDrawable().apply {
                         cornerRadius = dp(16).toFloat()
-                        setColor(getColor(R.color.colorBrandPrimary))
+                        setColor(cds.fillSecondary)
                     }
                 } else {
-                    tab.setTextColor(Color.parseColor("#8b949e"))
+                    tab.setTextColor(cds.textMuted)
                     tab.background = null
                 }
             }
@@ -455,12 +481,10 @@ class LlmConfigActivity : BaseActivity() {
                         LinearLayout.LayoutParams.WRAP_CONTENT
                     ).apply { bottomMargin = dp(6) }
                     radius = dp(10).toFloat()
-                    cardElevation = dp(1).toFloat()
-                    setCardBackgroundColor(if (isSelected) Color.parseColor("#2A1F1A") else tc.toolbarBg)
-                    if (isSelected) {
-                        // Orange border for selected
-                        setContentPadding(dp(2), dp(2), dp(2), dp(2))
-                    }
+                    cardElevation = 0f
+                    // Selected card carries the accent-subtle wash (the CDS
+                    // selected-state tint), unselected ones stay surface-2.
+                    setCardBackgroundColor(if (isSelected) cds.accentSubtle else cds.surface2)
                     setOnClickListener {
                         selectedModelId = model.id
                         renderModels()
@@ -477,7 +501,7 @@ class LlmConfigActivity : BaseActivity() {
                 val dot = TextView(this).apply {
                     text = if (isSelected) "◉" else "○"
                     textSize = 16f
-                    setTextColor(if (isSelected) getColor(R.color.colorBrandPrimary) else Color.parseColor("#8b949e"))
+                    setTextColor(if (isSelected) cds.accent else cds.textMuted)
                     setPadding(0, 0, dp(10), 0)
                 }
                 row.addView(dot)
@@ -494,7 +518,7 @@ class LlmConfigActivity : BaseActivity() {
                 nameRow.addView(TextView(this).apply {
                     text = model.displayName
                     textSize = 14f
-                    setTextColor(tc.aiText)
+                    setTextColor(cds.textPrimary)
                     if (isSelected) setTypeface(typeface, android.graphics.Typeface.BOLD)
                 })
                 // Recommended badge
@@ -510,7 +534,7 @@ class LlmConfigActivity : BaseActivity() {
                 info.addView(TextView(this).apply {
                     text = "${model.tier.stars} ${model.tier.label} · \$${model.inputPricePerM} / \$${model.outputPricePerM} / 每百万 tokens"
                     textSize = 11f
-                    setTextColor(Color.parseColor("#8b949e"))
+                    setTextColor(cds.textMuted)
                 })
                 row.addView(info)
 
@@ -521,7 +545,7 @@ class LlmConfigActivity : BaseActivity() {
         renderModels()
 
         // Provider tab switch — load per-provider saved API key
-        fun switchProvider(provider: CloudProvider, colors: ThemeManager.ChatColors) {
+        fun switchProvider(provider: CloudProvider) {
             selectedProvider = provider
             selectedModelId = when {
                 provider == CloudProvider.CUSTOM -> cloudSeed.modelName
@@ -536,7 +560,7 @@ class LlmConfigActivity : BaseActivity() {
         }
         // Re-assign click listeners with the inner function
         tabViews.forEach { (provider, tab) ->
-            tab.setOnClickListener { switchProvider(provider, tc) }
+            tab.setOnClickListener { switchProvider(provider) }
         }
 
         // Test Connection
@@ -548,7 +572,7 @@ class LlmConfigActivity : BaseActivity() {
             }
             tvStatus.visibility = View.VISIBLE
             tvStatus.text = "测试中…"
-            tvStatus.setTextColor(Color.parseColor("#8b949e"))
+            tvStatus.setTextColor(cds.textMuted)
 
             executor.submit {
                 try {

@@ -44,31 +44,28 @@ class MemoryActivity : BaseActivity() {
     private lateinit var actionsGroup: MenuGroup
     private var searchQuery: String = ""
 
+    /** CDS palette (follows system night mode), shared by all render passes. */
+    private val cds by lazy { io.agents.pokeclaw.ui.cds.CdsUi.palette(this) }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         MemoryStore.init(this)
 
-        val tc = ThemeManager.getColors()
-        window.statusBarColor = tc.toolbarBg
-        window.decorView.setBackgroundColor(tc.bg)
+        window.decorView.setBackgroundColor(cds.surface1)
 
         setContentView(R.layout.activity_memory)
 
         val contentFrame = findViewById<ViewGroup>(android.R.id.content)
-        contentFrame?.setBackgroundColor(tc.bg)
-        (contentFrame?.getChildAt(0) as? ViewGroup)?.setBackgroundColor(tc.bg)
+        contentFrame?.setBackgroundColor(cds.surface1)
+        (contentFrame?.getChildAt(0) as? ViewGroup)?.setBackgroundColor(cds.surface1)
 
-        findViewById<CommonToolbar>(R.id.toolbar).apply {
-            setTitle("记忆库")
-            setTitleColor(tc.aiText)
-            setBackgroundColor(tc.toolbarBg)
-            showBackButton(true) { finish() }
-            findViewById<android.widget.ImageView>(R.id.ivBack)?.setColorFilter(tc.aiText)
-        }
+        val toolbar = findViewById<CommonToolbar>(R.id.toolbar)
+        io.agents.pokeclaw.ui.cds.CdsUi.styleToolbar(this, toolbar, cds, "记忆库")
+        toolbar.showBackButton(true) { finish() }
 
         findViewById<EditText>(R.id.etSearch).apply {
-            setTextColor(tc.aiText)
+            io.agents.pokeclaw.ui.cds.CdsUi.styleEditText(this, cds)
             addTextChangedListener(object : TextWatcher {
                 override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
                 override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
@@ -80,15 +77,14 @@ class MemoryActivity : BaseActivity() {
         }
 
         memoryGroup = findViewById(R.id.memoryGroup)
-        memoryGroup.setTitleColor(tc.aiText)
-        memoryGroup.setCardBackgroundColor(tc.toolbarBg)
+        memoryGroup.applyCds(cds)
 
         actionsGroup = findViewById(R.id.actionsGroup)
-        actionsGroup.setTitleColor(tc.aiText)
-        actionsGroup.setCardBackgroundColor(tc.toolbarBg)
+        actionsGroup.applyCds(cds)
 
         findViewById<TextView>(R.id.tvFooter).apply {
-            setTextColor(tc.aiText)
+            setTextColor(cds.textMuted)
+            setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11f)
         }
     }
 
@@ -116,7 +112,6 @@ class MemoryActivity : BaseActivity() {
     }
 
     private fun renderMemories() {
-        val tc = ThemeManager.getColors()
         memoryGroup.clearMenuItems()
 
         val entries = filtered()
@@ -129,8 +124,8 @@ class MemoryActivity : BaseActivity() {
                 onClick = {},
                 showDivider = false
             ).apply {
-                setTitleColor(tc.aiText)
-                setLeadingIconColor(tc.aiText)
+                setTitleColor(cds.textMuted)
+                setLeadingIconColor(cds.textMuted)
                 setShowTrailingIcon(false)
             }
             return
@@ -145,7 +140,7 @@ class MemoryActivity : BaseActivity() {
                 onClick = { showEditDialog(entry) },
                 showDivider = true
             ).apply {
-                setTitleColor(tc.aiText)
+                setTitleColor(cds.textPrimary)
                 setTrailingText(
                     buildString {
                         append(entry.kindLabel)
@@ -158,9 +153,9 @@ class MemoryActivity : BaseActivity() {
                         }
                     }
                 )
-                setTrailingTextColor(tc.aiText)
-                setLeadingIconColor(tc.aiText)
-                setTrailingIconColor(tc.aiText)
+                setTrailingTextColor(if (conflicted) cds.danger else cds.textSecondary)
+                setLeadingIconColor(cds.textPrimary)
+                setTrailingIconColor(cds.textMuted)
                 setOnLongClickListener {
                     showDeleteDialog(entry)
                     true
@@ -202,7 +197,6 @@ class MemoryActivity : BaseActivity() {
     // ── Actions ───────────────────────────────────────────────────────────────
 
     private fun renderActions() {
-        val tc = ThemeManager.getColors()
         actionsGroup.clearMenuItems()
         actionsGroup.setTitle("管理")
 
@@ -221,11 +215,11 @@ class MemoryActivity : BaseActivity() {
             },
             showDivider = true
         ).apply {
-            setTitleColor(tc.aiText)
+            setTitleColor(cds.textPrimary)
             setTrailingText(if (enabled) "开启" else "关闭")
-            setTrailingTextColor(if (enabled) tc.sendColor else tc.aiText)
-            setLeadingIconColor(tc.aiText)
-            setTrailingIconColor(tc.aiText)
+            setTrailingTextColor(if (enabled) cds.accent else cds.textMuted)
+            setLeadingIconColor(cds.textPrimary)
+            setTrailingIconColor(cds.textMuted)
         }
 
         actionsGroup.addMenuItem(
@@ -234,9 +228,9 @@ class MemoryActivity : BaseActivity() {
             onClick = { showEditDialog(null) },
             showDivider = true
         ).apply {
-            setTitleColor(tc.aiText)
-            setLeadingIconColor(tc.aiText)
-            setTrailingIconColor(tc.aiText)
+            setTitleColor(cds.accent)
+            setLeadingIconColor(cds.accent)
+            setTrailingIconColor(cds.textMuted)
         }
 
         actionsGroup.addMenuItem(
@@ -248,9 +242,9 @@ class MemoryActivity : BaseActivity() {
             onClick = { exportAndShare() },
             showDivider = true
         ).apply {
-            setTitleColor(tc.aiText)
-            setLeadingIconColor(tc.aiText)
-            setTrailingIconColor(tc.aiText)
+            setTitleColor(cds.textPrimary)
+            setLeadingIconColor(cds.textPrimary)
+            setTrailingIconColor(cds.textMuted)
         }
 
         actionsGroup.addMenuItem(
@@ -259,9 +253,9 @@ class MemoryActivity : BaseActivity() {
             onClick = { showClearDialog() },
             showDivider = true
         ).apply {
-            setTitleColor(tc.aiText)
-            setLeadingIconColor(tc.aiText)
-            setTrailingIconColor(tc.aiText)
+            setTitleColor(cds.textPrimary)
+            setLeadingIconColor(cds.danger)
+            setTrailingIconColor(cds.textMuted)
         }
 
         // Forgetting leaves a fingerprint so the agent cannot re-learn the fact.
@@ -273,9 +267,9 @@ class MemoryActivity : BaseActivity() {
             onClick = { showSuppressionListDialog() },
             showDivider = false
         ).apply {
-            setTitleColor(tc.aiText)
-            setLeadingIconColor(tc.aiText)
-            setTrailingIconColor(tc.aiText)
+            setTitleColor(cds.textPrimary)
+            setLeadingIconColor(cds.textPrimary)
+            setTrailingIconColor(cds.textMuted)
         }
     }
 

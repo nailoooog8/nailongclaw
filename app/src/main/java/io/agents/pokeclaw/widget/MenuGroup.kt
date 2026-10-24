@@ -4,6 +4,7 @@
 package io.agents.pokeclaw.widget
 
 import android.content.Context
+import android.graphics.Typeface
 import android.util.AttributeSet
 import android.view.LayoutInflater
 import android.widget.FrameLayout
@@ -12,6 +13,7 @@ import android.widget.TextView
 import com.google.android.material.card.MaterialCardView
 import androidx.core.view.isVisible
 import io.agents.pokeclaw.R
+import io.agents.pokeclaw.ui.cds.CdsUi
 
 /**
  * Menu group component - rounded card container with a title
@@ -26,11 +28,40 @@ class MenuGroup @JvmOverloads constructor(
     private val cardContainer: MaterialCardView
     private val itemsContainer: LinearLayout
 
+    /** When set (via [applyCds]), newly added items pick up CDS defaults. */
+    private var cdsPalette: CdsUi.Palette? = null
+
     init {
         LayoutInflater.from(context).inflate(R.layout.widget_menu_group, this, true)
         tvTitle = findViewById(R.id.tvTitle)
         cardContainer = findViewById(R.id.cardContainer)
         itemsContainer = findViewById(R.id.itemsContainer)
+    }
+
+    /**
+     * Restyle the group onto the Claude Design System: the `--cds-panel` card
+     * (surface-2, hairline border, 10px radius, no elevation) and a
+     * `.group-label`-styled title. Also arms the palette so items added later
+     * inherit CDS defaults without every caller restating them.
+     */
+    fun applyCds(palette: CdsUi.Palette) {
+        cdsPalette = palette
+        cardContainer.setCardBackgroundColor(palette.surface2)
+        cardContainer.radius = CdsUi.dp(context, 10f)
+        cardContainer.strokeWidth = CdsUi.dp(context, 1)
+        cardContainer.setStrokeColor(palette.border)
+        cardContainer.cardElevation = 0f
+        tvTitle.apply {
+            setTextColor(palette.textMuted)
+            setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11f)
+            setTypeface(typeface, Typeface.BOLD)
+            letterSpacing = 0.02f
+            // group-label sits ~4px inside the card margin, not 32dp deep
+            setPadding(
+                CdsUi.dp(context, 4), paddingTop,
+                CdsUi.dp(context, 4), paddingBottom
+            )
+        }
     }
 
     /**
@@ -82,6 +113,13 @@ class MenuGroup @JvmOverloads constructor(
             trailingIcon?.let { setTrailingIcon(it) }
             setShowTrailingIcon(showTrailingIcon)
             setShowDivider(showDivider)
+            cdsPalette?.let { cds ->
+                setTitleColor(cds.textPrimary)
+                setTrailingTextColor(cds.textSecondary)
+                setLeadingIconColor(cds.textPrimary)
+                setTrailingIconColor(cds.textMuted)
+                setDividerColor(cds.border)
+            }
         }
         itemsContainer.addView(item)
         return item

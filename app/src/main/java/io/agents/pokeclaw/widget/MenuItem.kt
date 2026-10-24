@@ -124,6 +124,13 @@ class MenuItem @JvmOverloads constructor(
     }
 
     /**
+     * Set divider color (used by the CDS restyle to switch to the palette's hairline)
+     */
+    fun setDividerColor(color: Int) {
+        divider.background = android.graphics.drawable.ColorDrawable(color)
+    }
+
+    /**
      * Get trailing text
      */
     fun getTrailingText(): CharSequence? {

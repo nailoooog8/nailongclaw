@@ -35,36 +35,33 @@ class McpServersActivity : BaseActivity() {
     private lateinit var serversGroup: MenuGroup
     private var configs: List<McpServerConfig> = emptyList()
 
+    /** CDS palette (follows system night mode), shared by all render passes. */
+    private val cds by lazy { io.agents.pokeclaw.ui.cds.CdsUi.palette(this) }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val tc = io.agents.pokeclaw.ui.chat.ThemeManager.getColors()
-        window.statusBarColor = tc.toolbarBg
-        window.decorView.setBackgroundColor(tc.bg)
+        window.decorView.setBackgroundColor(cds.surface1)
 
         setContentView(R.layout.activity_mcp_servers)
 
         val contentFrame = findViewById<android.view.ViewGroup>(android.R.id.content)
-        contentFrame?.setBackgroundColor(tc.bg)
-        (contentFrame?.getChildAt(0) as? android.view.View)?.setBackgroundColor(tc.bg)
+        contentFrame?.setBackgroundColor(cds.surface1)
+        (contentFrame?.getChildAt(0) as? android.view.View)?.setBackgroundColor(cds.surface1)
 
-        findViewById<CommonToolbar>(R.id.toolbar).apply {
-            setTitle("MCP 服务器")
-            setTitleColor(tc.aiText)
-            setBackgroundColor(tc.toolbarBg)
-            showBackButton(true) { finish() }
-            findViewById<android.widget.ImageView>(R.id.ivBack)?.setColorFilter(tc.aiText)
-        }
+        val toolbar = findViewById<CommonToolbar>(R.id.toolbar)
+        io.agents.pokeclaw.ui.cds.CdsUi.styleToolbar(this, toolbar, cds, "MCP 服务器")
+        toolbar.showBackButton(true) { finish() }
 
         serversGroup = findViewById(R.id.serversGroup)
-        serversGroup.setTitleColor(tc.aiText)
-        serversGroup.setCardBackgroundColor(tc.toolbarBg)
+        serversGroup.applyCds(cds)
 
         findViewById<TextView>(R.id.tvConfigPath)?.apply {
             text = "配置存储于 mcp_servers.json（应用外部目录），与 adb 推送方式兼容。\n" +
                 "鉴权 Header 值以 enc:v1: 开头的密文保存，请在应用内填写。\n" +
                 "点击服务器编辑，长按删除。"
-            setTextColor(tc.aiText)
+            setTextColor(cds.textMuted)
+            setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11f)
         }
 
         lifecycleScope.launch {
@@ -97,7 +94,6 @@ class McpServersActivity : BaseActivity() {
     }
 
     private fun renderServerItems() {
-        val tc = io.agents.pokeclaw.ui.chat.ThemeManager.getColors()
         serversGroup.clearMenuItems()
         serversGroup.setTitle("Servers（${configs.size}）")
 
@@ -108,12 +104,19 @@ class McpServersActivity : BaseActivity() {
                 onClick = { showEditDialog(config) },
                 showDivider = true
             ).apply {
-                setTitle(if (config.enabled) config.name else config.name + "（已停用）")
-                setTrailingText(statusText(config.name))
-                setTitleColor(tc.aiText)
-                setTrailingTextColor(if (config.enabled) tc.sendColor else tc.aiText)
-                setLeadingIconColor(tc.aiText)
-                setTrailingIconColor(tc.aiText)
+                if (config.enabled) {
+                    setTitle(config.name)
+                    setTrailingText(statusText(config.name))
+                    setTitleColor(cds.textPrimary)
+                    setTrailingTextColor(cds.textSecondary)
+                } else {
+                    setTitle(config.name + "（已停用）")
+                    setTrailingText(statusText(config.name))
+                    setTitleColor(cds.textMuted)
+                    setTrailingTextColor(cds.textMuted)
+                }
+                setLeadingIconColor(cds.textPrimary)
+                setTrailingIconColor(cds.textMuted)
                 setOnLongClickListener {
                     showDeleteDialog(config)
                     true
@@ -128,8 +131,8 @@ class McpServersActivity : BaseActivity() {
             onClick = { showEditDialog(null) },
             showDivider = false
         ).apply {
-            setTitleColor(tc.sendColor)
-            setLeadingIconColor(tc.sendColor)
+            setTitleColor(cds.accent)
+            setLeadingIconColor(cds.accent)
             setShowTrailingIcon(false)
         }
     }

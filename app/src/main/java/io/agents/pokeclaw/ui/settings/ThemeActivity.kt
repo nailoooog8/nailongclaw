@@ -10,6 +10,7 @@ import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.view.children
 import io.agents.pokeclaw.R
 import io.agents.pokeclaw.base.BaseActivity
 import io.agents.pokeclaw.utils.KVUtils
@@ -39,24 +40,42 @@ class ThemeActivity : BaseActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val tc = io.agents.pokeclaw.ui.chat.ThemeManager.getColors()
-        window.statusBarColor = tc.toolbarBg
-        window.decorView.setBackgroundColor(tc.bg)
+        // Chrome rides the CDS tokens (this page is the sheet's 主题 row);
+        // the preview cards below intentionally keep their ThemeManager colors —
+        // they depict the themes being picked, not the page chrome.
+        val cds = io.agents.pokeclaw.ui.cds.CdsUi.palette(this)
+        window.decorView.setBackgroundColor(cds.surface1)
 
         setContentView(R.layout.activity_theme)
 
         val contentFrame = findViewById<android.view.ViewGroup>(android.R.id.content)
-        contentFrame?.setBackgroundColor(tc.bg)
-        (contentFrame?.getChildAt(0) as? android.view.View)?.setBackgroundColor(tc.bg)
+        contentFrame?.setBackgroundColor(cds.surface1)
+        (contentFrame?.getChildAt(0) as? android.view.View)?.setBackgroundColor(cds.surface1)
 
-        findViewById<CommonToolbar>(R.id.toolbar).apply {
-            setTitle(getString(R.string.settings_group_appearance))
-            setTitleColor(tc.aiText)
-            setBackgroundColor(tc.toolbarBg)
-            showBackButton(true) { finish() }
-            findViewById<android.widget.ImageView>(R.id.ivBack)?.setColorFilter(tc.aiText)
+        val toolbar = findViewById<CommonToolbar>(R.id.toolbar)
+        io.agents.pokeclaw.ui.cds.CdsUi.styleToolbar(
+            this, toolbar, cds, getString(R.string.settings_group_appearance)
+        )
+        toolbar.showBackButton(true) { finish() }
+        findViewById<TextView>(R.id.tvCurrentTheme)?.apply {
+            setTextColor(cds.textMuted)
+            setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12f)
         }
-        findViewById<TextView>(R.id.tvCurrentTheme)?.setTextColor(tc.aiText)
+
+        // Section headers ("Dark Themes" / "Light Themes") are unmarked TextViews
+        // in the scroll column; restyle them as CDS group labels.
+        val content = findViewById<android.view.ViewGroup>(android.R.id.content)
+        val root = content?.getChildAt(0) as? android.view.ViewGroup
+        val scroll = root?.children?.filterIsInstance<android.widget.ScrollView>()?.firstOrNull()
+        val column = scroll?.getChildAt(0) as? android.view.ViewGroup
+        column?.let { col ->
+            for (i in 0 until col.childCount) {
+                val v = col.getChildAt(i)
+                if (v is TextView && v.id == View.NO_ID) {
+                    io.agents.pokeclaw.ui.cds.CdsUi.styleGroupLabel(v, cds)
+                }
+            }
+        }
 
         selectedThemeId = KVUtils.getString("THEME_ID", "ember_dark")
 

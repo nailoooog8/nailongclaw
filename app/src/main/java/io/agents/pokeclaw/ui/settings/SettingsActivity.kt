@@ -84,6 +84,9 @@ class SettingsActivity : BaseActivity() {
         ViewModelProvider(this)[SettingsViewModel::class.java]
     }
 
+    /** CDS palette for this page (follows system night mode; resolved once per instance). */
+    private val cds by lazy { io.agents.pokeclaw.ui.cds.CdsUi.palette(this) }
+
     // Keep MenuItem references for dynamic updates
     private val menuItems = mutableMapOf<String, MenuItem>()
 
@@ -103,22 +106,21 @@ class SettingsActivity : BaseActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Force match theme from ThemeManager
-        val themeColors = io.agents.pokeclaw.ui.chat.ThemeManager.getColors()
-        window.statusBarColor = themeColors.toolbarBg
-        window.decorView.setBackgroundColor(themeColors.bg)
+        // The full settings page rides the same CDS tokens as the WebView sheet
+        // that links here (「全部设置」 row) — not the chat ThemeManager.
+        window.decorView.setBackgroundColor(cds.surface1)
 
         setContentView(R.layout.activity_settings)
 
-        // Override XML backgrounds with ThemeManager colors
+        // Override XML backgrounds with the CDS canvas color
         val contentFrame = findViewById<android.view.ViewGroup>(android.R.id.content)
-        contentFrame?.setBackgroundColor(themeColors.bg)
+        contentFrame?.setBackgroundColor(cds.surface1)
         // Root LinearLayout has android:background="@color/colorBgPrimary" — override it
-        (contentFrame?.getChildAt(0) as? android.view.View)?.setBackgroundColor(themeColors.bg)
+        (contentFrame?.getChildAt(0) as? android.view.View)?.setBackgroundColor(cds.surface1)
 
-        initToolbar()
+        initToolbar(cds)
+        applyCdsToGroups(cds)
         initMenuGroups()
-        applyThemeToGroups(themeColors)
         observeViewModel()
     }
 
@@ -191,6 +193,9 @@ class SettingsActivity : BaseActivity() {
         externalAutomationItem?.setTrailingText(
             if (KVUtils.isExternalAutomationEnabled()) "Enabled" else "Disabled"
         )
+        externalAutomationItem?.setTrailingTextColor(
+            if (KVUtils.isExternalAutomationEnabled()) cds.accent else cds.textMuted
+        )
     }
 
     /** Refreshes the trailing label on the global-prompt row (#45). */
@@ -215,36 +220,21 @@ class SettingsActivity : BaseActivity() {
         customModelUrlItem?.setTrailingText(label)
     }
 
-    private fun initToolbar() {
-        findViewById<CommonToolbar>(R.id.toolbar).apply {
-            setTitle(getString(R.string.settings_title))
-            showBackButton(true) { finish() }
-        }
+    private fun initToolbar(cds: io.agents.pokeclaw.ui.cds.CdsUi.Palette) {
+        val toolbar = findViewById<CommonToolbar>(R.id.toolbar)
+        io.agents.pokeclaw.ui.cds.CdsUi.styleToolbar(
+            this, toolbar, cds, getString(R.string.settings_title)
+        )
+        toolbar.showBackButton(true) { finish() }
     }
 
-    private fun applyThemeToGroups(tc: io.agents.pokeclaw.ui.chat.ThemeManager.ChatColors) {
+    private fun applyCdsToGroups(cds: io.agents.pokeclaw.ui.cds.CdsUi.Palette) {
         val groups = listOf(
             R.id.permissionsGroup, R.id.channelGroup, R.id.modelGroup,
             R.id.appearanceGroup, R.id.toolsGroup, R.id.remoteGroup, R.id.aboutGroup
         )
         for (id in groups) {
-            val g = findViewById<MenuGroup>(id) ?: continue
-            g.setTitleColor(tc.aiText)
-            g.setCardBackgroundColor(tc.toolbarBg)
-            for (i in 0 until g.getMenuItemCount()) {
-                g.getMenuItemAt(i)?.apply {
-                    setTitleColor(tc.aiText)
-                    setTrailingTextColor(tc.sendColor)
-                    setLeadingIconColor(tc.aiText)
-                    setTrailingIconColor(tc.aiText)
-                }
-            }
-        }
-        // Toolbar
-        findViewById<CommonToolbar>(R.id.toolbar)?.apply {
-            setBackgroundColor(tc.toolbarBg)
-            setTitleColor(tc.aiText)
-            findViewById<android.widget.ImageView>(R.id.ivBack)?.setColorFilter(tc.aiText)
+            findViewById<MenuGroup>(id)?.applyCds(cds)
         }
     }
 
@@ -402,7 +392,6 @@ class SettingsActivity : BaseActivity() {
             onClick = { viewModel.onMenuItemClick(SettingsViewModel.MenuAction.LAN_CONFIG) },
             showDivider = false
         )
-        menuItems[SettingsViewModel.MenuAction.LAN_CONFIG.name]?.setLeadingIconColor(getColor(R.color.colorTextPrimary))
 
 
         val modelGroup = findViewById<MenuGroup>(R.id.modelGroup)
@@ -414,7 +403,6 @@ class SettingsActivity : BaseActivity() {
             onClick = { viewModel.onMenuItemClick(SettingsViewModel.MenuAction.LLM_CONFIG) },
             showDivider = false
         )
-        menuItems[SettingsViewModel.MenuAction.LLM_CONFIG.name]?.setLeadingIconColor(getColor(R.color.colorTextPrimary))
 
         // Task Budget (inline in model group)
         modelGroup.addMenuItem(
@@ -447,7 +435,6 @@ class SettingsActivity : BaseActivity() {
             },
             showDivider = false
         )
-        globalPromptItem?.setLeadingIconColor(getColor(R.color.colorTextPrimary))
         refreshGlobalPromptStatus()
 
         // Custom Local Model URL (#36) — advanced: lets users add their own model download URL
@@ -497,7 +484,6 @@ class SettingsActivity : BaseActivity() {
             },
             showDivider = false
         )
-        customModelUrlItem?.setLeadingIconColor(getColor(R.color.colorTextPrimary))
         refreshCustomModelUrlStatus()
 
         // Appearance
@@ -538,7 +524,6 @@ class SettingsActivity : BaseActivity() {
             onClick = { startActivity(Intent(this, McpServersActivity::class.java)) },
             showDivider = false
         ).apply {
-            setLeadingIconColor(getColor(R.color.colorTextPrimary))
             setTrailingText(refreshMcpServerCount())
         }
 
@@ -549,7 +534,6 @@ class SettingsActivity : BaseActivity() {
             onClick = { startActivity(Intent(this, UserSkillsActivity::class.java)) },
             showDivider = true
         ).apply {
-            setLeadingIconColor(getColor(R.color.colorTextPrimary))
         }
 
         // Long-term memory bank — what the agent carries between sessions
@@ -559,7 +543,6 @@ class SettingsActivity : BaseActivity() {
             onClick = { startActivity(Intent(this, MemoryActivity::class.java)) },
             showDivider = true
         ).apply {
-            setLeadingIconColor(getColor(R.color.colorTextPrimary))
             setTrailingText(refreshMemoryCount())
         }
 
@@ -574,14 +557,17 @@ class SettingsActivity : BaseActivity() {
                 keepAliveItem?.setTrailingText(
                     if (enabled) getString(R.string.settings_on) else getString(R.string.settings_off)
                 )
+                keepAliveItem?.setTrailingTextColor(if (enabled) cds.accent else cds.textMuted)
                 ForegroundService.syncToBackgroundState(this)
             },
             showDivider = false
         ).apply {
-            setLeadingIconColor(getColor(R.color.colorTextPrimary))
             setTrailingText(
                 if (ForegroundService.isPersistentKeepAliveEnabled()) getString(R.string.settings_on)
                 else getString(R.string.settings_off)
+            )
+            setTrailingTextColor(
+                if (ForegroundService.isPersistentKeepAliveEnabled()) cds.accent else cds.textMuted
             )
         }
 
@@ -598,10 +584,12 @@ class SettingsActivity : BaseActivity() {
             showDivider = true
         ).apply {
             val token = KVUtils.getTelegramBotToken()
+            val connected = token.isNotEmpty()
             setTrailingText(
-                if (token.isNotEmpty()) getString(R.string.settings_status_connected)
+                if (connected) getString(R.string.settings_status_connected)
                 else getString(R.string.settings_status_not_connected)
             )
+            setTrailingTextColor(if (connected) cds.accent else cds.textMuted)
         }
 
         externalAutomationItem = remoteGroup.addMenuItem(
@@ -610,10 +598,12 @@ class SettingsActivity : BaseActivity() {
             onClick = { toggleExternalAutomation() },
             showDivider = true
         ).apply {
+            val enabled = KVUtils.isExternalAutomationEnabled()
             setTrailingText(
-                if (KVUtils.isExternalAutomationEnabled()) getString(R.string.settings_status_enabled)
+                if (enabled) getString(R.string.settings_status_enabled)
                 else getString(R.string.settings_status_disabled)
             )
+            setTrailingTextColor(if (enabled) cds.accent else cds.textMuted)
         }
 
         remoteGroup.addMenuItem(
@@ -705,7 +695,6 @@ class SettingsActivity : BaseActivity() {
         ).apply {
             setTrailingText(getString(R.string.settings_about_sponsor_desc))
             // ic_heart ships white; without this it disappears in the light theme.
-            setLeadingIconColor(getColor(R.color.colorTextPrimary))
         }
 
         // Claude UI surface. Was a design-review entry showing hardcoded HTML;
@@ -744,7 +733,6 @@ class SettingsActivity : BaseActivity() {
             },
             showDivider = false
         ).apply {
-            setLeadingIconColor(getColor(R.color.colorTextPrimary))
         }
     }
 
@@ -1085,9 +1073,13 @@ class SettingsActivity : BaseActivity() {
             setPadding(48, 32, 48, 16)
         }
 
+        // System AlertDialog is light-themed, so the fields keep fixed dark
+        // text (same convention as the MCP / skill / memory dialogs).
+        val fieldColor = 0xFF333333.toInt()
+
         val tokenLabel = android.widget.TextView(this).apply {
             text = "单任务最大 token 数"
-            setTextColor(getColor(R.color.colorTextPrimary))
+            setTextColor(fieldColor)
         }
         layout.addView(tokenLabel)
 
@@ -1110,7 +1102,7 @@ class SettingsActivity : BaseActivity() {
 
         val costLabel = android.widget.TextView(this).apply {
             text = "\n单任务成本上限（美元）"
-            setTextColor(getColor(R.color.colorTextPrimary))
+            setTextColor(fieldColor)
         }
         layout.addView(costLabel)
 
@@ -1118,7 +1110,7 @@ class SettingsActivity : BaseActivity() {
             inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
             hint = "留空 = 不设成本上限"
             setText(currentCost?.let { String.format("%.2f", it) } ?: "")
-            setTextColor(getColor(R.color.colorTextPrimary))
+            setTextColor(fieldColor)
         }
         layout.addView(costInput)
 

@@ -31,30 +31,26 @@ class UserSkillsActivity : BaseActivity() {
     private lateinit var skillsGroup: MenuGroup
     private var files: List<File> = emptyList()
 
+    /** CDS palette (follows system night mode), shared by all render passes. */
+    private val cds by lazy { io.agents.pokeclaw.ui.cds.CdsUi.palette(this) }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val tc = io.agents.pokeclaw.ui.chat.ThemeManager.getColors()
-        window.statusBarColor = tc.toolbarBg
-        window.decorView.setBackgroundColor(tc.bg)
+        window.decorView.setBackgroundColor(cds.surface1)
 
         setContentView(R.layout.activity_user_skills)
 
         val contentFrame = findViewById<android.view.ViewGroup>(android.R.id.content)
-        contentFrame?.setBackgroundColor(tc.bg)
-        (contentFrame?.getChildAt(0) as? android.view.View)?.setBackgroundColor(tc.bg)
+        contentFrame?.setBackgroundColor(cds.surface1)
+        (contentFrame?.getChildAt(0) as? android.view.View)?.setBackgroundColor(cds.surface1)
 
-        findViewById<CommonToolbar>(R.id.toolbar).apply {
-            setTitle("自定义技能")
-            setTitleColor(tc.aiText)
-            setBackgroundColor(tc.toolbarBg)
-            showBackButton(true) { finish() }
-            findViewById<android.widget.ImageView>(R.id.ivBack)?.setColorFilter(tc.aiText)
-        }
+        val toolbar = findViewById<CommonToolbar>(R.id.toolbar)
+        io.agents.pokeclaw.ui.cds.CdsUi.styleToolbar(this, toolbar, cds, "自定义技能")
+        toolbar.showBackButton(true) { finish() }
 
         skillsGroup = findViewById(R.id.skillsGroup)
-        skillsGroup.setTitleColor(tc.aiText)
-        skillsGroup.setCardBackgroundColor(tc.toolbarBg)
+        skillsGroup.applyCds(cds)
     }
 
     override fun onResume() {
@@ -68,7 +64,6 @@ class UserSkillsActivity : BaseActivity() {
     }
 
     private fun renderItems() {
-        val tc = io.agents.pokeclaw.ui.chat.ThemeManager.getColors()
         skillsGroup.clearMenuItems()
         skillsGroup.setTitle("技能配方（${files.size}）")
 
@@ -91,10 +86,10 @@ class UserSkillsActivity : BaseActivity() {
             ).apply {
                 setTitle(title)
                 setTrailingText(trailing)
-                setTitleColor(tc.aiText)
-                setTrailingTextColor(if (skill == null) tc.sendColor else tc.aiText)
-                setLeadingIconColor(tc.aiText)
-                setTrailingIconColor(tc.aiText)
+                setTitleColor(if (skill == null) cds.textMuted else cds.textPrimary)
+                setTrailingTextColor(if (skill == null) cds.danger else cds.textSecondary)
+                setLeadingIconColor(cds.textPrimary)
+                setTrailingIconColor(cds.textMuted)
                 setOnLongClickListener {
                     showDeleteDialog(file, title)
                     true
@@ -117,8 +112,8 @@ class UserSkillsActivity : BaseActivity() {
             },
             showDivider = false
         ).apply {
-            setTitleColor(if (capture == null) tc.aiText else tc.sendColor)
-            setLeadingIconColor(if (capture == null) tc.aiText else tc.sendColor)
+            setTitleColor(if (capture == null) cds.textMuted else cds.accent)
+            setLeadingIconColor(if (capture == null) cds.textMuted else cds.accent)
             setShowTrailingIcon(false)
         }
 
@@ -129,8 +124,8 @@ class UserSkillsActivity : BaseActivity() {
             onClick = { showEditDialog(null) },
             showDivider = false
         ).apply {
-            setTitleColor(tc.sendColor)
-            setLeadingIconColor(tc.sendColor)
+            setTitleColor(cds.accent)
+            setLeadingIconColor(cds.accent)
             setShowTrailingIcon(false)
         }
 
@@ -138,7 +133,8 @@ class UserSkillsActivity : BaseActivity() {
             text = "技能配方存于应用外部目录 /skills/（*.yaml），与 adb 推送方式兼容，重启后自动加载。\n" +
                 "点击配方可查看/编辑 YAML，长按删除。\n" +
                 "配方引用的工具须在工具注册表中（mcp_* 远程工具允许后注册）。"
-            setTextColor(tc.aiText)
+            setTextColor(cds.textMuted)
+            setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11f)
         }
     }
 
