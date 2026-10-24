@@ -4,6 +4,7 @@
 package io.agents.pokeclaw.agent.skill
 
 import io.agents.pokeclaw.tool.ToolRegistry
+import io.agents.pokeclaw.tool.ToolResult
 import io.agents.pokeclaw.utils.XLog
 
 /**
@@ -26,12 +27,20 @@ class SkillExecutor {
      * @param skill the skill definition
      * @param params user-provided parameter values (e.g., {"query": "cat videos"})
      * @param onProgress callback for each step progress
+     * @param onToolCall callback before each attempt, carrying the tool's
+     *   registry name. Optional; lets the caller surface tool calls the same
+     *   way the agent loop's onToolCall does.
+     * @param onToolResult callback after each attempt, carrying the tool's
+     *   registry name and its result — per attempt, matching the agent loop
+     *   where every call gets exactly one result. Optional.
      * @return SkillResult indicating success or failure
      */
     fun execute(
         skill: Skill,
         params: Map<String, String>,
-        onProgress: ((step: Int, total: Int, description: String) -> Unit)? = null
+        onProgress: ((step: Int, total: Int, description: String) -> Unit)? = null,
+        onToolCall: ((toolName: String) -> Unit)? = null,
+        onToolResult: ((toolName: String, result: ToolResult) -> Unit)? = null,
     ): SkillResult {
         XLog.i(TAG, "Executing skill: ${skill.id} with params: $params")
         val totalSteps = skill.steps.size
@@ -50,8 +59,10 @@ class SkillExecutor {
             var succeeded = false
             for (attempt in 1..step.retries) {
                 try {
+                    onToolCall?.invoke(step.toolName)
                     val toolParams = resolvedParams.mapValues { (_, v) -> v as Any }
                     val result = ToolRegistry.getInstance().executeTool(step.toolName, toolParams)
+                    onToolResult?.invoke(step.toolName, result)
 
                     if (result.isSuccess) {
                         XLog.d(TAG, "Step $stepNum OK: ${result.data?.take(100)}")
@@ -64,6 +75,10 @@ class SkillExecutor {
                         }
                     }
                 } catch (e: Exception) {
+                    onToolResult?.invoke(
+                        step.toolName,
+                        ToolResult.error("Tool execution failed: ${e.message}"),
+                    )
                     XLog.e(TAG, "Step $stepNum exception (attempt $attempt/${step.retries})", e)
                     if (attempt < step.retries) {
                         Thread.sleep(500)

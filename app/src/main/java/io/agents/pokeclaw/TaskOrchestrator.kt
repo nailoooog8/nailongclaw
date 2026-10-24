@@ -173,6 +173,24 @@ class TaskOrchestrator(
 
     fun isTaskRunning(): Boolean = taskSessionStore.isTaskRunning()
 
+    /**
+     * One `TaskEvent.ToolResult` for the UI, from a tool result.
+     *
+     * The single formatter for both paths that execute tools — the agent
+     * loop's `onToolResult` and the skill path (which used to emit nothing at
+     * all, leaving skill steps invisible as tool cards on every surface).
+     * Keeps the 300-char truncation and the display-name mapping in one
+     * place: the truncation is what the chips parser's no-wrong-chip
+     * guarantee is written against (MemoryRecallFormat).
+     */
+    private fun emitToolResultEvent(toolName: String, result: ToolResult) {
+        val success = result.isSuccess
+        var data = if (success) result.data else result.error
+        if (data != null && data.length > 300) data = data.substring(0, 300) + "..."
+        val displayName = io.agents.pokeclaw.tool.ToolRegistry.getInstance().getDisplayName(toolName)
+        taskEventCallback?.invoke(TaskEvent.ToolResult(displayName, success, data ?: ""))
+    }
+
     // ==================== Task Execution ====================
 
     fun cancelCurrentTask() {
@@ -296,11 +314,25 @@ class TaskOrchestrator(
                         FloatingCircleManager.showTaskNotify(task, channel)
                         val watchdog = armWatchdog(channel, messageID)
                         Thread({
-                            val skillResult = skillExecutor.execute(skill, route.params) { step, total, desc ->
-                                watchdog.recordProgress()
-                                taskEventCallback?.invoke(TaskEvent.Progress(step, "Step $step/$total: $desc"))
-                                ForegroundService.updateTaskStatus(ClawApplication.instance, desc)
-                            }
+                            val skillResult = skillExecutor.execute(
+                                skill,
+                                route.params,
+                                onProgress = { step, total, desc ->
+                                    watchdog.recordProgress()
+                                    taskEventCallback?.invoke(TaskEvent.Progress(step, "Step $step/$total: $desc"))
+                                    ForegroundService.updateTaskStatus(ClawApplication.instance, desc)
+                                },
+                                onToolCall = { toolName ->
+                                    watchdog.recordProgress()
+                                    val displayName =
+                                        io.agents.pokeclaw.tool.ToolRegistry.getInstance().getDisplayName(toolName)
+                                    taskEventCallback?.invoke(TaskEvent.ToolAction(displayName))
+                                },
+                                onToolResult = { toolName, result ->
+                                    watchdog.recordProgress()
+                                    emitToolResultEvent(toolName, result)
+                                },
+                            )
                             if (skillResult.success) {
                                 watchdog.disarm()
                                 val session = releaseTask()
@@ -419,12 +451,9 @@ class TaskOrchestrator(
                 watchdog.recordProgress()
                 val app = ClawApplication.instance
                 val success = result.isSuccess
-                var data = if (success) result.data else result.error
-                if (data != null && data.length > 300) data = data.substring(0, 300) + "..."
-                if (!success) XLog.e(TAG, "Tool failed: $toolName $data")
+                if (!success) XLog.e(TAG, "Tool failed: $toolName ${result.error}")
 
-                val displayName = io.agents.pokeclaw.tool.ToolRegistry.getInstance().getDisplayName(toolName)
-                taskEventCallback?.invoke(TaskEvent.ToolResult(displayName, success, data ?: ""))
+                emitToolResultEvent(toolName, result)
 
                 if (toolId == "finish" && result.data?.isNotEmpty() == true) {
                     flushRoundBuffer()
