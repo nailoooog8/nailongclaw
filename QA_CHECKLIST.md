@@ -959,7 +959,7 @@ When in doubt, rerun the smaller bundle first, then expand only if something dri
 - [ ] **H11. Channel group is reachable [RELEASE-OK]**: Settings → scroll to the channel group → Discord / Telegram / WeChat / QQ / Douyin / Pairing PIN / LAN Config rows are ALL visible (this group was `android:visibility="gone"` in `activity_settings.xml`, so the handlers existed in code but had no UI entry) → each opens its `ChannelConfigActivity` page → QQ shows WS URL + Token fields, Douyin shows Webhook URL + Token fields → save → row trailing text flips to Bound
 - [ ] **H12. QQ and Douyin icons render**: Settings → channel group → QQ row shows the penguin icon and Douyin row shows the note icon (they previously used `android.R.drawable.stat_notify_chat` / `ic_media_play` placeholders) → no missing-icon box, tinted consistently with Discord/Telegram/WeChat
 
-### Claude UI experimental surface — promoted 2026-10-18, ships as a product entry
+### Claude UI chat surface — promoted 2026-10-18, ships as a product entry
 
 > This surface used to be a *temporary surface, delete before release*. It was
 > promoted on 2026-10-18: it drives the real task flow (`WebChatSink` →
@@ -971,7 +971,7 @@ When in doubt, rerun the smaller bundle first, then expand only if something dri
 > label is a defect in the docs, not a safety margin — the same class of leak
 > as `.github/FUNDING.yml` shipping a dead sponsor handle (§10.2).
 
-- [x] **H13. The preview page opens and its JS actually runs [PASS — 2026-10-22]**: Settings → About → 「Claude UI 实验版」 → a full-screen page appears. **This is the case that catches the silent bug**: `javaScriptEnabled` was never set, so `cds.js` never ran — theme switching, scroll pinning and the model popover were all dead while the HTML shell still rendered and *looked* fine. Verify JS is live, not just that the page painted:
+- [x] **H13. The preview page opens and its JS actually runs [PASS — 2026-10-22]**: Settings → About → 「Claude UI 聊天」 → a full-screen page appears. **This is the case that catches the silent bug**: `javaScriptEnabled` was never set, so `cds.js` never ran — theme switching, scroll pinning and the model popover were all dead while the HTML shell still rendered and *looked* fine. Verify JS is live, not just that the page painted:
   - tap the theme/accent switcher → the palette changes (proves `cds.js` executed)
   - scroll up mid-conversation → the 「跳至最新」 jump button appears (proves scroll pinning + JS)
   - `adb logcat --pid=$(adb shell pidof io.agents.pokeclaw) -s ClaudeUiPreview` shows `onCreate: loaded https://appassets.androidplatform.net/assets/claude-ui/index.html`
@@ -1018,7 +1018,7 @@ When in doubt, rerun the smaller bundle first, then expand only if something dri
   - **本条最值钱的证据**：`replaceTypingIndicator` 走的是「无指示器则补一条」这条**非默认**契约。若当初图省事让 `ChatSessionSink` 继承 `ChatSink`（no-op 语义），这条回复会被**整个吞掉** —— 用户发完消息界面永远停在「思考中」。真机这一轮把该设计选择验实了。
   - ⚠️ **token/费用计数未取到数值**（**不计入 PASS**）：`XLog` 在 release 下只有 `e` 级进 logcat（§18.12），计数走的是 `XLog.d`；且当次 logcat 缓冲区仅剩 64 行、无 pokeclaw 记录。计数是纯读改写（`sink.sessionTokens += n` ↔ 原 `MutableState.value += n`），`ChatSessionUiStateTest` 已钉住往返，但**真机未观测**。要补验需 debug 包，而设备上是 release 签名、debug 无法覆盖安装（§13.2）。
   - ✅ 附带确认：`onPause` 的 `ConversationCompactor.compact(engine!!, sink.snapshotMessages(), ...)`（§19.6 记的既有越线程隐患，本次未改）本轮未被触发，无 snapshot 异常。
-- [x] **H18. The preview page drives a real task [PASS — 2026-10-18]**: 设置 → 关于 →「Claude UI 实验版」→ 在输入框发一条真实指令 → 确认①用户气泡立即出现②先出现「正在思考…」指示器③随后被真实回复替换④任务完成后仍停留在该页。
+- [x] **H18. The preview page drives a real task [PASS — 2026-10-18]**: 设置 → 关于 →「Claude UI 聊天」→ 在输入框发一条真实指令 → 确认①用户气泡立即出现②先出现「正在思考…」指示器③随后被真实回复替换④任务完成后仍停留在该页。
   - 这是 B 方案（把设计稿接上真实任务流）的验收用例。设计稿此前是**硬编码 HTML**，`cds.js` 只有 `renderBackoff()` 一个渲染函数、全项目零 JS 桥。现在由 `WebChatSink` 实现 `ChatSink`，Kotlin 侧把整份快照 `evaluateJavascript` 给页面，页面按 role 重建 turn。
   - ✅ **真机 PASS（release 包 `PokeClaw_v0.8.3_20261018_171735.apk`，commit `b93b9b4`）**：①用户气泡出现 ②「正在思考…」指示器出现并被替换 ③回复含模型真实输出 ④**回复完成后仍停留在预览页**。
   - ✅ **客观佐证**：`dumpsys activity activities` 的 `topResumedActivity` = `.ui.web.ClaudeUiPreviewActivity`；logcat **无 `FATAL EXCEPTION` / 无 `ANR`**。
@@ -1075,19 +1075,26 @@ When in doubt, rerun the smaller bundle first, then expand only if something dri
     - **单测**：`ChatHistoryManagerLoadTest`（4 例）—— 结构还原 / 摘要里含箭头 / 未知格式保留原文 / 无摘要的行。
     - ✅ **真机 PASS**：用**旧包写下的**历史文件（`- ✓ 截屏 → …` 格式）在新包上恢复，工具卡回来了（无障碍树里 `截屏` 与 `工具调用` 分开、路径单独一行）。**向后兼容也一起验了**：不需要迁移旧文件。
     - ⚠️ 这次恢复之所以会暴露问题，是因为 H14 那 3 轮开关把 Activity 重建了 —— 也就是说**这个缺陷在正常使用中必然出现**，不是只有测试才碰得到。
-- [x] **H27. An MCP tool call waits for the user's decision before it runs**: 配一个只暴露一个工具的 MCP 服务器 → 在 App 里添加该服务器 → 触发一次 `mcp_<name>_<tool>` 调用 → 确认①工具**没有**被执行（服务端调用日志为零）②旗舰聊天页/Claude UI 实验版出现确认卡，带「允许一次 / 始终允许 / 本次拒绝」三个按钮③点「本次拒绝」→ 工具仍不执行，transcript 留下记录④再触发一次，点「允许一次」→ 服务端日志恰好**一次** `tools/call`，且**不记住**（再触发会再次弹卡）⑤点「始终允许」后再触发 → **不再出卡**，直接执行。
+- [x] **H27. An MCP tool call waits for the user's decision before it runs**: 配一个只暴露一个工具的 MCP 服务器 → 在 App 里添加该服务器 → 触发一次 `mcp_<name>_<tool>` 调用 → 确认①工具**没有**被执行（服务端调用日志为零）②旗舰聊天页/Claude UI 聊天出现确认卡，带「允许一次 / 始终允许 / 本次拒绝」三个按钮③点「本次拒绝」→ 工具仍不执行，transcript 留下记录④再触发一次，点「允许一次」→ 服务端日志恰好**一次** `tools/call`，且**不记住**（再触发会再次弹卡）⑤点「始终允许」后再触发 → **不再出卡**，直接执行。
   - ✅ **2026-10-24 真机 PASS（①②③④⑤ 全过）**：设备 `10AG4J1THX00524` / V2502DA，release 41（`PokeClaw_v0.8.3_20261023_214600.apk`）。判据全部以**服务端调用日志**（`scripts/mcp-echo-calls.log`）+ **落盘 transcript** 为准，不靠 App 内的提示。详见 QA Debug Changelog 2026-10-24。
-  - ✅ **两个面的卡都实现了**：旗舰聊天页是 `McpConfirmationSurface` 的 AlertDialog（三按钮），Claude UI 实验版是 `cds.js` 的 `.mcp-card`（`renderConfirmation` + `PokeClawChat.decideMcp`）。本轮真机走的是**旗舰聊天页**；实验版那一侧共用同一套 coordinator，JS 侧的按钮未在真机上点过。
+  - ✅ **两个面的卡都实现了**：旗舰聊天页是 `McpConfirmationSurface` 的 AlertDialog（三按钮），Claude UI 聊天是 `cds.js` 的 `.mcp-card`（`renderConfirmation` + `PokeClawChat.decideMcp`）。本轮真机走的是**旗舰聊天页**；另一侧共用同一套 coordinator，JS 侧的按钮未在真机上点过。
   - ⬜ **「没有可见界面时立即拒绝」一格未在真机验到**（被 fallback 的模型调用反复打岔）。语义由单测钉住。
   - **为什么用技能触发，而不是 `am broadcast`**：`DebugTaskReceiver` 在 release 构建里第一行就 `if (!BuildConfig.DEBUG) return`，LAN 控制台的 `/api/debug/execute` 同样被关。两处关得对，不该为测试打开。改用**用户技能的 Tier 1.5 触发匹配**（确定性正则、0 次 LLM 调用）：`scripts/h27_mcp_echo.yaml`（以及 `_ping` / `_pong`）推到 `<外部文件目录>/skills/`，触发语料 `h27 echo|ping|pong <任意文字>` → `SkillExecutor` → 与 agent loop 同一条 `ToolRegistry.executeTool`，"要不要调这个工具"不再由模型随机决定。
   - **为什么用技能触发，而不是 `am broadcast`**：`DebugTaskReceiver` 在 release 构建里第一行就 `if (!BuildConfig.DEBUG) return`，LAN 控制台的 `/api/debug/execute` 同样被关。两处关得对，不该为测试打开。改用**用户技能的 Tier 1.5 触发匹配**（确定性正则、0 次 LLM 调用）：`scripts/h27_mcp_echo.yaml` 推到 `<外部文件目录>/skills/`，触发语料 `h27 echo <任意文字>` → `SkillExecutor` → 与 agent loop 同一条 `ToolRegistry.executeTool`，"要不要调这个工具"不再由模型随机决定。
   - **服务端**：`scripts/mcp-echo-server.mjs`（Node、零依赖）监听 8801，实现 `initialize` / `notifications/initialized` / `tools/list` / `tools/call`，并把每次 `tools/call` 追加写入 `scripts/mcp-echo-calls.log`。QA 机只有蜂窝与自身热点、与宿主不在同一网络，故用 `adb reverse tcp:8801 tcp:8801` 让设备的 `127.0.0.1:8801` 直通宿主，不需要任何网络配置。
   - **「工具没有执行」怎么证明**：只看服务端调用日志（行数与内容），不看 App 内的任何提示 —— App 说"没执行"不算证据，服务端没收到请求才算。反过来「执行了」也以服务端日志为准。
-  - **两个面都要过**：Claude UI 实验版（`cds.js` 的 `.mcp-card`）与旗舰聊天页（AlertDialog）各注册一个 surface，只有前台那个会收到确认请求。把 App 切到后台再触发 → **立即拒绝**并说明"确认卡不可见"，不占用 60 秒等待。
+  - **两个面都要过**：Claude UI 聊天（`cds.js` 的 `.mcp-card`）与旗舰聊天页（AlertDialog）各注册一个 surface，只有前台那个会收到确认请求。把 App 切到后台再触发 → **立即拒绝**并说明"确认卡不可见"，不占用 60 秒等待。
   - **fail-closed 判据**：先按 HOME 再触发（两个 Activity 都不在前台）→ 立即拒绝，error 里点名原因，服务端零调用。
   - **超时**：60 秒无人应答 → 按拒绝处理，服务端零调用。真机上等满 60 秒代价高，超时这条转移由单测钉住，真机只验「有人应答」与「没有界面」两条。
   - **单测（纯逻辑，无 Android 依赖、无 mock）**：`McpConfirmationGateTest` —— 已记住的允许 / 无界面 / 已有待确认 / 三种决策 / 超时 / 取消；`McpConfirmationCoordinatorTest` —— 无 surface 立即拒绝、短超时（200 ms）无人应答转拒绝、`submit` 后立即放行。
   - ⚠️ **行为变化（同步记入 BACKLOG）**：MCP 工具从"始终可直接执行"变为"需要前台界面里有人点头"。远程渠道本就已被 `ToolRiskPolicy` 拦掉（`mcp_` 一律 HIGH_IMPACT），本次补上的是**本地交互路径**的确认；LAN 控制台与 debug 广播这类"没有交互界面"的路径会拿到明确的拒绝，而不是静默执行。
+
+- [ ] **H28. Memory recall renders as chips, and they survive a restore**: 记忆库里存至少两条可被召回的事实 → 在 Claude UI 聊天页发一条会触发 `memory_recall` 的任务 → 确认①工具步骤渲染成 `.chips`（`#编号 + 内容`，不再是 `.tool-card`）②chip 内容与工具卡正文来自同一条 summary 文本③`am force-stop` 后重开 → 历史恢复后 chips 仍是 chips（不是退化成工具卡）④`memory_recall` 返回空库 / 无匹配文案时**不**出现 chips，回退为普通工具卡。
+  - 数据通路：`TaskEvent.ToolResult.detail`（可能被 300 字符截断）→ `MemoryRecallFormat.chips()` 解析 → `ToolStep.memories` → `WebChatSink` → JSON `memories[]` → `cds.js buildTurn` 画 `.chips`。解析器与格式化器在**同一个文件**（`MemoryRecallFormat`），格式漂移会被 round-trip 单测先抓到。
+  - ⚠️ **截断语义**：`TaskOrchestrator` 对 detail 做 300 字符截断（补 `...`）。被截断的尾部 chip 会**整条丢弃**（lookahead 保证），不会出现内容被腰斩的错 chip；chip 多于约 6 条时尾部的可能不显示，属已知限制——完整文本仍在工具卡的回退正文里。
+  - ⚠️ **Compose 聊天页不渲染 chips**：`ChatScreen` 的 `ToolGroup()` 仍画 summary 全文。chips 是 Web 面的呈现升级，数据两侧共享，Compose 侧要跟随时数据已就位。
+  - ⬜ **真机未跑（2026-10-24）**：新包安装三次被拒（`INSTALL_FAILED_ABORTED: User rejected permissions` —— vivo 的 USB 安装确认弹窗需要人在设备上点允许，且当时通知栏卡在展开态）。**跑前准备已就绪**：`scripts/h28_memory_seed.yaml` / `h28_memory_recall.yaml` 已推到 `<外部文件目录>/skills/`（目录权限 777，H27 修过的坑），装包后重启进程即注册；触发语料 `h28 seed` / `h28 recall <query>`（ASCII——`adb input text` 打不了 CJK，种子内容在 yaml 里）。证据渠道沿用 H27：`uiautomator dump` 读 WebView 文字原文（H25 的方法），chips 判据是 dump 里有 `#<12位hex>` 节点，恢复判据是 `force-stop` 重开后仍在。
+  - ✅ **非设备验证已完成（2026-10-24）**：全量单测 **342 / 36 suites / 0 失败**（新增 `MemoryRecallFormatTest` 7 例、`WebChatSinkTest` 3 例、`ChatHistoryManagerLoadTest` 3 例）；release 包 `PokeClaw_v0.8.3_20261024_150559.apk` 解包验证：`assets/claude-ui/` 恰好三文件、`cds.js` 含 chips 渲染与 `enterLiveMode` 清空逻辑、dex 含 `"memories":[` 与 `memory_recall` 字面量（查 APK，不看 `build/` 中间产物——QA H15 的判据）。
 
 - [x] **H24. Long unbroken text does not overflow its container [PASS — 2026-10-22]**: 发一条会回很长连续文本的消息（截图文件路径、无空格的工具输出）→ 确认文本**换行**而不是被裁掉或撑破卡片。
   - **起因（先量出来的，不是猜的）**：411 dp（V2502DA 逻辑宽度）下 `pre-wrap` **只认换行符，不认超长单词**：
@@ -1112,7 +1119,7 @@ When in doubt, rerun the smaller bundle first, then expand only if something dri
     - 真正的原因是小字号 CJK 的 OCR 误读（11.5 px 等宽字）。**教训**：不要 OCR 小字后当证据上报，要拿源码或 DOM 断言。
   - ✅ **顺带修掉一个真实隐患**：预览页的 asset URL 恒定不变，WebView 资源缓存可能把**上一版构建**的页面端上来 —— 评审就变成了在评一个没装在机上的构建。`ClaudeUiPreviewActivity` 现在 `clearCache(true)` + 按 `BuildConfig.VERSION_CODE` 加查询串（同源，localStorage 里的主题状态不受影响）。
     - 查询串不会让 asset 解析失败：`WebViewAssetLoader.shouldInterceptRequest` 与 `PathMatcher.match` **只读 `uri.getPath()`**，从不看 query（已对 `androidx.webkit:1.12.1` 的 class 反汇编确认，不是凭印象）。
-- [x] **H25. Claude UI shows the final answer after a tool call [PASS — 2026-10-22]**: Open the Claude UI experimental surface on a real device with a local model active → send a safe prompt requiring one read-only `get_screen_info` call followed by a short answer → verify the live tool card appears, then exactly one final assistant answer appears after it, and the task returns to idle. No notification, contact, clipboard, or cloud access. Repeat a no-tool prompt to confirm the ordinary answer path still appears once.
+- [x] **H25. Claude UI shows the final answer after a tool call [PASS — 2026-10-22]**: Open the Claude UI chat surface on a real device with a local model active → send a safe prompt requiring one read-only `get_screen_info` call followed by a short answer → verify the live tool card appears, then exactly one final assistant answer appears after it, and the task returns to idle. No notification, contact, clipboard, or cloud access. Repeat a no-tool prompt to confirm the ordinary answer path still appears once.
   - **根因（读代码读出来的，不是猜的）**：`handleTaskEvent` 在 `TaskEvent.ToolAction` 到达时先 `sink.removeTypingIndicator()` —— **回合中途指示器就被删了**；随后 `TaskEvent.Completed` 调 `replaceTypingIndicator(answer)`，而 `WebChatSink.replaceTypingIndicator` 的语义是**填指示器自己的槽位**，没有指示器就是 **no-op**。最终回答因此无处可落，页面停在工具卡上。
     - 这就是 H23「工具卡接上真实数据」之后才暴露的原因：没有工具就没有 `ToolAction`，指示器一直在，旧的 `replace` 反而是好的。
   - ✅ **修法**：`ChatSink` 新增 `completeAssistantTurn(text, modelName)` —— **有指示器就原地替换，没有就追加**一条助手消息；`TaskFlowController` 的全部终态出口（`Completed` / `Failed` / `Blocked` / 直接工具任务）统一走 `publishAssistantResponse()`，并用 `assistantResponsePublished` 挡掉重复的终态事件（`sendTask` 时重置）。
@@ -1852,6 +1859,25 @@ adb shell run-as io.agents.pokeclaw strings /data/data/io.agents.pokeclaw/files/
 ## QA Debug Changelog
 
 Format: `[date] [status] [test-id] description`
+
+### 2026-10-24 — H28: memory chips get their real data source
+
+The last of the three static sample turns in `index.html` (tool card / MCP card
+/ memory chips) now has a producer: a `memory_recall` tool result is parsed by
+`MemoryRecallFormat` (formatter and parser in one file, round-trip tested) into
+`#id + content` chips that ride the tool step's `memories` field through the
+existing TOOL_GROUP path — persistence included, because a restored transcript
+re-derives the chips from the persisted summary text. With this, the
+"experimental" entry qualifier lost its stated justification and the entry was
+renamed a second time (实验版 → 聊天). The sample turns themselves stay in
+`index.html` for the pure-browser design preview but are cleared the moment
+the Kotlin bridge is present (`enterLiveMode`) — in a live surface a fictional
+conversation is impersonation, not a sample.
+
+[2026-10-24] [NOTE]   —    **装包即受阻**：新 release 包三次 `adb install -r` 被拒（`INSTALL_FAILED_ABORTED: User rejected permissions`），vivo 的安装确认弹窗必须有人在设备上点允许；当时 `mCurrentFocus` 一直停在 `NotificationShade`（通知栏卡在展开态，BACK 也不收）。H28 五格全部留待装包后跑，准备已就绪（见 H28 条目）。
+[2026-10-24] [NOTE]   —    **确定性触发**：沿用 H27 的技能 Tier 1.5 方案。`h28_memory_seed.yaml`（`h28 seed` → 两步 `memory_save`，内容带「H28测试」前缀、内容哈希幂等）与 `h28_memory_recall.yaml`（`h28 recall {msg}` → 一步 `memory_recall`）已推到 `<外部文件目录>/skills/`，重启进程注册。
+[2026-10-24] [PASS]   —    单测（纯逻辑，无 Android 依赖、无 mock）：`MemoryRecallFormatTest` 7 例（round-trip / 压平恢复 / 300 字符截断只丢整条 chip / 空库无匹配零 chip / 内容里的"(命中 N 次)"不提前断开）+ `WebChatSinkTest` 3 例 + `ChatHistoryManagerLoadTest` 3 例。全量 **342 / 36 suites / 0 失败**（基线 329）。
+[2026-10-24] [PASS]   —    装在包里的就是这份代码：解包 `PokeClaw_v0.8.3_20261024_150559.apk`，`assets/claude-ui/` 恰好三文件、`cds.js` 含 chips 渲染与 live 清空逻辑、dex 含 `"memories":[` / `memory_recall` 字面量。
 
 ### 2026-10-24 — H27: an MCP tool call now waits for the user, and the wait is real
 

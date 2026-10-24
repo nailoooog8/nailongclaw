@@ -1,12 +1,13 @@
 # Claude UI 表面（PokeClaw）
 
-这是一个**实验性聊天界面**，不是独立产品。
+这是一个**第二聊天界面**（Claude UI 设计语言），不是独立产品。
 
 - **接真实后端** —— 由 `WebChatSink` 实现 `ChatSink`，驱动的是与旗舰聊天页
   同一个 `TaskFlowController`。composer 经 `PokeClawChat.send` 回调 Kotlin，
   消息经 `evaluateJavascript` 推回页面。
 - 同一份 HTML 在纯浏览器里打开时**仍然是完整设计稿** —— `cds.js` 检测不到
-  桥就退回本地模拟，并把静态控件全部显示出来。
+  桥就退回本地模拟，并把静态控件与示例 turn 全部显示出来；检测到桥
+  （`enterLiveMode`）则清空示例 turn，只走真实数据。
 
 > ⚠️ **本目录确实会进 APK**，通过 `app/build.gradle.kts` 的 `syncClaudeUiMockup`
 > 任务在 `preBuild` 阶段同步到 `build/generated/claudeUiAssets/claude-ui/`，
@@ -15,16 +16,19 @@
 > 验证方式：**解包 APK 看实际路径**，不要只看 `build/` 里的中间产物 ——
 > 中间目录正确不代表最终 APK 正确。
 >
-> 入口：设置 → 关于 →「Claude UI 实验版」。曾是「P1 发布前必删」的临时入口，
+> 入口：设置 → 关于 →「Claude UI 聊天」。曾是「P1 发布前必删」的临时入口，
 > 现在是有产品功能的入口，故那条判据已作废（见 `BACKLOG.md`）。
 >
-> **仍不完整**：**记忆 chips** 仍是静态示例 —— 渲染侧已就绪，缺的是生产侧数据
-> （要接到记忆召回结果）。**MCP 确认卡已于 2026-10-24 接上真实决策回路**（QA H27：
-> `mcp_*` 工具执行前停在界面上等人点头，`PokeClawChat.decideMcp` 把决定送回
-> Kotlin，泊在 `ToolRegistry.executeTool` 里的 agent 线程才继续）。**工具卡片已接
-> 真实数据**（2026-10-19，QA H23），并且在历史恢复后也仍是工具卡（2026-10-22 修了
-> `ChatHistoryManager.load()` 不还原 `toolSteps` 的缺陷，QA H26）—— 这条曾被记成
-> 「生产侧从未被赋值」，那是过时结论。
+> **三类示例 turn 都已接真实数据**：**工具卡片**（2026-10-19，QA H23，2026-10-22
+> 修复历史恢复后丢失，QA H26 —— 「生产侧从未被赋值」是过时结论）；**MCP 确认卡**
+> （2026-10-24，QA H27：`mcp_*` 工具执行前停在界面上等人点头，`PokeClawChat.decideMcp`
+> 把决定送回 Kotlin，泊在 `ToolRegistry.executeTool` 里的 agent 线程才继续）；
+> **记忆 chips**（2026-10-24）：`memory_recall` 的结果文本由 `MemoryRecallFormat`
+> 解析成 `#编号 + 内容`，随工具步骤的 `memories` 字段进页面渲染 `.chips`，
+> 恢复历史时从落盘的 summary 文本重新解析，chips 不丢。
+>
+> 入口随之在 2026-10-24 二次改名：「Claude UI 实验版」→「**Claude UI 聊天**」——
+> 「实验版」的依据（三类卡全是静态示例）已全部失效。真机验收见 QA H28（待跑）。
 >
 > 真机已验证：2026-10-18 配色跨进程存活（QA H13-b）；
 > 2026-10-19 用户确认「能用了」（QA H18 / H20 / H21）；

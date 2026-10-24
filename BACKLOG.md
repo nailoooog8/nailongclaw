@@ -112,8 +112,11 @@ section is not empty, the release is not ready.
 
 - [x] ~~Claude UI design-review surface~~ **已转为功能入口**。原先记为「无产品价值、纯设计评审、
   不得随发布」，但 B 方案落地后它驱动的是真实任务流（见下方「Promote」条）。
-  唯一残留的临时痕迹是 `index.html` 里的静态示例 turn（工具卡 / MCP 卡 / 记忆 chips），
-  它们在 `toolSteps` 喂上数据前应视为示例而非缺陷。
+  ✅ **2026-10-24 静态示例去留已决策**：`index.html` 里的示例 turn（工具卡 / MCP 卡 /
+  记忆 chips）**保留在纯浏览器预览**（同一份 HTML 兼作设计稿，删了就看不到完整设计），
+  但**接上 Kotlin 桥即清空**（`cds.js` 的 `enterLiveMode`）—— 三类示例此时都有真实
+  数据源（H23 / H27 / 2026-10-24 记忆 chips），真实界面里再摆虚构对话是冒充不是示例；
+  首次打开（无历史可恢复）时不清空会让用户误以为任务已经跑过。
 
 - [x] **P1** Promote the Claude UI mockup to a real screen. The user wants the design live, not just viewable. **Both seams are now extracted**: `ChatSink` (`ui/chat/ChatSink.kt`, commit `86e4719`) for the task flow, and `ChatSessionSink` (`ui/chat/ChatSessionSink.kt`) for the session path — a WebView surface implements them and forwards to `evaluateJavascript` instead of re-implementing either flow. Do not shortcut by duplicating the flow — that is exactly the anti-pattern these extractions exist to remove.
   - ⚠️ The two sinks are **deliberately separate types**. `replaceTypingIndicator` has opposite contracts (task flow no-ops when the indicator is gone; session appends so the user's reply is never swallowed). Do not merge them without changing one caller's behaviour on purpose — `TaskFlowUiStateTest` and `ChatSessionUiStateTest` will each break, which is the intended alarm.
@@ -127,7 +130,8 @@ section is not empty, the release is not ready.
   - ✅ **2026-10-19 工具卡已接真实数据**：`ChatSink` 新增 `appendToolStep()`，`handleTaskEvent` 在 `TaskEvent.ToolResult` 到达时写入 `TOOL_GROUP` 消息。**只在结果时落卡** —— `ToolAction` 与 `ToolResult` **并非严格成对**（`TaskOrchestrator:319` 会发一个永远没有结果的 `ToolAction("Retrying with AI agent")`），在 Action 时落卡会留下永久「运行中」的卡片。
     - 之前的判断「缺的是生产侧」是对的：`ChatScreen` 早有 `ToolGroup()` 渲染器、`cds.js` 早就能画 `.tool-card`，两边都在等一个不存在的字段。
     - 全量 **274 tests / 29 suites / 0 失败**（新增 5 例）。**2026-10-19 真机 PASS**，用户确认工具卡出现且工作正常。
-  - ⚠️ **MCP 确认卡曾是静态示例，2026-10-24 已接上真实决策回路**（QA H27 ①③⑤ 真机 PASS）：`mcp_*` 工具执行前会停在界面上等人点头，`McpConfirmationGate` 定策略、`McpConfirmationCoordinator` 把 agent 线程泊住等回答；拒绝 / 允许一次 / 始终允许三种决定都写进 transcript，"没批准就没执行"以服务端调用日志为证。**记忆 chips 仍缺数据源**（要接记忆召回结果），属另一次范围决策。
+  - ⚠️ **MCP 确认卡曾是静态示例，2026-10-24 已接上真实决策回路**（QA H27 ①③⑤ 真机 PASS）：`mcp_*` 工具执行前会停在界面上等人点头，`McpConfirmationGate` 定策略、`McpConfirmationCoordinator` 把 agent 线程泊住等回答；拒绝 / 允许一次 / 始终允许三种决定都写进 transcript，"没批准就没执行"以服务端调用日志为证。
+  - ✅ **2026-10-24 记忆 chips 接上召回数据**：`memory_recall` 的结果文本（`TaskEvent.ToolResult.detail`）由 `MemoryRecallFormat.chips()` 解析成 `#编号 + 内容`，挂 `ToolStep.memories` 走既有 TOOL_GROUP 通路进 `cds.js` 渲染 `.chips`；解析器与格式化器**同文件**，300 字符截断只丢尾部整条 chip、不会造出错 chip；历史恢复时从落盘 summary 重新解析，chips 不退化为工具卡。Compose 聊天页仍画 summary 全文（chips 是 Web 面的呈现升级，数据两侧共享）。真机验收待跑（QA H28）。
     - ⚠️ **这是行为变化**：MCP 工具从"始终可直接执行"变为"需要前台界面里有人点头"。远程渠道本就已被 `ToolRiskPolicy` 拦掉（`mcp_` 一律 HIGH_IMPACT），本次补上的是**本地交互路径**；LAN 控制台与 debug 广播这类没有交互界面的路径会拿到明确拒绝，而不是静默执行。"始终允许"只在本进程有效，刻意不落盘——落会的"是"活得比换来它的那次对话久。
   - ✅ **2026-10-19 收敛完成**（commits `5b4e68c` / `aa0a6ed`）：①修 `executor` 线程泄漏（我上一笔引入的缺陷，`ComposeChatActivity` 本来就有这行）；②用 `<html data-live="true">` 隐藏死控件，**保留纯浏览器里的完整设计稿**；③会话落盘（`saveChat()` 从空实现改为真实写入）。
     - ⚠️ **落盘刻意绕开 `ConversationStore`**：它的 `currentConversationId` 存在**全局 KV**，共用会让预览页与聊天页互相覆盖对方历史。改走无状态 `ChatHistoryManager` + 固定 ID `preview_claude_ui`。
@@ -135,6 +139,7 @@ section is not empty, the release is not ready.
   - ✅ **2026-10-19 真机确认「能用了」**。全量 **269 tests / 29 suites / 0 失败**。详见 `QA_CHECKLIST.md` **H21 / H22**。
   - ✅ **2026-10-19 入口改名**：「Claude UI 设计稿 / mockup」→「**Claude UI 实验版 / experimental**」（三语）。理由：它已接真实任务流，「设计稿」名不副实；而 MCP 卡 / 记忆 chips 仍是静态示例，「实验版」如实反映成熟度。
     - 顺带清掉五处「发布前必删」「不连后端」「计划移除」等**与现状相反**的表述（`SettingsActivity` 横幅、`mockup/claude-ui/README.md` 开篇、`NOTICE`、`BACKLOG` 删除清单、`scripts/ui_cycle_test.py` 的旧入口名）。最危险的是 `SettingsActivity` 那条横幅——它会告诉下一个人删掉一个能用的功能。
+  - ✅ **2026-10-24 入口二次改名**：「Claude UI 实验版 / experimental」→「**Claude UI 聊天 / chat**」（三语）。理由：「实验版」的依据是三类卡全是静态示例（上一条改名的原话），如今 MCP 卡（H27）与记忆 chips（同日）都有真实数据源，依据全部失效——标签应描述界面是什么，而不是它最好听的那一面。`SettingsActivity` 注释、`ui_cycle_test.py` 的 `ENTRY`、QA 用例里的入口名一并跟改（沿用 2026-10-19 的惯例：用例名跟当前 UI，历史判定保留）。
 
   Same class of leak as `.github/FUNDING.yml` shipping `github: ithiria894` (§10.2).
 
