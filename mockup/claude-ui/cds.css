@@ -1012,9 +1012,43 @@ body {
 .scroller::-webkit-scrollbar-thumb { background: var(--cds-alpha-3); border-radius: 999px; border: 3px solid transparent; background-clip: content-box; }
 .scroller::-webkit-scrollbar-track { background: transparent; }
 
+/* ---- 会话抽屉（≤760px）----
+   桌面参考实现（Caho1/open-claude-ui）侧栏常驻 288px、内容为
+   新建任务 + 分组会话列表；手机宽度没有这份常驻空间，同一份侧栏
+   内容改为覆盖抽屉，由顶栏汉堡按钮召唤。遮罩点按 / Esc 关闭。 */
+.menu-btn { display: none; }
+
+.nav-scrim {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 30;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms ease;
+}
+
 @media (max-width: 760px) {
   .app { grid-template-columns: 1fr; }
-  .sidebar { display: none; }
+
+  .menu-btn { display: flex; }
+
+  body.nav-open .nav-scrim {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0; bottom: 0; left: 0;
+    width: 288px;
+    max-width: 84vw;
+    z-index: 40;
+    transform: translateX(-100%);
+    transition: transform 240ms var(--cds-ease-swift);
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.18);
+  }
+
+  body.nav-open .sidebar { transform: translateX(0); }
 }
 
 /* ============================================================ 真实模式收敛
@@ -1025,9 +1059,9 @@ body {
    由 <html data-live="true"> 驱动 —— cds.js 在检测到 Kotlin 桥时设置该属性。
    纯浏览器打开设计稿时属性不存在，整套侧边栏照常显示，评审时看到的仍是
    完整设计。用 CSS 而不是删元素，正是为了保住「一份 HTML 两种用途」。 */
-/* .sidebar-foot 里的记忆库 / 技能管理是死入口，但主题设置是活的，
-   所以用直接子选择器整体藏掉，再用 #themePickerBtn 单独顶回来。
-   #themeToggle（深浅色）同理。 */
+/* .sidebar-foot 里的记忆库 / 技能管理是死入口，但主题设置与「设置」行
+   是活的，所以用直接子选择器整体藏掉，再用 #themePickerBtn / #settingsBtn
+   单独顶回来。#themeToggle（深浅色）同理。 */
 [data-live="true"] .sessions,
 [data-live="true"] .search,
 [data-live="true"] .new-task,
@@ -1037,10 +1071,17 @@ body {
 }
 
 [data-live="true"] #themePickerBtn { display: flex; }
+[data-live="true"] #settingsBtn { display: flex; }
 [data-live="true"] .sidebar-head { border-bottom: none; }
 
-/* 顶栏两枚图标按钮（重命名 / 更多）在真实模式下没有任何行为，
+/* 顶栏图标按钮（重命名 / 更多）在真实模式下没有任何行为，
    而它们长得就像能点。点不动的控件比没有控件更糟，直接藏掉。
+   #menuBtn（会话抽屉开关）相反是活的 —— 但只在抽屉断点内顶回来，
+   桌面宽度侧栏常驻，汉堡没有存在的意义。
    用属性选择器定位而不是加 class，避免动 index.html 的结构 ——
    那份 HTML 同时是纯浏览器里的设计稿，改结构会影响评审效果。 */
 [data-live="true"] .topbar > .icon-btn { display: none; }
+
+@media (max-width: 760px) {
+  [data-live="true"] #menuBtn { display: flex; }
+}

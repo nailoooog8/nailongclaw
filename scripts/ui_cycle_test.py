@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """QA H14 — Claude UI preview open/close cycle, checking for a WebView leak.
 
-Navigates entirely through the UI: launcher -> app -> Settings -> preview ->
-BACK BACK -> Settings. Records TOTAL PSS after each close.
+Navigates entirely through the UI: launcher -> app home (the preview surface
+itself since 2026-10-24) -> sidebar drawer -> Settings -> entry -> preview ->
+BACK -> Settings. Records TOTAL PSS after each close.
 
 A WebView that is never destroyed grows the process monotonically. GC noise is
 not a leak: assert the trend is flat, not that any single sample is small.
@@ -91,33 +92,49 @@ def go_home() -> None:
     sh("input", "keyevent", "KEYCODE_HOME")
 
 
-def back_to_chat() -> bool:
-    """Back out of whatever screen is on top until the chat page is up.
+def back_to_home() -> bool:
+    """Back out of whatever screen is on top until the home surface is up.
 
-    Launching the app does NOT guarantee the chat page: the launcher intent
-    resumes whatever activity was on top when the process died, which may be
-    the preview surface or Settings. Reaching the chat page explicitly is
-    what makes the navigation below deterministic.
+    The home surface is ClaudeUiPreviewActivity since 2026-10-24 (Splash
+    routes there); the old ComposeChatActivity stays reachable through the
+    external `task` contract, so accept either. Launching the app does NOT
+    guarantee the home: the launcher intent resumes whatever activity was on
+    top when the process died, which may be Settings. Reaching the home
+    explicitly is what makes the navigation below deterministic.
     """
     for _ in range(4):
-        if "ComposeChatActivity" in focus():
+        f = focus()
+        if "ClaudeUiPreviewActivity" in f or "ComposeChatActivity" in f:
             return True
         sh("input", "keyevent", "KEYCODE_BACK")
         time.sleep(1.5)
-    return "ComposeChatActivity" in focus()
+    f = focus()
+    return "ClaudeUiPreviewActivity" in f or "ComposeChatActivity" in f
 
 
 def open_settings() -> bool:
-    """Chat -> Settings. Settings is not exported (QA note)."""
+    """Home -> Settings. Settings is not exported (QA note).
+
+    From the preview home the path is the sidebar drawer: hamburger
+    (aria-label 会话列表) -> 设置 row — both WebView nodes, visible in the
+    uiautomator dump. From the old chat screen the 设置 row is a Compose node
+    with the same label, so the final lookup is shared.
+    """
     go_home()
     time.sleep(1)
     subprocess.run(["adb", "shell", "monkey", "-p", PKG,
                     "-c", "android.intent.category.LAUNCHER", "1"],
                    capture_output=True, check=False)
     time.sleep(3)
-    if not back_to_chat():
+    if not back_to_home():
         return False
-    pt = find("设置")          # 设置
+    if "ClaudeUiPreviewActivity" in focus():
+        pt = find("会话列表")
+        if not pt:
+            return False
+        tap(pt)
+        time.sleep(1.5)
+    pt = find("设置")
     if not pt:
         return False
     tap(pt)

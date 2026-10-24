@@ -162,10 +162,14 @@ class AppViewModel : ViewModel() {
 
     /**
      * Bring the app to the foreground
+     *
+     * Opens the main screen (the Claude UI surface since 2026-10-24), not the
+     * old chat screen — the floating pill's click has no extras, it is a plain
+     * "open the app" gesture.
      */
     private fun bringAppToForeground() {
         val context = ClawApplication.instance
-        val intent = android.content.Intent(context, io.agents.pokeclaw.ui.chat.ComposeChatActivity::class.java).apply {
+        val intent = android.content.Intent(context, io.agents.pokeclaw.ui.web.ClaudeUiPreviewActivity::class.java).apply {
             flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
                     android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP
         }

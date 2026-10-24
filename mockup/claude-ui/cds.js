@@ -624,6 +624,40 @@
     });
   }
 
+  /* --------------------------------------------- 会话抽屉（≤760px）
+     手机宽度侧栏是覆盖抽屉（见 cds.css 断点段）：汉堡开，遮罩 / Esc 关。
+     桌面宽度下汉堡不存在（.menu-btn display:none），这套监听全部空转。 */
+  var menuBtn = document.getElementById('menuBtn');
+  var navScrim = document.getElementById('navScrim');
+
+  function closeNav() { document.body.classList.remove('nav-open'); }
+
+  if (menuBtn) {
+    menuBtn.addEventListener('click', function () {
+      document.body.classList.add('nav-open');
+    });
+  }
+  if (navScrim) {
+    navScrim.addEventListener('click', closeNav);
+  }
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeNav();
+  });
+
+  /* --------------------------------------------- 设置行
+     真实模式下是活的：PokeClawChat.openSettings 进原生设置页 ——
+     这块页面在手机宽度没有侧栏之外的出口，而 LLM / MCP / 无障碍
+     全部在设置里，主界面不能没有这扇门。设计稿里静默不动。 */
+  var settingsBtn = document.getElementById('settingsBtn');
+  if (settingsBtn) {
+    settingsBtn.addEventListener('click', function () {
+      closeNav();
+      if (window.PokeClawChat && window.PokeClawChat.openSettings) {
+        window.PokeClawChat.openSettings();
+      }
+    });
+  }
+
   /* ==================================================== QA 自检面板
      为什么把诊断画进页面，而不是只靠 logcat：
        §18.7  uiautomator 看不见 WebView 内部，截图才是可靠 ground truth

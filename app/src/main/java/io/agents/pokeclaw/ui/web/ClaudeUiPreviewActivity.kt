@@ -18,9 +18,13 @@ import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updatePadding
 import androidx.webkit.WebViewAssetLoader
 import io.agents.pokeclaw.BuildConfig
 import io.agents.pokeclaw.agent.mcp.McpConfirmationCoordinator
@@ -32,11 +36,17 @@ import io.agents.pokeclaw.ui.chat.ChatHistoryManager
 import io.agents.pokeclaw.ui.chat.ChatSessionController
 import io.agents.pokeclaw.ui.chat.ChatSessionUiState
 import io.agents.pokeclaw.ui.chat.TaskFlowController
+import io.agents.pokeclaw.ui.settings.SettingsActivity
 import io.agents.pokeclaw.utils.XLog
 import java.util.concurrent.Executors
 
 /**
  * Claude UI chat surface, backed by the real task flow.
+ *
+ * The app's main screen since 2026-10-24: SplashActivity (the launcher)
+ * routes here, as do the floating-pill click and the foreground-service
+ * notification tap. The Compose chat screen ([io.agents.pokeclaw.ui.chat.ComposeChatActivity])
+ * keeps only the external `task` extra contract and is otherwise demoted.
  *
  * Renders `assets/claude-ui/index.html` from the packaged APK and drives it
  * from [io.agents.pokeclaw.ui.chat.TaskFlowController] through a
@@ -190,6 +200,26 @@ class ClaudeUiPreviewActivity : BaseActivity() {
             }
             XLog.e(TAG, "[chat] decideMcp($parsed)")
             McpConfirmationCoordinator.submit(parsed)
+        }
+
+        /**
+         * JS → Kotlin: open the native settings screen.
+         *
+         * The WebView page has no sidebar at phone widths (the mockup hides it
+         * under 760px), so the topbar gear is the only way out of this surface.
+         * Since it became the app's home screen (2026-10-24, SplashActivity
+         * routes here) that matters beyond convenience: LLM, MCP and the
+         * accessibility service all live behind SettingsActivity, and a home
+         * screen without a settings exit strands a fresh install.
+         */
+        @JavascriptInterface
+        fun openSettings() {
+            XLog.e(TAG, "[chat] openSettings()")
+            runOnUiThread {
+                // `this` inside the bridge object is the bridge, not the
+                // activity — the Intent constructor needs the qualified label.
+                startActivity(Intent(this@ClaudeUiPreviewActivity, SettingsActivity::class.java))
+            }
         }
     }
 
@@ -449,7 +479,34 @@ class ClaudeUiPreviewActivity : BaseActivity() {
             this.clearCache(true)
             loadUrl("$MOCKUP_URL?v=${BuildConfig.VERSION_CODE}")
         }
-        setContentView(webView)
+        // Pad the web surface down by the system-bar/cutout inset. Two traps,
+        // both measured on the V2502DA: (1) BaseActivity's status-bar pass
+        // (BarUtils at decorView.post) never landed here, so the page rendered
+        // edge-to-edge with its topbar under the status bar (StatusBar
+        // touchableRegion [0,0][1260,123] vs hamburger bounds y=30..128) —
+        // harmless while the topbar held no live controls, fatal once the
+        // hamburger became the only nav. (2) A WebView IGNORES its own padding
+        // when rendering content (build 44 set it and the page did not move),
+        // so the padding goes on a wrapper container instead. Insets are the
+        // authoritative source, and BaseActivity's later pass no-ops: its
+        // guard only raises padding smaller than the status bar.
+        val chrome = FrameLayout(this)
+        chrome.addView(
+            webView,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        )
+        ViewCompat.setOnApplyWindowInsetsListener(chrome) { v, insets ->
+            val bars = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or
+                    WindowInsetsCompat.Type.displayCutout()
+            )
+            if (bars.top > v.paddingTop) v.updatePadding(top = bars.top)
+            WindowInsetsCompat.CONSUMED
+        }
+        setContentView(chrome)
         // Scheduled AFTER setContentView, not inside the apply{} above: a
         // View that is not yet attached has no handler to drain its message
         // queue, so postDelayed there silently never runs. That produced a

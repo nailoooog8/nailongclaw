@@ -154,18 +154,17 @@ def main() -> int:
     tap(toggle2)
     shot("tp3")
 
-    # 4. close and reopen
-    sh("input", "keyevent", "KEYCODE_BACK")
-    time.sleep(1)
+    # 4. close and reopen. The preview IS the home screen since 2026-10-24
+    # (SplashActivity routes there), so BACK exits the app and a launcher
+    # relaunch lands back on the preview directly — no settings entry in
+    # between any more.
     sh("input", "keyevent", "KEYCODE_BACK")
     time.sleep(2)
     print(f"after close: {focus()}")
-
-    entry = retry_find(ENTRY)
-    if not entry:
-        print("FAIL: could not find the entry point again")
-        return 1
-    tap(entry)
+    subprocess.run(["adb", "shell", "monkey", "-p", PKG,
+                    "-c", "android.intent.category.LAUNCHER", "1"],
+                   capture_output=True, check=False)
+    time.sleep(3)
     print(f"after reopen: {focus()}")
 
     if not in_preview():

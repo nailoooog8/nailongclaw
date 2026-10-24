@@ -716,6 +716,11 @@ class SettingsActivity : BaseActivity() {
         // now have real producers (H23, H27, memory chips via
         // MemoryRecallFormat). The label describes what the surface is.
         //
+        // Since the same day it is also the app's main screen (SplashActivity
+        // routes there), so this entry is a shortcut back to it from wherever
+        // Settings was reached — the surface itself opens Settings through the
+        // PokeClawChat.openSettings bridge on its sidebar's 设置 row.
+        //
         // ClaudeUiPreviewActivity is exported="false" on purpose, so `adb shell
         // am start` cannot reach it either (SecurityException: not exported from
         // uid 10395). Loosening exported just to make QA convenient would let

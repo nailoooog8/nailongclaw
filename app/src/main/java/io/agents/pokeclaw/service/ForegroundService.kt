@@ -244,7 +244,10 @@ class ForegroundService : Service() {
         }
 
         private fun buildNotification(context: Context, title: String, text: String): Notification {
-            val intent = Intent(context, io.agents.pokeclaw.ui.chat.ComposeChatActivity::class.java)
+            // Tap → the main screen (the Claude UI surface since 2026-10-24).
+            // No extras involved, so the chat screen's task-extra contract is
+            // not a reason to keep the old destination here.
+            val intent = Intent(context, io.agents.pokeclaw.ui.web.ClaudeUiPreviewActivity::class.java)
             val pendingIntent = PendingIntent.getActivity(
                 context,
                 0,
