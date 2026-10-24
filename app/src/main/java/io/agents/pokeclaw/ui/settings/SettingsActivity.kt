@@ -710,10 +710,11 @@ class SettingsActivity : BaseActivity() {
 
         // Claude UI surface. Was a design-review entry showing hardcoded HTML;
         // it now runs the real TaskFlowController through a ChatSink, so it is
-        // an experimental chat interface rather than a mockup. Labelled
-        // "experimental" because the MCP / memory cards still render as
-        // static samples — they have no producer yet. (The tool card is not
-        // one of them: it has carried real tool calls since 2026-10-19.)
+        // a second chat interface in the Claude UI design. Labelled plainly
+        // since 2026-10-24: the "experimental" qualifier existed because the
+        // tool / MCP / memory cards rendered as static samples, and all three
+        // now have real producers (H23, H27, memory chips via
+        // MemoryRecallFormat). The label describes what the surface is.
         //
         // ClaudeUiPreviewActivity is exported="false" on purpose, so `adb shell
         // am start` cannot reach it either (SecurityException: not exported from
