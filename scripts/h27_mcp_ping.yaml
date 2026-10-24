@@ -1,0 +1,26 @@
+# H27 E2E（用例②）：把一次调用定向到 qatools 的 ping 工具。
+#
+# 为什么用 ping 而不是 echo：用例③已经在本进程里对 mcp_qatools_echo 点过
+# 「始终允许」，而「始终允许」的记忆按工具名记、只在本进程有效。要干净复现
+# 用例②（允许一次 = 放行一次且不记住），需要一个没被记住过的工具名，
+# 否则第一次调用就被直接放行，判据失效。ping 就是那个新名字。
+#
+# 放 <外部文件目录>/skills/ 下，用 App 内的「自定义技能」编辑器打开再按保存，
+# 即可注册进当前进程（UserSkillLoader 只在 ClawApplication.onCreate 加载，
+# 编辑器保存会额外调 SkillRegistry.register）。
+id: h27_mcp_ping
+name: H27 MCP Ping
+description: H27 测试技能，调用 qatools MCP 服务器的 ping 工具，例如 h27 ping now
+category: TEST
+user_facing: false
+estimated_steps_saved: 1
+triggers:
+  - "h27 ping {msg}"
+parameters: []
+steps:
+  - tool: mcp_qatools_ping
+    description: 调用 MCP ping 工具
+    optional: false
+    retries: 1
+    params: {}
+fallback_goal: 调用 MCP ping 工具

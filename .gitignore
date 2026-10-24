@@ -32,3 +32,6 @@ thoughts/
 .mimosa/
 baseline_build.log
 /tools/
+
+# MCP echo test server runtime log (QA H27 evidence is regenerated each run)
+scripts/mcp-echo-calls.log
