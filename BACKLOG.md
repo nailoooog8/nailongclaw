@@ -144,6 +144,8 @@ section is not empty, the release is not ready.
   - ✅ **2026-10-24 升格主界面**：Splash 落地面从 `ComposeChatActivity` 换成 `ClaudeUiPreviewActivity`；浮动球点击（`bringAppToForeground`）与前台服务通知（两处纯「打开应用」语义、无 extra）随之指向新主界面。**外部 `task` 契约不动**：`ExternalAutomationEntrypoint` / `TaskTriggerReceiver` / Splash 自带的 `--es task` 调试转发仍走聊天页——那条契约（extra 消费、外部回调回执）只存在于聊天页，重定向等于静默丢任务。
     - **新主界面必须有设置出口**：页面在手机宽度没有常驻侧栏，按参考实现 Caho1/open-claude-ui 的侧栏逻辑（288px 常驻、头部新建 + 分组会话、脚部功能行）把 ≤760px 的侧栏从 `display:none` 改为**覆盖抽屉**（汉堡 + 遮罩 / Esc 关闭），脚部新增「设置」行经 `PokeClawChat.openSettings` 桥进 SettingsActivity——否则 LLM / MCP / 无障碍全在设置里而主界面无门可入。参考实现的 pin / 拖拽重排（4px 死区 / Alt+↑↓）需要会话模型，刻意未抄。
     - QA 脚本导航随改：`ui_cycle_test.py` 的 `back_to_chat` → `back_to_home`（抽屉路径进设置）、`theme_persist_test.py` 的「BACK 两次找设置入口」→「BACK 退出 + launcher 重进」。
+  - ✅ **2026-10-24（第二轮）设置收敛进 CDS**：主界面页内新增**设置面板**（`#settingsView`，Claude 的设置形态：从侧栏唤起的弹层 sheet，同一套 CDS 令牌），分组列出 模型与预算 / 渠道 / MCP / 技能 / 记忆 / 主题，每行经 `PokeClawChat.openSettingsPage(section)` 打开对应**原生编辑页**——配置行为仍只有原生一处，面板纯呈现；「全部设置」行进原生完整页（权限/监控/关于刻意不重复）。抽屉的「记忆库」「技能管理」从死行接为直达行（同一分发桥，`enterLiveMode` 抹掉「· 128 条」示例计数）。BACK 键先关面板再退应用（页面经 `notifySettingsView` 上报开合，Activity 据此分派 BACK）。真机验证见 QA_CHECKLIST **H30**。
+    - ⚠️ **导航抽屉的 BACK 未覆盖**：设置面板开着时 BACK 先关面板；导航抽屉开着时 BACK 仍直接退出应用（H29 ⑤ 的行为）。同样处理需给抽屉也加开合上报，记为 P3。
 
   Same class of leak as `.github/FUNDING.yml` shipping `github: ithiria894` (§10.2).
 

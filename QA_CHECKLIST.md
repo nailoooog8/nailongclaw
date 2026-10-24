@@ -1115,6 +1115,18 @@ When in doubt, rerun the smaller bundle first, then expand only if something dri
   - **QA 脚本随改**：`ui_cycle_test.py` 的 `back_to_chat` → `back_to_home`（主界面抽屉路径进设置）；`theme_persist_test.py` 的「BACK 两次找设置页入口」→「BACK 退出 + launcher 重进」（预览页已是任务根，BACK 即离应用）。
   - **单测**：346 / 0 / 0（本轮无新增——路由与 inset 是 Activity 层，抽屉是页面 DOM/CSS/JS；全量回归在 feat 提交前跑过）。
 
+- [x] **H30. Settings converge into the CDS surface [PASS — 2026-10-24]**: 设置内容外移 + 页内设置面板。①抽屉「记忆库」「技能管理」死行接为直达行（经 `openSettingsPage` 桥进 MemoryActivity / UserSkillsActivity，`enterLiveMode` 抹掉「· 128 条」示例计数）②抽屉「设置」行打开**页内设置面板**（`#settingsView`，弹层 sheet，分组：模型与预算 / 渠道接入 / MCP 服务器 / 技能 / 记忆库 / 主题 + 「全部设置」）③面板行打开对应原生编辑页，BACK 回来面板还在④BACK 先关面板再退应用⑤面板关着时不向无障碍树泄漏幽灵节点。
+  - **形态依据**：参考实现（open-claude-ui）没有设置页组件（30 个组件全是会话/产物侧），面板形态取 Claude 客户端通行的「设置 = 从侧栏唤起的弹层」，令牌与行样式同源（cds.css）。**配置行为仍只有原生一处**——面板是纯呈现，行经 `PokeClawChat.openSettingsPage(section)` 分发到原生编辑页（未知 section 记日志后丢弃）；「全部设置」进原生完整页（权限/监控/关于刻意不重复做两份）。
+  - ✅ **真机 PASS（2026-10-24，设备 `10AG4J1THX00524` / V2502DA，release 47 `PokeClaw_v0.8.3_20261024_185111.apk`）**：
+    - **① 直达行**：抽屉开 → 「记忆库」[21,355][857,447] 点 → `mCurrentFocus = …settings.MemoryActivity`；BACK → 抽屉已关（行点击先 `closeNav`）→ 重开抽屉「技能管理」[21,444][857,536] → `…UserSkillsActivity`。关着的抽屉里行文本已是 `text="记忆库"`（计数被抹；y≈2187 处另一个以「记忆库」开头的节点是 H28 无匹配回退卡的摘要，非本行）。
+    - **② 面板**：抽屉「设置」[21,622][857,714] → 面板行全数进屏（模型与预算 / 渠道接入 / MCP 服务器 / 技能 / 全部设置 + 脚注），标题「设置」。
+    - **③ 行分发**：「模型与预算」[33,426][1225,545] → `…LlmConfigActivity`；BACK → 面板仍在（「关闭设置」按钮 bounds [39,153][137,251] 实位）。**全部 7 个 section 的分发另由机主本人在 build 46 上逐行点验**（logcat：`openSettingsPage(channels)×2 / mcp / model / skills / memory / theme / all` 全部路由，随后一次 BACK 触发 `closeSettingsView` 的上报序列）——logcat 在这台机上当日可读。
+    - **④ BACK 语义**：面板开着按 BACK → 关面板（feed 完好，`h28 recall` 节点在）→ 再按 BACK → 退出到 launcher。开合经 `notifySettingsView` 上报，Activity 侧 `settingsViewOpen` 驱动 BACK 分派。
+    - **⑤ 无障碍**：面板关着时 `关闭设置` / 各行节点在 dump 中 **0 命中**（`visibility:hidden` 剔除；build 46 用纯 `opacity:0` 时这些幽灵节点全部可见于 a11y 树——读屏用户会撞见不可点按钮，已修）。
+  - ⚠️ **快速连点同一行会叠两个原生页实例**（机主点 channels 两次 → 两次都启动；标准 launchMode 不去重）。低危，暂不处理；要修给这组 activity 加 `singleTop` 或在桥内节流。
+  - **QA 脚本随改**：`ui_cycle_test.py` 的 `open_settings` 在抽屉「设置」行之后追点面板的「全部设置」行（面板关着时 `visibility:hidden` 不贡献节点，`find("设置")` 仍唯一命中抽屉行）。
+  - **单测**：346 / 0（无新增逻辑可测——桥分发是 Activity 层，面板是 DOM/CSS/JS）。
+
 - [x] **H24. Long unbroken text does not overflow its container [PASS — 2026-10-22]**: 发一条会回很长连续文本的消息（截图文件路径、无空格的工具输出）→ 确认文本**换行**而不是被裁掉或撑破卡片。
   - **起因（先量出来的，不是猜的）**：411 dp（V2502DA 逻辑宽度）下 `pre-wrap` **只认换行符，不认超长单词**：
     | 容器 | 修前 `scrollWidth` / `clientWidth` | 修前溢出 |
