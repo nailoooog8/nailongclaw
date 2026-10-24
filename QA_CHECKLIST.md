@@ -1089,12 +1089,19 @@ When in doubt, rerun the smaller bundle first, then expand only if something dri
   - **单测（纯逻辑，无 Android 依赖、无 mock）**：`McpConfirmationGateTest` —— 已记住的允许 / 无界面 / 已有待确认 / 三种决策 / 超时 / 取消；`McpConfirmationCoordinatorTest` —— 无 surface 立即拒绝、短超时（200 ms）无人应答转拒绝、`submit` 后立即放行。
   - ⚠️ **行为变化（同步记入 BACKLOG）**：MCP 工具从"始终可直接执行"变为"需要前台界面里有人点头"。远程渠道本就已被 `ToolRiskPolicy` 拦掉（`mcp_` 一律 HIGH_IMPACT），本次补上的是**本地交互路径**的确认；LAN 控制台与 debug 广播这类"没有交互界面"的路径会拿到明确的拒绝，而不是静默执行。
 
-- [ ] **H28. Memory recall renders as chips, and they survive a restore**: 记忆库里存至少两条可被召回的事实 → 在 Claude UI 聊天页发一条会触发 `memory_recall` 的任务 → 确认①工具步骤渲染成 `.chips`（`#编号 + 内容`，不再是 `.tool-card`）②chip 内容与工具卡正文来自同一条 summary 文本③`am force-stop` 后重开 → 历史恢复后 chips 仍是 chips（不是退化成工具卡）④`memory_recall` 返回空库 / 无匹配文案时**不**出现 chips，回退为普通工具卡。
+- [x] **H28. Memory recall renders as chips, and they survive a restore [PASS — 2026-10-24]**: 记忆库里存至少两条可被召回的事实 → 在 Claude UI 聊天页发一条会触发 `memory_recall` 的任务 → 确认①工具步骤渲染成 `.chips`（`#编号 + 内容`，不再是 `.tool-card`）②chip 内容与工具卡正文来自同一条 summary 文本③`am force-stop` 后重开 → 历史恢复后 chips 仍是 chips（不是退化成工具卡）④`memory_recall` 返回空库 / 无匹配文案时**不**出现 chips，回退为普通工具卡。
   - 数据通路：`TaskEvent.ToolResult.detail`（可能被 300 字符截断）→ `MemoryRecallFormat.chips()` 解析 → `ToolStep.memories` → `WebChatSink` → JSON `memories[]` → `cds.js buildTurn` 画 `.chips`。解析器与格式化器在**同一个文件**（`MemoryRecallFormat`），格式漂移会被 round-trip 单测先抓到。
   - ⚠️ **截断语义**：`TaskOrchestrator` 对 detail 做 300 字符截断（补 `...`）。被截断的尾部 chip 会**整条丢弃**（lookahead 保证），不会出现内容被腰斩的错 chip；chip 多于约 6 条时尾部的可能不显示，属已知限制——完整文本仍在工具卡的回退正文里。
   - ⚠️ **Compose 聊天页不渲染 chips**：`ChatScreen` 的 `ToolGroup()` 仍画 summary 全文。chips 是 Web 面的呈现升级，数据两侧共享，Compose 侧要跟随时数据已就位。
-  - ⬜ **真机未跑（2026-10-24）**：新包安装三次被拒（`INSTALL_FAILED_ABORTED: User rejected permissions` —— vivo 的 USB 安装确认弹窗需要人在设备上点允许，且当时通知栏卡在展开态）。**跑前准备已就绪**：`scripts/h28_memory_seed.yaml` / `h28_memory_recall.yaml` 已推到 `<外部文件目录>/skills/`（目录权限 777，H27 修过的坑），装包后重启进程即注册；触发语料 `h28 seed` / `h28 recall <query>`（ASCII——`adb input text` 打不了 CJK，种子内容在 yaml 里）。证据渠道沿用 H27：`uiautomator dump` 读 WebView 文字原文（H25 的方法），chips 判据是 dump 里有 `#<12位hex>` 节点，恢复判据是 `force-stop` 重开后仍在。
-  - ✅ **非设备验证已完成（2026-10-24）**：全量单测 **342 / 36 suites / 0 失败**（新增 `MemoryRecallFormatTest` 7 例、`WebChatSinkTest` 3 例、`ChatHistoryManagerLoadTest` 3 例）；release 包 `PokeClaw_v0.8.3_20261024_150559.apk` 解包验证：`assets/claude-ui/` 恰好三文件、`cds.js` 含 chips 渲染与 `enterLiveMode` 清空逻辑、dex 含 `"memories":[` 与 `memory_recall` 字面量（查 APK，不看 `build/` 中间产物——QA H15 的判据）。
+  - ✅ **真机 PASS（①②③④ 全过，2026-10-24）**：设备 `10AG4J1THX00524` / V2502DA，release 42（`PokeClaw_v0.8.3_20261024_161615.apk`，`POKECLAW_VERSION_CODE=42` 本地构建——本地默认 33 低于设备上已装的 41，见 Device Notes 的版本降级条）。证据全部取自 `uiautomator dump` 的文字节点（H25 的方法）+ 落盘 transcript，不认截图。
+    - **① chips 渲染**：`h28 recall H28`（技能 Tier 1.5 触发）→ 召回 turn 显示 `#aec3b3b4d32e` + `H28测试：妈妈出行优先上午车次`、`#d79830086a29` + `H28测试：常买杭州东到上海虹桥`，**没有**「工具调用」卡——chips 替代了卡片。同轮的 `memory_save` 步骤（无 chips 可解析）仍是普通工具卡，两种渲染同屏并存。
+    - **② 同源**：落盘 transcript 的工具行 `- ✓ memory_recall → 记忆检索「h28」： - [偏好#aec3b3b4d32e] …` 与 dump 里的 chip 节点**逐字一致**。
+    - **③ 恢复**：`am force-stop`（顺带验证了 shell 重开无障碍的步骤仍有效）→ 重进页面（历史恢复）→ 两个 chips turn 原样回来，id 与内容不变，未退化成工具卡。恢复输入是 `oneLine()` 压平后的单行 summary，解析器同时吃两种形状的设计在真机上成立。
+    - **④ 回退**：`h28 recall zzzqqq`（无匹配）→ 召回 turn 是普通工具卡（`记忆库里没有匹配「zzzqqq」的内容（共 2 条）。`），chip 节点计数不变（仍 2 个）——空解析不造 chip。
+    - **附带验证**：新入口名「Claude UI 聊天」首次真机点击通过（H28 的导航步骤就是它）；首开清空示例 turn 也在真机确认——删除旧 transcript 后重进页面，feed 只剩「新任务」标题与 composer 控件，三段虚构对话全部不在。
+  - ⚠️ **使能修复（跑 H28 时发现的真实缺口）**：`SkillExecutor` 原本只发 `Progress`——技能步骤走的是与 agent loop 同一条 `ToolRegistry.executeTool`，却不发 `ToolAction` / `ToolResult`，两个聊天面都看不到技能的工具卡，chips 更是永远不会出现在技能路径上。已修：`SkillExecutor.execute` 新增 `onToolCall` / `onToolResult` 回调（每次尝试一对，与 agent loop 每调用一结果的口径一致），`TaskOrchestrator` 把它们翻译成事件；300 字符截断与 displayName 映射抽成共用 `emitToolResultEvent`（loop 与技能同一段代码，chips 的「无错 chip」判据就写在这个截断上）。**播种/召回因此从"看不见的两步"变成两张真工具卡**。
+  - ⚠️ **QA 脚本写法教训**：`adb shell input text` / `keyevent` 成功时**stdout 为空**——把「stdout 为空就重试」的包装器套在写命令上会把输入重复执行三遍（本次 composer 里留下的 `h28 seedh28 seedh28 seed` 就是这么来的；重试只该套在 dumpsys / cat 这类读命令上）。
+  - **单测**：`MemoryRecallFormatTest` 7 例 + `SkillExecutorTest` 4 例（每次尝试一对事件 / 重试各发一次 / 失败耗尽仍发失败结果 / 占位符解析进真实参数）+ `WebChatSinkTest` 3 例 + `ChatHistoryManagerLoadTest` 3 例。全量 **346 tests / 37 suites / 0 失败**。
 
 - [x] **H24. Long unbroken text does not overflow its container [PASS — 2026-10-22]**: 发一条会回很长连续文本的消息（截图文件路径、无空格的工具输出）→ 确认文本**换行**而不是被裁掉或撑破卡片。
   - **起因（先量出来的，不是猜的）**：411 dp（V2502DA 逻辑宽度）下 `pre-wrap` **只认换行符，不认超长单词**：
@@ -1860,7 +1867,7 @@ adb shell run-as io.agents.pokeclaw strings /data/data/io.agents.pokeclaw/files/
 
 Format: `[date] [status] [test-id] description`
 
-### 2026-10-24 — H28: memory chips get their real data source
+### 2026-10-24 — H28: memory chips get their real data source, and skill steps become visible
 
 The last of the three static sample turns in `index.html` (tool card / MCP card
 / memory chips) now has a producer: a `memory_recall` tool result is parsed by
@@ -1874,10 +1881,22 @@ renamed a second time (实验版 → 聊天). The sample turns themselves stay i
 the Kotlin bridge is present (`enterLiveMode`) — in a live surface a fictional
 conversation is impersonation, not a sample.
 
-[2026-10-24] [NOTE]   —    **装包即受阻**：新 release 包三次 `adb install -r` 被拒（`INSTALL_FAILED_ABORTED: User rejected permissions`），vivo 的安装确认弹窗必须有人在设备上点允许；当时 `mCurrentFocus` 一直停在 `NotificationShade`（通知栏卡在展开态，BACK 也不收）。H28 五格全部留待装包后跑，准备已就绪（见 H28 条目）。
-[2026-10-24] [NOTE]   —    **确定性触发**：沿用 H27 的技能 Tier 1.5 方案。`h28_memory_seed.yaml`（`h28 seed` → 两步 `memory_save`，内容带「H28测试」前缀、内容哈希幂等）与 `h28_memory_recall.yaml`（`h28 recall {msg}` → 一步 `memory_recall`）已推到 `<外部文件目录>/skills/`，重启进程注册。
-[2026-10-24] [PASS]   —    单测（纯逻辑，无 Android 依赖、无 mock）：`MemoryRecallFormatTest` 7 例（round-trip / 压平恢复 / 300 字符截断只丢整条 chip / 空库无匹配零 chip / 内容里的"(命中 N 次)"不提前断开）+ `WebChatSinkTest` 3 例 + `ChatHistoryManagerLoadTest` 3 例。全量 **342 / 36 suites / 0 失败**（基线 329）。
-[2026-10-24] [PASS]   —    装在包里的就是这份代码：解包 `PokeClaw_v0.8.3_20261024_150559.apk`，`assets/claude-ui/` 恰好三文件、`cds.js` 含 chips 渲染与 live 清空逻辑、dex 含 `"memories":[` / `memory_recall` 字面量。
+The run also flushed out a real gap: `SkillExecutor` executed skill steps
+through the same `ToolRegistry.executeTool` as the agent loop but emitted only
+`Progress`, so skill tool calls were invisible as tool cards on every surface
+— and the chips could never appear on the deterministic path. `SkillExecutor`
+now reports one call/result pair per attempt and `TaskOrchestrator` maps them
+through the same `emitToolResultEvent` the loop uses.
+
+[2026-10-24] [NOTE]   —    **装包两道坎**：① vivo 的 USB 安装确认需要人在设备上点允许，第一批三次被拒（`User rejected permissions`，当时通知栏卡在展开态）——用户到场点允许即过；② 本地构建 versionCode 默认 33 低于设备已装的 41（`INSTALL_FAILED_VERSION_DOWNGRADE`），按 Device Notes 导出 `POKECLAW_VERSION_CODE=42` 重建后 `adb install -r` Success。
+[2026-10-24] [PASS]   H28   ① **chips 渲染**：`h28 recall H28`（技能触发）→ `#aec3b3b4d32e` + `H28测试：妈妈出行优先上午车次`、`#d79830086a29` + `H28测试：常买杭州东到上海虹桥`，无「工具调用」卡；同轮 `memory_save` 步骤仍渲染为普通工具卡，两种渲染同屏并存。证据取自 `uiautomator dump` 文字节点。
+[2026-10-24] [PASS]   H28   ② **同源**：落盘 transcript 工具行 `- ✓ memory_recall → 记忆检索「h28」： - [偏好#aec3b3b4d32e] …` 与 dump 里的 chips 逐字一致。
+[2026-10-24] [PASS]   H28   ③ **恢复**：`am force-stop`（shell 重开无障碍两行命令再次有效）→ 重进页面 → 两个 chips turn 原样回来，未退化为工具卡——解析器吃 `oneLine()` 压平形状的设计成立。
+[2026-10-24] [PASS]   H28   ④ **回退**：`h28 recall zzzqqq`（无匹配）→ 普通工具卡 `记忆库里没有匹配「zzzqqq」的内容（共 2 条）。`，chip 节点计数不变——空解析不造 chip。
+[2026-10-24] [PASS]   —    **附带**：新入口名「Claude UI 聊天」首次真机点击通过；删除旧 transcript 后首开 feed 只剩「新任务」+ composer 控件——`enterLiveMode` 清空示例 turn 真机成立。
+[2026-10-24] [NOTE]   —    **技能步骤现在也发工具事件**（使能修复）：`SkillExecutor` 的 `onToolCall` / `onToolResult`（每次尝试一对）→ `TaskOrchestrator.emitToolResultEvent`（与 loop 共用，含 300 字符截断与 displayName 映射）。播种/召回从"看不见的步骤"变成真工具卡并落盘 transcript。`SkillExecutorTest` 4 例钉住契约。
+[2026-10-24] [PASS]   —    单测：`MemoryRecallFormatTest` 7 + `SkillExecutorTest` 4 + `WebChatSinkTest` 3 + `ChatHistoryManagerLoadTest` 3。全量 **346 / 37 suites / 0 失败**。
+[2026-10-24] [NOTE]   —    **QA 脚本教训**：`adb shell input text` / `keyevent` 成功时 stdout 为空；「stdout 空则重试」的包装器套在写命令上会把输入重复执行（本次 composer 残留 `h28 seedh28 seedh28 seed` 即此故）。重试只用于读命令。
 
 ### 2026-10-24 — H27: an MCP tool call now waits for the user, and the wait is real
 
