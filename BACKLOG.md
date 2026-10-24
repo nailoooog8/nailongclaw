@@ -127,7 +127,8 @@ section is not empty, the release is not ready.
   - ✅ **2026-10-19 工具卡已接真实数据**：`ChatSink` 新增 `appendToolStep()`，`handleTaskEvent` 在 `TaskEvent.ToolResult` 到达时写入 `TOOL_GROUP` 消息。**只在结果时落卡** —— `ToolAction` 与 `ToolResult` **并非严格成对**（`TaskOrchestrator:319` 会发一个永远没有结果的 `ToolAction("Retrying with AI agent")`），在 Action 时落卡会留下永久「运行中」的卡片。
     - 之前的判断「缺的是生产侧」是对的：`ChatScreen` 早有 `ToolGroup()` 渲染器、`cds.js` 早就能画 `.tool-card`，两边都在等一个不存在的字段。
     - 全量 **274 tests / 29 suites / 0 失败**（新增 5 例）。**2026-10-19 真机 PASS**，用户确认工具卡出现且工作正常。
-  - ⚠️ **MCP 确认卡 / 记忆 chips 仍是静态示例**：两者都有渲染器、无数据源。MCP 确认按钮需一条 Kotlin → JS → Kotlin 的**决策回路**，记忆 chips 需接到记忆召回结果。属另一次范围决策。
+  - ⚠️ **MCP 确认卡曾是静态示例，2026-10-24 已接上真实决策回路**（QA H27 ①③⑤ 真机 PASS）：`mcp_*` 工具执行前会停在界面上等人点头，`McpConfirmationGate` 定策略、`McpConfirmationCoordinator` 把 agent 线程泊住等回答；拒绝 / 允许一次 / 始终允许三种决定都写进 transcript，"没批准就没执行"以服务端调用日志为证。**记忆 chips 仍缺数据源**（要接记忆召回结果），属另一次范围决策。
+    - ⚠️ **这是行为变化**：MCP 工具从"始终可直接执行"变为"需要前台界面里有人点头"。远程渠道本就已被 `ToolRiskPolicy` 拦掉（`mcp_` 一律 HIGH_IMPACT），本次补上的是**本地交互路径**；LAN 控制台与 debug 广播这类没有交互界面的路径会拿到明确拒绝，而不是静默执行。"始终允许"只在本进程有效，刻意不落盘——落会的"是"活得比换来它的那次对话久。
   - ✅ **2026-10-19 收敛完成**（commits `5b4e68c` / `aa0a6ed`）：①修 `executor` 线程泄漏（我上一笔引入的缺陷，`ComposeChatActivity` 本来就有这行）；②用 `<html data-live="true">` 隐藏死控件，**保留纯浏览器里的完整设计稿**；③会话落盘（`saveChat()` 从空实现改为真实写入）。
     - ⚠️ **落盘刻意绕开 `ConversationStore`**：它的 `currentConversationId` 存在**全局 KV**，共用会让预览页与聊天页互相覆盖对方历史。改走无状态 `ChatHistoryManager` + 固定 ID `preview_claude_ui`。
     - ⚠️ **文件路径算不出来**：`save()` 用「日期 + 首条用户消息」命名，ID 只在 frontmatter 里。故按 ID 过滤 `listConversations` 取最新匹配。

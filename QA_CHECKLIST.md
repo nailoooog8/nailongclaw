@@ -1075,6 +1075,20 @@ When in doubt, rerun the smaller bundle first, then expand only if something dri
     - **单测**：`ChatHistoryManagerLoadTest`（4 例）—— 结构还原 / 摘要里含箭头 / 未知格式保留原文 / 无摘要的行。
     - ✅ **真机 PASS**：用**旧包写下的**历史文件（`- ✓ 截屏 → …` 格式）在新包上恢复，工具卡回来了（无障碍树里 `截屏` 与 `工具调用` 分开、路径单独一行）。**向后兼容也一起验了**：不需要迁移旧文件。
     - ⚠️ 这次恢复之所以会暴露问题，是因为 H14 那 3 轮开关把 Activity 重建了 —— 也就是说**这个缺陷在正常使用中必然出现**，不是只有测试才碰得到。
+- [x] **H27. An MCP tool call waits for the user's decision before it runs**: 配一个只暴露一个工具的 MCP 服务器 → 在 App 里添加该服务器 → 触发一次 `mcp_<name>_<tool>` 调用 → 确认①工具**没有**被执行（服务端调用日志为零）②旗舰聊天页/Claude UI 实验版出现确认卡，带「允许一次 / 始终允许 / 本次拒绝」三个按钮③点「本次拒绝」→ 工具仍不执行，transcript 留下记录④再触发一次，点「允许一次」→ 服务端日志恰好**一次** `tools/call`，且**不记住**（再触发会再次弹卡）⑤点「始终允许」后再触发 → **不再出卡**，直接执行。
+  - ✅ **2026-10-24 真机 PASS（①②③④⑤ 全过）**：设备 `10AG4J1THX00524` / V2502DA，release 41（`PokeClaw_v0.8.3_20261023_214600.apk`）。判据全部以**服务端调用日志**（`scripts/mcp-echo-calls.log`）+ **落盘 transcript** 为准，不靠 App 内的提示。详见 QA Debug Changelog 2026-10-24。
+  - ✅ **两个面的卡都实现了**：旗舰聊天页是 `McpConfirmationSurface` 的 AlertDialog（三按钮），Claude UI 实验版是 `cds.js` 的 `.mcp-card`（`renderConfirmation` + `PokeClawChat.decideMcp`）。本轮真机走的是**旗舰聊天页**；实验版那一侧共用同一套 coordinator，JS 侧的按钮未在真机上点过。
+  - ⬜ **「没有可见界面时立即拒绝」一格未在真机验到**（被 fallback 的模型调用反复打岔）。语义由单测钉住。
+  - **为什么用技能触发，而不是 `am broadcast`**：`DebugTaskReceiver` 在 release 构建里第一行就 `if (!BuildConfig.DEBUG) return`，LAN 控制台的 `/api/debug/execute` 同样被关。两处关得对，不该为测试打开。改用**用户技能的 Tier 1.5 触发匹配**（确定性正则、0 次 LLM 调用）：`scripts/h27_mcp_echo.yaml`（以及 `_ping` / `_pong`）推到 `<外部文件目录>/skills/`，触发语料 `h27 echo|ping|pong <任意文字>` → `SkillExecutor` → 与 agent loop 同一条 `ToolRegistry.executeTool`，"要不要调这个工具"不再由模型随机决定。
+  - **为什么用技能触发，而不是 `am broadcast`**：`DebugTaskReceiver` 在 release 构建里第一行就 `if (!BuildConfig.DEBUG) return`，LAN 控制台的 `/api/debug/execute` 同样被关。两处关得对，不该为测试打开。改用**用户技能的 Tier 1.5 触发匹配**（确定性正则、0 次 LLM 调用）：`scripts/h27_mcp_echo.yaml` 推到 `<外部文件目录>/skills/`，触发语料 `h27 echo <任意文字>` → `SkillExecutor` → 与 agent loop 同一条 `ToolRegistry.executeTool`，"要不要调这个工具"不再由模型随机决定。
+  - **服务端**：`scripts/mcp-echo-server.mjs`（Node、零依赖）监听 8801，实现 `initialize` / `notifications/initialized` / `tools/list` / `tools/call`，并把每次 `tools/call` 追加写入 `scripts/mcp-echo-calls.log`。QA 机只有蜂窝与自身热点、与宿主不在同一网络，故用 `adb reverse tcp:8801 tcp:8801` 让设备的 `127.0.0.1:8801` 直通宿主，不需要任何网络配置。
+  - **「工具没有执行」怎么证明**：只看服务端调用日志（行数与内容），不看 App 内的任何提示 —— App 说"没执行"不算证据，服务端没收到请求才算。反过来「执行了」也以服务端日志为准。
+  - **两个面都要过**：Claude UI 实验版（`cds.js` 的 `.mcp-card`）与旗舰聊天页（AlertDialog）各注册一个 surface，只有前台那个会收到确认请求。把 App 切到后台再触发 → **立即拒绝**并说明"确认卡不可见"，不占用 60 秒等待。
+  - **fail-closed 判据**：先按 HOME 再触发（两个 Activity 都不在前台）→ 立即拒绝，error 里点名原因，服务端零调用。
+  - **超时**：60 秒无人应答 → 按拒绝处理，服务端零调用。真机上等满 60 秒代价高，超时这条转移由单测钉住，真机只验「有人应答」与「没有界面」两条。
+  - **单测（纯逻辑，无 Android 依赖、无 mock）**：`McpConfirmationGateTest` —— 已记住的允许 / 无界面 / 已有待确认 / 三种决策 / 超时 / 取消；`McpConfirmationCoordinatorTest` —— 无 surface 立即拒绝、短超时（200 ms）无人应答转拒绝、`submit` 后立即放行。
+  - ⚠️ **行为变化（同步记入 BACKLOG）**：MCP 工具从"始终可直接执行"变为"需要前台界面里有人点头"。远程渠道本就已被 `ToolRiskPolicy` 拦掉（`mcp_` 一律 HIGH_IMPACT），本次补上的是**本地交互路径**的确认；LAN 控制台与 debug 广播这类"没有交互界面"的路径会拿到明确的拒绝，而不是静默执行。
+
 - [x] **H24. Long unbroken text does not overflow its container [PASS — 2026-10-22]**: 发一条会回很长连续文本的消息（截图文件路径、无空格的工具输出）→ 确认文本**换行**而不是被裁掉或撑破卡片。
   - **起因（先量出来的，不是猜的）**：411 dp（V2502DA 逻辑宽度）下 `pre-wrap` **只认换行符，不认超长单词**：
     | 容器 | 修前 `scrollWidth` / `clientWidth` | 修前溢出 |
@@ -1838,6 +1852,28 @@ adb shell run-as io.agents.pokeclaw strings /data/data/io.agents.pokeclaw/files/
 ## QA Debug Changelog
 
 Format: `[date] [status] [test-id] description`
+
+### 2026-10-24 — H27: an MCP tool call now waits for the user, and the wait is real
+
+Closes the last piece of the Claude UI experimental surface that was still a
+static sample: the MCP confirmation card. Before this, an MCP tool ran the
+moment the agent loop reached it — `ToolRiskPolicy` refuses them for remote
+*channels*, and deliberately stopped there ("a remote task has no foreground
+activity to show a dialog on"). This adds the other half: on the interactive
+path, a human approves each call.
+
+[2026-10-24] [PASS]    H27   ① **拒绝**：技能步骤调 `mcp_qatools_echo` → 弹出「MCP 工具需要确认」（工具 echo / 服务器 qatools / 描述 / 参数 `message = run-4` / 三个按钮）→ 点「本次拒绝」→ transcript 留 `⏳ 等待确认` + `✗ 已拒绝：echo（MCP:qatools），工具未执行`，**服务端调用日志为空**（App 说"没跑"不算证据，服务端没收到请求才算）。
+[2026-10-24] [PASS]    H27   ③ **始终允许**：本轮由设备前的操作者连点三次允许（fallback 到 agent loop 后模型自己调了三次 `echo`，服务端日志 3 行，参数均为模型生成）。此后**不再弹卡**：再发一次任务 → 无对话框、技能 1 步直接成功、服务端日志 3→4 行。即"始终允许"确实 remembered，且 remembered 的检查排在界面检查之前（切后台也不会退回询问）。
+[2026-10-24] [PASS]    —    单测（纯逻辑，无 Android 依赖、无 mock）：`McpConfirmationGateTest` 15 例 + `McpConfirmationCoordinatorTest` 9 例 + `WebChatSinkTest` 新增 1 例（确认卡是活状态、不进 transcript）。全量 **329 / 0 失败**。
+[2026-10-24] [NOTE]   —    **触发方式是技能，不是 debug 广播。** 原计划用 `DebugTaskReceiver`（`am broadcast --es tool mcp_…`）做确定触发，但它在 release 构建里第一行就 `if (!BuildConfig.DEBUG) return`，LAN 控制台的 `/api/debug/execute` 同样被 `BuildConfig.DEBUG` 关着。两处关得对，不该为测试打开。改用**用户技能的 Tier 1.5 触发匹配**（确定性正则、0 次 LLM 调用）：`scripts/h27_mcp_echo.yaml` 推到 `<外部文件目录>/skills/`，触发语料 `h27 echo <任意文字>` → `SkillExecutor` → 与 agent loop 同一条 `ToolRegistry.executeTool`。
+[2026-10-24] [NOTE]   —    **这台设备取证只有三条路**：① ROM 把第三方 logcat 全屏蔽（连启动必打的 `XLog.e` 都看不到，只能靠 `dumpsys`/exit-info/可观测副作用）；② debug 报告写进 `cacheDir`，没 root 拉不出来；③ **落盘 transcript 可拉取** —— `/sdcard/Android/data/io.agents.pokeclaw/files/chats/*.md`，按 HOME 让 Activity 暂停触发存档后 `adb pull`。本次全部判据都走 ①③ + 服务端日志。
+[2026-10-24] [NOTE]   —    **聊天页停在对话模式时，composer 走的是 `sendChat` 不是 `sendTask`** —— 不进入任务路由，也就永远碰不到确认闸门。判据：占位符是「与本地 AI 对话…」而非「描述一个手机操作任务…」。切到底部「任务」再发。（这一条坑掉了前两次尝试，两次都被本地模型用"我不明白"回答。）
+[2026-10-24] [NOTE]   —    **`adb shell mkdir` 建的目录 App 读不到**：`skills/` 由 shell 建出来是 `shell:ext_data_rw rwxrws---`，targetSdk 36 无存储权限的 App 进不去，`listFiles` 静默返回空。而**文件**推在 App 自己的 `files/` 下能读（MCP 配置就是这么成功的）。修法：`chmod 777` 该目录，或干脆用 App 内的编辑器保存一次（会以 App 身份建目录并注册）。
+[2026-10-24] [NOTE]   —    **MCP 连接只在启动时建立**：`McpConnectionManager.refresh()` 全文无调用方；`McpServersActivity.onResume` 只重读配置不重连。服务端中途挂过（后台任务被杀）→ 工具静默未注册 → 技能报 `Unknown tool` 直接失败并 fallback，transcript 里**没有任何确认记录**（这是"闸门前就失败"与"被闸门拒绝"的区分点）。恢复：MCP 服务器页点进该服务器再按「保存」→ `connectOne` 重连并注册，无需重启进程。
+[2026-10-24] [NOTE]   —    `monkey -p … -c LAUNCHER` 在这台机上会挂住不注入；`am start -n io.agents.pokeclaw/.ui.splash.SplashActivity`（清单里 `exported="true"`）稳定可用，且不会杀进程，能保住已注册的技能/工具/无障碍绑定。
+[2026-10-24] [PASS]    H27   ② **允许一次**（换工具名复现，未重启进程）：服务端加第三个工具 `pong` —— 「始终允许」的记忆**按工具名记**，所以 `mcp_qatools_pong` 是没被记住的新名字，不必重启进程清空。推 `scripts/h27_mcp_pong.yaml` → MCP 页重连（`3 tools`）→ 技能编辑器保存注册 → 触发 → 弹卡 → 点「允许一次」→ 服务端日志 **5→6 行**（恰好一次 `tools/call pong {}`），transcript `⏳ 等待确认` → `✓ 已允许一次` → 技能 1 步成功。**再触发一次 → 卡片再次弹出、日志仍是 6 行**（允许一次不被记住）→ 点「本次拒绝」→ 日志仍 6 行。两个判据都拿到。
+[2026-10-24] [NOTE]   —    **拒绝会 fallback 到 agent loop，而 loop 可能再调同一个工具**：本轮三次拒绝后都出现了 `Retrying with AI agent...`，随后本地模型自己发起了 `mcp_qatools_*` 调用（参数都是它生成的）。若该工具已被「始终允许」，这些调用**不再弹卡**直接执行 —— 服务端日志里 04:59:30/32/35 三行就是这样来的。**闸门是逐次生效的，不是一次授权管全程**；反过来「始终允许」也确实管住了后续所有调用。这一点值得记住：测确认回路时，fallback 的模型调用会污染服务端日志，判据要按时间戳对齐。
+[2026-10-24] [FAIL]    —    **「没有可见界面时立即拒绝」这一格未在真机验到**：需要任务在飞行中而 App 退到后台，实操中被上面的 fallback 调用反复打岔（日志增长归因不清）。语义由单测钉住（`a backgrounded surface refuses immediately` / `no surface refuses immediately`）。真实触发条件也确实窄：任务只能从界面发起，所以"没有界面"基本只出现在任务已在后台运行、而模型此时要调 MCP 工具的那一刻。
 
 ### 2026-10-23 — E3 passes on release 40, and the recovery path is the one the app now names
 
