@@ -1,0 +1,36 @@
+# H28 E2E（播种）：两步 memory_save，幂等播种 H28 用的固定记忆。
+#
+# 内容哈希相同的记忆会合并，所以重复触发不产生重复条目。种子内容带「H28测试」
+# 前缀，避免与设备上已有的真实记忆混淆。
+#
+# 用户技能的 Tier 1.5 触发匹配是确定性正则、0 次 LLM 调用，SkillExecutor 直接调
+# ToolRegistry.executeTool —— 与 agent loop 同一条生产路径。触发语料：`h28 seed`
+# （ASCII，因 adb input text 打不了 CJK）。
+#
+# 放 <外部文件目录>/skills/ 下，重启 app 自动加载注册（UserSkillLoader 只在
+# ClawApplication.onCreate 里加载，所以必须重启进程）。
+id: h28_memory_seed
+name: H28 记忆播种
+description: H28 测试技能，播种两条固定记忆用于召回验证
+category: TEST
+user_facing: false
+estimated_steps_saved: 1
+triggers:
+  - "h28 seed"
+parameters: []
+steps:
+  - tool: memory_save
+    description: 播种记忆一
+    optional: false
+    retries: 1
+    params:
+      content: "H28测试：妈妈出行优先上午车次"
+      kind: "preference"
+  - tool: memory_save
+    description: 播种记忆二
+    optional: false
+    retries: 1
+    params:
+      content: "H28测试：常买杭州东到上海虹桥"
+      kind: "fact"
+fallback_goal: 播种记忆
