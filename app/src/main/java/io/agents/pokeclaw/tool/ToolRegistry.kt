@@ -15,6 +15,9 @@ object ToolRegistry {
 
     enum class DeviceType { TV, MOBILE }
 
+    /** Third-party MCP tools, registered as `mcp_<server>_<tool>`. */
+    private const val MCP_TOOL_PREFIX = "mcp_"
+
     private val tools = LinkedHashMap<String, BaseTool>()
     var deviceType: DeviceType = DeviceType.TV
         private set
@@ -117,6 +120,37 @@ object ToolRegistry {
                 "Refused '$name' for source=$sourceChannel risk=${ToolRiskPolicy.riskOf(name)}"
             )
             return ToolResult.error(reason)
+        }
+
+        // Third layer, and the one that needs a human. An MCP tool is
+        // third-party code that the *model* decided to call, so on the
+        // interactive path it waits for the user to approve it.
+        // ToolRiskPolicy already refuses these for remote channels; this
+        // covers the task the user started themselves. Fail closed — no
+        // visible screen, a second call while one waits, or no answer inside
+        // the timeout all mean the tool does not run, and the model is told
+        // why so the loop can finish honestly. See McpConfirmationGate.
+        if (name.startsWith(MCP_TOOL_PREFIX)) {
+            val prompt = (tool as? io.agents.pokeclaw.agent.mcp.McpTool)
+                ?.describeForConfirmation(params)
+            if (prompt == null) {
+                io.agents.pokeclaw.utils.XLog.e(
+                    "ToolRegistry",
+                    "Refused '$name': an MCP tool that is not a registered McpTool cannot be confirmed"
+                )
+                return ToolResult.error(
+                    "Refused '$name': an unrecognised MCP tool cannot be confirmed and was not run."
+                )
+            }
+            val verdict = io.agents.pokeclaw.agent.mcp.McpConfirmationCoordinator
+                .awaitDecision(prompt)
+            if (!verdict.allowed) {
+                io.agents.pokeclaw.utils.XLog.w(
+                    "ToolRegistry",
+                    "MCP confirmation refused '$name': ${verdict.outcome}"
+                )
+                return ToolResult.error(verdict.reason)
+            }
         }
 
         return try {
