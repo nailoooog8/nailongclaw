@@ -23,6 +23,9 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.webkit.WebViewAssetLoader
 import io.agents.pokeclaw.BuildConfig
+import io.agents.pokeclaw.agent.mcp.McpConfirmationCoordinator
+import io.agents.pokeclaw.agent.mcp.McpConfirmationGate
+import io.agents.pokeclaw.agent.mcp.McpConfirmationRequest
 import io.agents.pokeclaw.appViewModel
 import io.agents.pokeclaw.base.BaseActivity
 import io.agents.pokeclaw.ui.chat.ChatHistoryManager
@@ -41,11 +44,13 @@ import java.util.concurrent.Executors
  * controller backs the Compose chat screen; this is the second sink.
  *
  * Also a design-review surface, so the static sample turns (MCP confirm
- * card, memory chips) stay in `index.html` as markup samples. Those have no
- * live data source: the MCP card needs a Kotlin → JS → Kotlin decision loop
- * and the memory chips need the recall results. The tool card is not one of
- * them — it has carried real tool calls since 2026-10-19, and since
- * 2026-10-22 it survives a transcript restore too (QA H23 / H26).
+ * card, memory chips) stay in `index.html` as markup samples. The memory chips
+ * still have no live data source. The MCP card is not one of them any more —
+ * since 2026-10-23 it carries a real decision loop: `PokeClawChat.decideMcp`
+ * answers `McpConfirmationCoordinator`, which is what parks the agent thread
+ * that asked (QA H27). The tool card has carried real tool calls since
+ * 2026-10-19, and since 2026-10-22 it survives a transcript restore too
+ * (QA H23 / H26).
  *
  * Not exported, so no other app can reach it.
  */
@@ -56,7 +61,10 @@ class ClaudeUiPreviewActivity : BaseActivity() {
     private val executor = Executors.newSingleThreadExecutor()
 
     private val sink by lazy {
-        WebChatSink { messages -> publish(messages) }
+        WebChatSink(
+            onRender = { messages -> publish(messages) },
+            onConfirmation = { request -> publishConfirmation(request) },
+        )
     }
 
     private val taskFlowController by lazy {
@@ -157,6 +165,59 @@ class ClaudeUiPreviewActivity : BaseActivity() {
             XLog.e(TAG, "[chat] send(${payload.length} chars)")
             runOnUiThread { taskFlowController.sendTask(payload) }
         }
+
+        /**
+         * JS → Kotlin: the user answered the MCP confirmation card.
+         *
+         * The whole point of the loop: this is the half that unparks the agent
+         * thread blocked inside `ToolRegistry.executeTool`. Safe to call when
+         * nothing is waiting — a stale tap is logged and dropped by the
+         * coordinator rather than answering a later request.
+         */
+        @JavascriptInterface
+        fun decideMcp(decision: String?) {
+            val parsed = when (decision?.trim()?.lowercase()) {
+                "allow_once" -> McpConfirmationGate.Decision.ALLOW_ONCE
+                "allow_always" -> McpConfirmationGate.Decision.ALLOW_ALWAYS
+                "deny" -> McpConfirmationGate.Decision.DENY
+                else -> {
+                    XLog.e(TAG, "[chat] decideMcp('$decision') ignored — not a decision")
+                    return
+                }
+            }
+            XLog.e(TAG, "[chat] decideMcp($parsed)")
+            McpConfirmationCoordinator.submit(parsed)
+        }
+    }
+
+    /**
+     * Answers MCP confirmations while this page is what the user is looking at.
+     *
+     * Both this activity and `ComposeChatActivity` register a surface; the
+     * coordinator keeps whichever attached last, so the card lands on the
+     * screen the user is actually on. [isForeground] is what turns "attached
+     * but backgrounded" into a refusal instead of a 60-second wait nobody can
+     * see.
+     */
+    private val confirmationSurface = object : McpConfirmationCoordinator.Surface {
+
+        @Volatile
+        override var isForeground: Boolean = false
+
+        override fun showConfirmation(request: McpConfirmationRequest) {
+            // The coordinator calls this from the agent thread.
+            runOnUiThread {
+                taskFlowController.noteSystem(McpConfirmationGate.pendingNote(request))
+                sink.showMcpConfirmation(request)
+            }
+        }
+
+        override fun hideConfirmation(verdict: McpConfirmationGate.Verdict) {
+            runOnUiThread {
+                sink.hideMcpConfirmation()
+                taskFlowController.noteSystem(McpConfirmationGate.transcriptNote(verdict))
+            }
+        }
     }
 
     /**
@@ -183,6 +244,36 @@ class ClaudeUiPreviewActivity : BaseActivity() {
         // throws, the error surfaces via the console bridge instead.
         webView.post {
             webView.evaluateJavascript("window.__cds && window.__cds.renderLiveRaw($json);", null)
+        }
+    }
+
+    /**
+     * Kotlin → JS: put the MCP confirmation card on screen, or take it down
+     * with null.
+     *
+     * Deliberately a separate call from [publish]: the feed redraw starts by
+     * emptying `#feed`, so drawing the card in the same `evaluateJavascript`
+     * would delete it. The page therefore renders the card *after* the feed,
+     * and this method is the only thing that touches it.
+     */
+    private fun publishConfirmation(request: McpConfirmationRequest?) {
+        if (!::webView.isInitialized) return
+        val json = if (request == null) {
+            "null"
+        } else {
+            buildString {
+                append("{\"toolName\":"); appendJsonString(request.toolName)
+                append(",\"displayName\":"); appendJsonString(request.displayName)
+                append(",\"serverName\":"); appendJsonString(request.serverName)
+                append(",\"description\":"); appendJsonString(request.description)
+                append(",\"paramsPreview\":"); appendJsonString(request.paramsPreview)
+                append("}")
+            }
+        }
+        webView.post {
+            webView.evaluateJavascript(
+                "window.__cds && window.__cds.renderConfirmation($json);", null
+            )
         }
     }
 
@@ -436,7 +527,27 @@ class ClaudeUiPreviewActivity : BaseActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        // This page is the screen the user is looking at, so it is the surface
+        // that answers MCP confirmations. Two activities register; the
+        // coordinator keeps the last one attached.
+        confirmationSurface.isForeground = true
+        McpConfirmationCoordinator.attach(confirmationSurface)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        // Stays attached — a task keeps running with the page backgrounded —
+        // but can no longer show a card, which the coordinator treats as
+        // "refuse now", not "wait 60 seconds for nobody".
+        confirmationSurface.isForeground = false
+    }
+
     override fun onDestroy() {
+        // A wait this surface cannot answer must be refused now, not left to
+        // time out against a screen that no longer exists.
+        McpConfirmationCoordinator.detach(confirmationSurface)
         qaReceiver?.let {
             runCatching { unregisterReceiver(it) }
             qaReceiver = null

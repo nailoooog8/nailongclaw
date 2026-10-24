@@ -3,6 +3,7 @@
 
 package io.agents.pokeclaw.ui.web
 
+import io.agents.pokeclaw.agent.mcp.McpConfirmationRequest
 import io.agents.pokeclaw.ui.chat.ChatMessage
 import io.agents.pokeclaw.ui.chat.ChatSink
 import io.agents.pokeclaw.ui.chat.ToolStep
@@ -29,9 +30,21 @@ import io.agents.pokeclaw.ui.chat.ToolStep
  * `ChatSink.appendToolStep`; this sink maps it to `toolSteps`, which the page
  * renders as `.tool-card`. Keep the device QA gap separate from the data path:
  * long unbroken summaries still need verification on the real WebView.
+ *
+ * ## The MCP confirmation card is not a message
+ *
+ * [showMcpConfirmation] is deliberately outside the message list: a pending
+ * card is *live* state — it must never be persisted, never come back from a
+ * restore, and never be replayed by a full redraw. It rides its own channel
+ * ([onConfirmation]) so the page can draw it after the feed is rebuilt, which
+ * is also what keeps `renderLiveRaw`'s "wipe the feed and redraw" from
+ * deleting a card that is still waiting for an answer. What *is* persisted is
+ * the outcome, as an ordinary system line — see
+ * [io.agents.pokeclaw.agent.mcp.McpConfirmationGate.transcriptNote].
  */
 class WebChatSink(
     private val onRender: (List<WebMessage>) -> Unit,
+    private val onConfirmation: (McpConfirmationRequest?) -> Unit,
 ) : ChatSink {
 
     /** A message reduced to exactly what the page needs to draw it. */
@@ -197,5 +210,20 @@ class WebChatSink(
 
     private fun emit() {
         onRender(messages.toList())
+    }
+
+    /**
+     * Put the MCP confirmation card on screen, or take it down with null.
+     *
+     * Called from the coordinator (agent thread); the Activity marshals. Does
+     * not touch [messages], so a card cannot be mistaken for transcript
+     * content by `snapshotMessages()` / `restore()`.
+     */
+    fun showMcpConfirmation(request: McpConfirmationRequest) {
+        onConfirmation(request)
+    }
+
+    fun hideMcpConfirmation() {
+        onConfirmation(null)
     }
 }

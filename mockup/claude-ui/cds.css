@@ -773,6 +773,29 @@ body {
 .mcp-head { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
 .mcp-desc { font-size: 12.5px; color: var(--cds-text-secondary); margin-bottom: 11px; }
 .mcp-actions { display: flex; gap: 8px; }
+/* 工具名推到行尾：卡片的语义是「这个第三方工具要干件事」，名字是那件事的宾语。 */
+.mcp-tool {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 500;
+  opacity: .72;
+}
+/* 参数预览。overflow-wrap 是必须的，不是装饰：参数里最常见的长串就是绝对
+   路径（QA H24 量过 .tool-body 溢出 +131 px），pre-wrap 不认超长单词。 */
+.mcp-params {
+  margin: -4px 0 11px;
+  padding: 8px 10px;
+  border-radius: var(--cds-panel-radius);
+  background: var(--cds-alpha-1);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--cds-text-secondary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+/* 点击后本地禁用：让「点了，正在等」和「没点上」在画面上可区分。 */
+.mcp-actions button:disabled { opacity: .45; pointer-events: none; }
 
 /* 记忆库召回 chip：淡蓝底、无边框 */
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }

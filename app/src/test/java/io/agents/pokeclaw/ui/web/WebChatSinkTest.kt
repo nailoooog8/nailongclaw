@@ -1,5 +1,6 @@
 package io.agents.pokeclaw.ui.web
 
+import io.agents.pokeclaw.agent.mcp.McpConfirmationRequest
 import io.agents.pokeclaw.ui.chat.ChatMessage
 import io.agents.pokeclaw.ui.chat.ChatSink
 import io.agents.pokeclaw.ui.chat.ToolStep
@@ -22,11 +23,15 @@ class WebChatSinkTest {
 
     private var last: List<WebChatSink.WebMessage> = emptyList()
     private var renders = 0
+    private var lastConfirmation: Any? = "untouched"
 
-    private fun sink() = WebChatSink { messages ->
-        last = messages
-        renders++
-    }
+    private fun sink() = WebChatSink(
+        onRender = { messages ->
+            last = messages
+            renders++
+        },
+        onConfirmation = { request -> lastConfirmation = request },
+    )
 
     private fun typing() =
         ChatMessage(ChatMessage.Role.ASSISTANT, ChatSink.TYPING_INDICATOR)
@@ -392,5 +397,31 @@ class WebChatSinkTest {
         // role and the payload both have to survive persistence.
         assertEquals("TOOL_GROUP", last.single().role)
         assertEquals("com.MobileTicket", last.single().toolSteps.single().summary)
+    }
+
+    @Test
+    fun `a pending MCP confirmation is live state, not a message`() {
+        val s = sink()
+        val request = McpConfirmationRequest(
+            toolName = "mcp_qatools_echo",
+            displayName = "echo",
+            serverName = "qatools",
+            description = "Echoes text back",
+            paramsPreview = "text = hello",
+        )
+        s.showMcpConfirmation(request)
+
+        // Its own channel, so the page can draw it after a full feed redraw
+        // instead of being wiped by it.
+        assertEquals(request, lastConfirmation)
+        // ...and it must never enter the transcript: a card that is still
+        // waiting cannot be persisted, and a restored one would have no task
+        // behind it to answer it.
+        assertTrue(last.isEmpty())
+        assertTrue(s.snapshotMessages().isEmpty())
+
+        s.hideMcpConfirmation()
+        assertNull(lastConfirmation)
+        assertTrue(last.isEmpty())
     }
 }

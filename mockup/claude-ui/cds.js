@@ -466,6 +466,68 @@
     return node;
   }
 
+  /* ---------------------------------------------- MCP 确认卡（真实数据）
+     静态样例那几张卡（index.html 里的 .mcp-card）是给纯浏览器看的设计稿；
+     这一张是活的：Kotlin 侧 ToolRegistry 在一个 mcp_* 工具要执行前把请求推
+     过来，用户点一个按钮，PokeClawChat.decideMcp 把决定送回 Kotlin，
+     阻塞在 executeTool 里的那个线程才继续。
+
+     三个细节都是有原因的：
+       1. 卡片**不放进消息列表**。它由 renderConfirmation 单独画在 feed 末尾，
+          因为 renderLiveRaw 会先清空 feed 再重建——同一批 evaluateJavascript
+          里先画卡再重建，卡就没了。Kotlin 侧也据此分两次调用。
+       2. 点击后先本地禁用三个按钮，再上交决定。等待期间的重复点击会把两个
+          决定送给同一次等待，而第二次会被 coordinator 当作过期点击丢掉——
+          禁用让"点了没反应"和"没点上"在画面上可区分。
+       3. 无桥（纯浏览器打开）时按钮点了只禁用自己：那是设计稿，没有人在
+          等这个决定，不能假装有回路。                                       */
+  function renderConfirmation(req) {
+    removeConfirmation();
+    if (!req) return;
+    var card = turn('turn-assistant',
+      '<div class="mcp-card" id="mcpConfirm">' +
+        '<div class="mcp-head">' +
+          '<span class="status-dot" data-kind="clay"></span>' +
+          '<span>需要你确认</span>' +
+          '<span class="mcp-tool"></span>' +
+        '</div>' +
+        '<div class="mcp-desc"></div>' +
+        '<div class="mcp-params"></div>' +
+        '<div class="mcp-actions">' +
+          '<button class="pill cds-btn-squish" type="button" data-decide="allow_once">允许一次</button>' +
+          '<button class="pill cds-btn-squish" type="button" data-decide="allow_always">始终允许</button>' +
+          '<button class="pill cds-btn-squish" type="button" data-decide="deny">本次拒绝</button>' +
+        '</div>' +
+      '</div>');
+    card.querySelector('.mcp-tool').textContent = req.displayName + ' · ' + req.serverName;
+    card.querySelector('.mcp-desc').textContent = req.description || '';
+    var params = card.querySelector('.mcp-params');
+    if (req.paramsPreview) {
+      params.textContent = req.paramsPreview;
+    } else {
+      params.parentNode.removeChild(params);
+    }
+    card.addEventListener('click', function (e) {
+      var btn = e.target && e.target.closest ? e.target.closest('button[data-decide]') : null;
+      if (!btn) return;
+      var decision = btn.getAttribute('data-decide');
+      var buttons = card.querySelectorAll('button[data-decide]');
+      for (var i = 0; i < buttons.length; i++) { buttons[i].disabled = true; }
+      if (window.PokeClawChat && window.PokeClawChat.decideMcp) {
+        window.PokeClawChat.decideMcp(decision);
+      }
+    });
+    toBottom(true);
+    return card;
+  }
+
+  function removeConfirmation() {
+    var existing = document.getElementById('mcpConfirm');
+    if (existing && existing.parentNode) {
+      existing.parentNode.removeChild(existing);
+    }
+  }
+
   // 演示用的模拟回合，保留给纯浏览器预览；接入后走 renderLive。
   function runAssistant(prompt) {
     var status = turn('turn-assistant',
@@ -667,6 +729,8 @@
   window.__cds = {
     renderLive: renderLive,
     renderLiveRaw: renderLiveRaw,
+    renderConfirmation: renderConfirmation,
+    removeConfirmation: removeConfirmation,
     enterLiveMode: enterLiveMode,
     hasNativeBridge: hasNativeBridge,
     rateLimit: triggerBackoff,
