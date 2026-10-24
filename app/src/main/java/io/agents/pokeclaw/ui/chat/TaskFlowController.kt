@@ -20,6 +20,7 @@ import io.agents.pokeclaw.agent.DirectDeviceDataGuard
 import io.agents.pokeclaw.agent.PipelineRouter
 import io.agents.pokeclaw.agent.TaskPromptEnvelope
 import io.agents.pokeclaw.agent.llm.ModelConfigRepository
+import io.agents.pokeclaw.agent.memory.MemoryRecallFormat
 import io.agents.pokeclaw.service.ClawAccessibilityService
 import io.agents.pokeclaw.service.ClawNotificationListener
 import io.agents.pokeclaw.service.ForegroundService
@@ -473,6 +474,15 @@ class TaskFlowController(
                                 toolName = event.toolName,
                                 summary = event.detail.ifBlank { event.toolName },
                                 success = event.success,
+                                // event.toolName is ToolRegistry.getDisplayName(),
+                                // which for MemoryRecallTool is its registry name.
+                                // Parse failure → null → plain tool card, never a
+                                // wrong chip. See MemoryRecallFormat.
+                                memories = if (event.toolName == "memory_recall") {
+                                    MemoryRecallFormat.chips(event.detail).takeIf { it.isNotEmpty() }
+                                } else {
+                                    null
+                                },
                             )
                         )
                     }

@@ -4,6 +4,7 @@
 package io.agents.pokeclaw.ui.chat
 
 import android.content.Context
+import io.agents.pokeclaw.agent.memory.MemoryRecallFormat
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -271,11 +272,22 @@ object ChatHistoryManager {
             val match = TOOL_LINE.matchEntire(line) ?: return null
             val rest = match.groupValues[2]
             val arrow = rest.indexOf(TOOL_ARROW)
-            ToolStep(
+            val step = ToolStep(
                 toolName = if (arrow >= 0) rest.substring(0, arrow).trim() else rest,
                 summary = if (arrow >= 0) rest.substring(arrow + TOOL_ARROW.length).trim() else "",
                 success = match.groupValues[1] == TOOL_ICON_OK
             )
+            // The summary is the only thing persisted, so the chips a live
+            // memory_recall step carried are re-derived from it here. The
+            // summary was oneLine()'d on the way out — flattened, not lost —
+            // and the parser reads the flattened shape directly. Nothing to
+            // parse (empty bank, no match, format drift) leaves the plain
+            // tool card, which is what older transcripts show anyway.
+            if (step.toolName == "memory_recall") {
+                step.copy(memories = MemoryRecallFormat.chips(step.summary).takeIf { it.isNotEmpty() })
+            } else {
+                step
+            }
         }
     }
 

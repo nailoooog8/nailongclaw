@@ -1,5 +1,6 @@
 package io.agents.pokeclaw.ui.chat
 
+import io.agents.pokeclaw.agent.memory.MemoryRecallFormat
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -132,5 +133,69 @@ class ChatHistoryManagerLoadTest {
 
         assertEquals(1792678558202L, group.timestamp)
         assertEquals("截屏", group.toolSteps!![0].toolName)
+    }
+
+    @Test
+    fun `a restored memory_recall step re-derives its chips from the summary`() {
+        // The chips a live recall carried are not persisted as structure — the
+        // summary line is the only thing on disk. The loader must parse them
+        // back out so a restored feed renders .chips like the live one did.
+        // The summary is oneLine()'d on save, so the text here is the
+        // flattened shape.
+        val file = transcript(
+            """
+            ## Tools
+            - ✓ memory_recall → 记忆检索「全部」： - [偏好#a1b2c3d4e5f6] 妈妈出行优先上午车次 (命中 3 次) - [事实#0f9e8d7c6b5a] 常买杭州东 → 上海虹桥 (命中 1 次)
+            """.trimIndent()
+        )
+
+        val group = ChatHistoryManager.load(file)
+            .first { it.role == ChatMessage.Role.TOOL_GROUP }
+        val step = group.toolSteps!!.single()
+
+        assertEquals(
+            listOf(
+                MemoryRecallFormat.Chip("a1b2c3d4e5f6", "偏好", "妈妈出行优先上午车次"),
+                MemoryRecallFormat.Chip("0f9e8d7c6b5a", "事实", "常买杭州东 → 上海虹桥"),
+            ),
+            step.memories,
+        )
+    }
+
+    @Test
+    fun `a restored memory_recall step with nothing to parse keeps memories null`() {
+        // Empty-bank / no-match texts (and any older transcript) fall back to
+        // the plain tool card — no chips rather than wrong chips.
+        val file = transcript(
+            """
+            ## Tools
+            - ✓ memory_recall → 记忆库还是空的（0 条）。
+            """.trimIndent()
+        )
+
+        val step = ChatHistoryManager.load(file)
+            .first { it.role == ChatMessage.Role.TOOL_GROUP }
+            .toolSteps!!.single()
+
+        assertNull(step.memories)
+        assertEquals("memory_recall", step.toolName)
+    }
+
+    @Test
+    fun `a non-recall tool step never gets chips`() {
+        // Another tool's summary merely *looks* like recall output — chip
+        // parsing is keyed on the tool name, not on the text.
+        val file = transcript(
+            """
+            ## Tools
+            - ✓ 截屏 → 结果 - [偏好#12] 妈妈出行优先上午车次 (命中 3 次)
+            """.trimIndent()
+        )
+
+        val step = ChatHistoryManager.load(file)
+            .first { it.role == ChatMessage.Role.TOOL_GROUP }
+            .toolSteps!!.single()
+
+        assertNull(step.memories)
     }
 }

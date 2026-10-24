@@ -63,10 +63,13 @@ class MemoryRecallTool : BaseTool() {
                     "记忆库里没有匹配「${query.ifBlank { "全部" }}」的内容（共 $total 条）。"
                 )
             }
+            // The line format is a UI contract, not just model-facing text: the
+            // web surface reads chips back out of this exact text. Format and
+            // parser live together in MemoryRecallFormat so they cannot drift.
             val body = results.joinToString("\n") { r ->
-                "- [${r.entry.kindLabel}#${r.entry.id}] ${r.entry.content}  (命中 ${r.entry.hits + 1} 次)"
+                MemoryRecallFormat.chipLine(r.entry.kindLabel, r.entry.id, r.entry.content, r.entry.hits + 1)
             }
-            ToolResult.success("记忆检索「${query.ifBlank { "全部" }}」：\n$body")
+            ToolResult.success(MemoryRecallFormat.header(query) + "\n" + body)
         } catch (e: Exception) {
             ToolResult.error("memory_recall error: ${e.message}")
         }
