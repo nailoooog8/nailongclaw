@@ -181,6 +181,11 @@
     // 标题改成中性文案：写死「给妈妈订高铁票」会让真实使用显得像被冒充。
     var title = document.querySelector('.topbar-title');
     if (title) title.textContent = '新任务';
+    // 静态示例 turn（工具卡 / MCP 卡 / 记忆 chips）只属于纯浏览器里的设计稿。
+    // 三类示例现在都有真实数据源（工具卡 H23、MCP 卡 H27、chips 2026-10-24），
+    // 真实界面里再摆一段虚构的「给妈妈订高铁票」对话就不是示例而是冒充了。
+    // 首次打开（还没有历史可恢复）时不清空的话，用户会以为任务已经跑过。
+    feed.textContent = '';
   }
 
   function submit() {
@@ -440,28 +445,55 @@
       return t;
     }
 
+    // 一个工具步骤若带 memories（memory_recall 的结构化结果，Kotlin 侧
+    // MemoryRecallFormat 从同一段 summary 文本解析而来）就画成 .chips，
+    // 否则画 .tool-card。解析失败时 memories 为空 —— 那时工具卡就是回退，
+    // 完整文本还在卡里，宁缺勿错。
     var parts = [];
     if (m.content) {
       parts.push('<div class="body"><p></p></div>');
     }
-    (m.toolSteps || []).forEach(function () {
-      parts.push('<div class="tool-card"><div class="tool-head">' +
-        '<span class="status-dot" data-kind="ready"></span>' +
-        '<span class="tool-name"></span>' +
-        '<span class="tool-kind">工具调用</span></div>' +
-        '<div class="tool-body"></div></div>');
+    (m.toolSteps || []).forEach(function (step) {
+      if (step.memories && step.memories.length) {
+        parts.push('<div class="chips"></div>');
+      } else {
+        parts.push('<div class="tool-card"><div class="tool-head">' +
+          '<span class="status-dot" data-kind="ready"></span>' +
+          '<span class="tool-name"></span>' +
+          '<span class="tool-kind">工具调用</span></div>' +
+          '<div class="tool-body"></div></div>');
+      }
     });
     var node = turn('turn-assistant', parts.join(''));
 
     if (m.content) {
       node.querySelector('.body p').textContent = m.content;
     }
-    var steps = node.querySelectorAll('.tool-card');
-    (m.toolSteps || []).forEach(function (step, i) {
-      if (!steps[i]) return;
-      steps[i].querySelector('.tool-name').textContent = step.name;
-      steps[i].querySelector('.tool-body').textContent = step.summary;
-      steps[i].querySelector('.status-dot').setAttribute('data-kind', step.success ? 'ready' : 'error');
+    var chipBoxes = node.querySelectorAll('.chips');
+    var cards = node.querySelectorAll('.tool-card');
+    var chipIndex = 0;
+    var cardIndex = 0;
+    (m.toolSteps || []).forEach(function (step) {
+      if (step.memories && step.memories.length) {
+        var box = chipBoxes[chipIndex++];
+        if (!box) return;
+        step.memories.forEach(function (c) {
+          var chip = document.createElement('span');
+          chip.className = 'chip';
+          var idx = document.createElement('span');
+          idx.className = 'chip-idx';
+          idx.textContent = '#' + c.id;
+          chip.appendChild(idx);
+          chip.appendChild(document.createTextNode(c.content));
+          box.appendChild(chip);
+        });
+        return;
+      }
+      var card = cards[cardIndex++];
+      if (!card) return;
+      card.querySelector('.tool-name').textContent = step.name;
+      card.querySelector('.tool-body').textContent = step.summary;
+      card.querySelector('.status-dot').setAttribute('data-kind', step.success ? 'ready' : 'error');
     });
     return node;
   }

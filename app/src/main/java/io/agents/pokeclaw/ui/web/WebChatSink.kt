@@ -4,6 +4,7 @@
 package io.agents.pokeclaw.ui.web
 
 import io.agents.pokeclaw.agent.mcp.McpConfirmationRequest
+import io.agents.pokeclaw.agent.memory.MemoryRecallFormat
 import io.agents.pokeclaw.ui.chat.ChatMessage
 import io.agents.pokeclaw.ui.chat.ChatSink
 import io.agents.pokeclaw.ui.chat.ToolStep
@@ -28,7 +29,10 @@ import io.agents.pokeclaw.ui.chat.ToolStep
  *
  * `TaskFlowController` appends each non-Finish `TaskEvent.ToolResult` through
  * `ChatSink.appendToolStep`; this sink maps it to `toolSteps`, which the page
- * renders as `.tool-card`. Keep the device QA gap separate from the data path:
+ * renders as `.tool-card`. A `memory_recall` step additionally carries
+ * `memories`, parsed by [MemoryRecallFormat] out of the same summary text —
+ * the page renders those as `.chips`, with the card kept as the fallback when
+ * nothing parsed. Keep the device QA gap separate from the data path:
  * long unbroken summaries still need verification on the real WebView.
  *
  * ## The MCP confirmation card is not a message
@@ -60,6 +64,15 @@ class WebChatSink(
         val name: String,
         val summary: String,
         val success: Boolean,
+        /** Memory chips for a `memory_recall` step; empty means render the plain tool card. */
+        val memories: List<MemoryRecallFormat.Chip> = emptyList(),
+    )
+
+    private fun ToolStep.view() = ToolStepView(
+        name = toolName,
+        summary = summary,
+        success = success,
+        memories = memories.orEmpty(),
     )
 
     private val messages = mutableListOf<WebMessage>()
@@ -99,9 +112,7 @@ class WebChatSink(
             content = message.content,
             isTypingIndicator = isTyping,
             modelName = message.modelName,
-            toolSteps = message.toolSteps.orEmpty().map {
-                ToolStepView(it.toolName, it.summary, it.success)
-            },
+            toolSteps = message.toolSteps.orEmpty().map { it.view() },
         )
         if (isTyping) typingIndex = messages.lastIndex
         emit()
@@ -154,7 +165,7 @@ class WebChatSink(
             role = ChatMessage.Role.TOOL_GROUP.name,
             content = "",
             isTypingIndicator = false,
-            toolSteps = listOf(ToolStepView(step.toolName, step.summary, step.success)),
+            toolSteps = listOf(step.view()),
         )
         emit()
     }
@@ -165,7 +176,7 @@ class WebChatSink(
                 .getOrDefault(ChatMessage.Role.SYSTEM),
             content = web.content,
             toolSteps = web.toolSteps
-                .map { ToolStep(it.name, it.summary, it.success) }
+                .map { ToolStep(it.name, it.summary, it.success, it.memories.takeIf { m -> m.isNotEmpty() }) }
                 .takeIf { it.isNotEmpty() },
             modelName = web.modelName,
         )
@@ -200,9 +211,7 @@ class WebChatSink(
                     content = message.content,
                     isTypingIndicator = false,
                     modelName = message.modelName,
-                    toolSteps = message.toolSteps.orEmpty().map {
-                        ToolStepView(it.toolName, it.summary, it.success)
-                    },
+                    toolSteps = message.toolSteps.orEmpty().map { it.view() },
                 )
             }
         emit()

@@ -44,8 +44,11 @@ import java.util.concurrent.Executors
  * controller backs the Compose chat screen; this is the second sink.
  *
  * Also a design-review surface, so the static sample turns (MCP confirm
- * card, memory chips) stay in `index.html` as markup samples. The memory chips
- * still have no live data source. The MCP card is not one of them any more —
+ * card, memory chips) stay in `index.html` as markup samples — cleared on
+ * entry here, kept for the pure-browser preview. The memory chips have
+ * carried live recall data since 2026-10-24: a `memory_recall` tool result is
+ * parsed by `MemoryRecallFormat` into chips and rides the tool step's
+ * `memories` field. The MCP card is not a static sample any more either —
  * since 2026-10-23 it carries a real decision loop: `PokeClawChat.decideMcp`
  * answers `McpConfirmationCoordinator`, which is what parks the agent thread
  * that asked (QA H27). The tool card has carried real tool calls since
@@ -288,7 +291,19 @@ class ClaudeUiPreviewActivity : BaseActivity() {
             if (i > 0) append(',')
             append("{\"name\":"); appendJsonString(s.name)
             append(",\"summary\":"); appendJsonString(s.summary)
-            append(",\"success\":").append(s.success).append('}')
+            append(",\"success\":").append(s.success)
+            if (s.memories.isNotEmpty()) {
+                append(",\"memories\":[")
+                s.memories.forEachIndexed { j, chip ->
+                    if (j > 0) append(',')
+                    append("{\"id\":"); appendJsonString(chip.id)
+                    append(",\"kind\":"); appendJsonString(chip.kindLabel)
+                    append(",\"content\":"); appendJsonString(chip.content)
+                    append('}')
+                }
+                append(']')
+            }
+            append('}')
         }
         append("]}")
     }

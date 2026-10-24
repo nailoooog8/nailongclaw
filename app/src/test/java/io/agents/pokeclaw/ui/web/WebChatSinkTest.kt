@@ -1,6 +1,7 @@
 package io.agents.pokeclaw.ui.web
 
 import io.agents.pokeclaw.agent.mcp.McpConfirmationRequest
+import io.agents.pokeclaw.agent.memory.MemoryRecallFormat
 import io.agents.pokeclaw.ui.chat.ChatMessage
 import io.agents.pokeclaw.ui.chat.ChatSink
 import io.agents.pokeclaw.ui.chat.ToolStep
@@ -238,6 +239,45 @@ class WebChatSinkTest {
     }
 
     @Test
+    fun `memory chips ride the web view model and the snapshot back`() {
+        // The page renders a memory_recall step as .chips instead of the tool
+        // card, so the chips must survive both directions of the sink: out to
+        // JSON (through ToolStepView) and back for saveChat (through
+        // snapshotMessages). Losing them on the way back would make the next
+        // save drop chips that the current screen shows.
+        val chips = listOf(
+            MemoryRecallFormat.Chip("a1b2c3d4e5f6", "偏好", "妈妈出行优先上午车次"),
+            MemoryRecallFormat.Chip("0f9e8d7c6b5a", "事实", "常买杭州东 → 上海虹桥"),
+        )
+        val s = sink()
+        s.appendToolStep(
+            ToolStep(
+                "memory_recall",
+                "记忆检索「全部」：\n- [偏好#12] 妈妈出行优先上午车次  (命中 3 次)",
+                success = true,
+                memories = chips,
+            )
+        )
+
+        assertEquals(chips, last.single().toolSteps.single().memories)
+
+        val rebuilt = s.snapshotMessages().single().toolSteps?.single()
+        assertEquals(chips, rebuilt?.memories)
+    }
+
+    @Test
+    fun `a step without chips still snapshots as memories-null`() {
+        // Not every tool step is a recall; snapshotMessages must not invent an
+        // empty chip list for them — null is what TaskFlowController sets.
+        val s = sink()
+        s.appendToolStep(ToolStep("截屏", "/tmp/a.png", true))
+
+        assertTrue(last.single().toolSteps.single().memories.isEmpty()) // view default: empty list
+        val rebuilt = s.snapshotMessages().single().toolSteps?.single()
+        assertNull(rebuilt?.memories)
+    }
+
+    @Test
     fun `clear drops messages and any pending indicator`() {
         val s = sink()
         s.append(user("q"))
@@ -318,6 +358,25 @@ class WebChatSinkTest {
         )
         assertEquals(1, last.single().toolSteps.size)
         assertEquals("tap", last.single().toolSteps.single().name)
+    }
+
+    @Test
+    fun `restore keeps memory chips from the saved transcript`() {
+        // A restored memory_recall step must render as chips again, not fall
+        // back to a tool card — the restore path carries whatever the loader
+        // re-derived from the persisted summary.
+        val chips = listOf(MemoryRecallFormat.Chip("5e4d3c2b1a09", "身份", "妈妈身份证已存"))
+        val s = sink()
+        s.restore(
+            listOf(
+                ChatMessage(
+                    ChatMessage.Role.TOOL_GROUP,
+                    "",
+                    toolSteps = listOf(ToolStep("memory_recall", "记忆检索「全部」：…", true, chips)),
+                )
+            )
+        )
+        assertEquals(chips, last.single().toolSteps.single().memories)
     }
 
     // ---------------------------------------------------------------------
