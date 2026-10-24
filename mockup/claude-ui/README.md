@@ -58,6 +58,13 @@
 > 「· 128 条」示例计数）。参考实现没有提供设置页组件（30 个组件全是会话/产物侧），
 > 面板形态取自 Claude 客户端通行的「设置 = 从侧栏唤起的弹层」，令牌与行样式同源。
 > BACK 键先关面板再退应用（页面经 `notifySettingsView` 上报开合）。
+>
+> **同日第三轮：原生编辑页换装 CDS（QA H31）**。面板行背后的 7 个原生 Activity
+> 从 ember ThemeManager 观感迁到同一套令牌的 View 侧实现（`ui/cds/CdsUi.kt`）：
+> clay 浅/深调色板、`--cds-panel` 分组卡、`.group-label` 段落标题、
+> `.settings-topbar` 化的返回栏。深浅跟随系统 night mode（与 live 模式同信号）。
+> 面板的「渠道接入」行同时修为直达完整设置页——`ChannelConfigActivity` 需要
+> per-channel extra，裸开会立即 finish（47 上的死行）。
 
 ## 来源
 

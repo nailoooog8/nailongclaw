@@ -1115,6 +1115,17 @@ When in doubt, rerun the smaller bundle first, then expand only if something dri
   - **QA 脚本随改**：`ui_cycle_test.py` 的 `back_to_chat` → `back_to_home`（主界面抽屉路径进设置）；`theme_persist_test.py` 的「BACK 两次找设置页入口」→「BACK 退出 + launcher 重进」（预览页已是任务根，BACK 即离应用）。
   - **单测**：346 / 0 / 0（本轮无新增——路由与 inset 是 Activity 层，抽屉是页面 DOM/CSS/JS；全量回归在 feat 提交前跑过）。
 
+- [x] **H31. Native settings editors ride the CDS tokens [PASS — 2026-10-24]**: 设置面板行后面的 7 个原生编辑页从 ember ThemeManager 观感整体迁到 CDS（`mockup/claude-ui/cds.css` 逐值镜像到 View 侧），面板→编辑页不再跳风格。
+  - **做法**：新增 `ui/cds/CdsUi.kt`——调色板（clay 底浅/深两套：表面 0-3、文本三级、陶土橙 accent 系、alpha-ink 边框，全部引自 cds.css 并注明令牌名）、面板/输入框绘制器、`.group-label` 排版、CommonToolbar 的 `.settings-topbar` 化（标题左对齐 15sp/600）。深浅跟随系统 night mode（与 live 模式的 WebView 同信号）。`MenuGroup.applyCds` 把分组卡变 `--cds-panel`（surface-2 + 1px 发丝线 + 10px 圆角 + 零投影），后续新增行自动继承默认色。7 页全部换装：SettingsActivity / LlmConfigActivity / ChannelConfigActivity / McpServersActivity / UserSkillsActivity / MemoryActivity / ThemeActivity（主题页的预览卡保留 ember 实色——它们描绘的是被选的主题本身）。
+  - ✅ **真机 PASS（2026-10-24，设备 `10AG4J1THX00524` / V2502DA（API 36），release 48 `PokeClaw_v0.8.3_20261024_194552.apk`）**：
+    - **浅色像素判据（Node 解码 screencap，不认图）**：LlmConfig 画布 `#f9f2ec`（期望 #faf2eb，±1/255）、卡片 `#fcf8f4`（期望 #fdf8f4）✓；SettingsActivity 画布 `#f9f2ec` / 面板 `#fcf8f4` ✓。
+    - **深色像素判据**（`cmd uimode night yes` 后走 UI 路径进 SettingsActivity）：画布 **`#151515` 精确命中**、面板 **`#1a1a19` 精确命中** ✓（验完恢复 night no）。
+    - **逐页结构**（uiautomator dump）：模型（标题「模型」左对齐 [173,185]，Active/Default/Cloud LLM 段落标题 + provider tabs + API Key 字段在位）、MCP（Servers（1）+ 添加行）、技能（技能配方（5）+ 两个 ＋ 行）、记忆（记忆（2）+ 管理组 + 搜索框）、主题（外观 + Dark/Light 预览 + Current: Dark）、全部设置（五组全在）——全部经面板行进入，`mCurrentFocus` 逐一确认。
+    - **顺带修掉一个死行**：面板「渠道接入」行原派 `ChannelConfigActivity`，而它缺 `EXTRA_CHANNEL_TYPE` 会立即 finish——build 47 上这行点了等于没点。改派 `SettingsActivity`（持有各渠道行的完整页），真机验证 `mCurrentFocus = …SettingsActivity`。
+    - **已知既有形态（非本轮引入）**：状态栏区域（y<123）全应用为纯黑——主 surface（H30 签收）同样如此；API 36 / targetSdk 36 强制 edge-to-edge，`statusBarColor` 已被忽略，黑条是 SystemUI 层。要改需逐页做 inset 适配（同 H29 的 wrapper 套路），记 BACKLOG。
+    - **刻意未动**：MCP/技能/记忆的编辑对话框（系统 AlertDialog 浅色 + 固定深色文字是当初的既定取舍）保持原样，CDS 化记 BACKLOG；ember ThemeManager 只属于聊天侧，本轮不触碰。
+  - **单测**：346 / 0（改的是 View 装配与颜色，无可测纯逻辑）。
+
 - [x] **H30. Settings converge into the CDS surface [PASS — 2026-10-24]**: 设置内容外移 + 页内设置面板。①抽屉「记忆库」「技能管理」死行接为直达行（经 `openSettingsPage` 桥进 MemoryActivity / UserSkillsActivity，`enterLiveMode` 抹掉「· 128 条」示例计数）②抽屉「设置」行打开**页内设置面板**（`#settingsView`，弹层 sheet，分组：模型与预算 / 渠道接入 / MCP 服务器 / 技能 / 记忆库 / 主题 + 「全部设置」）③面板行打开对应原生编辑页，BACK 回来面板还在④BACK 先关面板再退应用⑤面板关着时不向无障碍树泄漏幽灵节点。
   - **形态依据**：参考实现（open-claude-ui）没有设置页组件（30 个组件全是会话/产物侧），面板形态取 Claude 客户端通行的「设置 = 从侧栏唤起的弹层」，令牌与行样式同源（cds.css）。**配置行为仍只有原生一处**——面板是纯呈现，行经 `PokeClawChat.openSettingsPage(section)` 分发到原生编辑页（未知 section 记日志后丢弃）；「全部设置」进原生完整页（权限/监控/关于刻意不重复做两份）。
   - ✅ **真机 PASS（2026-10-24，设备 `10AG4J1THX00524` / V2502DA，release 47 `PokeClaw_v0.8.3_20261024_185111.apk`）**：
