@@ -1,6 +1,7 @@
 # Claude UI 表面（PokeClaw）
 
-这是一个**第二聊天界面**（Claude UI 设计语言），不是独立产品。
+这是应用的**主界面**（Claude UI 设计语言）—— 2026-10-24 起由 Splash 直接落地
+（此前是经设置进入的第二聊天界面，`ComposeChatActivity` 退居外部 `task` 契约接收方）。
 
 - **接真实后端** —— 由 `WebChatSink` 实现 `ChatSink`，驱动的是与旗舰聊天页
   同一个 `TaskFlowController`。composer 经 `PokeClawChat.send` 回调 Kotlin，
@@ -36,6 +37,17 @@
 > 2026-10-19 用户确认「能用了」（QA H18 / H20 / H21）；
 > 2026-10-22 补完 H13 / H14 / H15 / H19，并修掉工具卡恢复丢失的缺陷；
 > 2026-10-24 MCP 确认回路（QA H27 ①③⑤，真机走的是旗舰聊天页那一侧）。
+>
+> **2026-10-24 升格主界面，侧栏按参考实现的逻辑落地**：≤760px 时侧栏从
+> `display:none` 改为**覆盖抽屉**（汉堡开关 + 遮罩点按 / Esc 关闭），桌面宽度
+> 仍常驻。参考 [Caho1/open-claude-ui](https://github.com/Caho1/open-claude-ui)
+> 的侧栏规格（288px 常驻、头部新建按钮 + 分组会话列表 + 脚部功能行）：本目录
+> 保留自己的 264px 网格与「今天 / 最近 / 远程渠道」分组，手机上把同一份内容
+> 收进抽屉而不是丢弃。**脚部新增「设置」行**（`#settingsBtn`）—— 参考实现
+> 的侧栏是布局里唯一的导航出口，本页面在手机宽度同样如此，而 LLM / MCP /
+> 无障碍全在原生设置里，经 `PokeClawChat.openSettings` 桥进入 SettingsActivity。
+> 参考实现的 pin / 拖拽重排（4px 死区 / Alt+↑↓）需要会话模型支撑，**刻意未抄**
+> —— 真实模式下会话列表仍是死控件（`data-live` 隐藏规则不变）。
 
 ## 来源
 

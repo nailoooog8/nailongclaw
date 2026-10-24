@@ -1103,6 +1103,18 @@ When in doubt, rerun the smaller bundle first, then expand only if something dri
   - ⚠️ **QA 脚本写法教训**：`adb shell input text` / `keyevent` 成功时**stdout 为空**——把「stdout 为空就重试」的包装器套在写命令上会把输入重复执行三遍（本次 composer 里留下的 `h28 seedh28 seedh28 seed` 就是这么来的；重试只该套在 dumpsys / cat 这类读命令上）。
   - **单测**：`MemoryRecallFormatTest` 7 例 + `SkillExecutorTest` 4 例（每次尝试一对事件 / 重试各发一次 / 失败耗尽仍发失败结果 / 占位符解析进真实参数）+ `WebChatSinkTest` 3 例 + `ChatHistoryManagerLoadTest` 3 例。全量 **346 tests / 37 suites / 0 失败**。
 
+- [x] **H29. The Claude UI surface is the main screen [PASS — 2026-10-24]**: `am force-stop` → 冷启动（Splash）→ 确认①落地在 `ClaudeUiPreviewActivity`，feed 无虚构示例、真实 transcript 恢复②顶栏汉堡打开侧栏抽屉③抽屉「设置」行 → `SettingsActivity`，BACK 回主界面④主界面 BACK 退出到 launcher⑤遮罩点按关闭抽屉。
+  - **改动范围**：Splash 落地面、浮动球点击（`bringAppToForeground`）、前台服务通知 PendingIntent 三处 → Claude UI；**外部 `task` 契约不动**（`ExternalAutomationEntrypoint` / `TaskTriggerReceiver` / Splash 的 `--es task` 调试转发仍走 `ComposeChatActivity`——extra 消费与外部回调回执只存在于聊天页，重定向等于静默丢任务）。
+  - **导航参照**：侧栏的放置与操作逻辑按 [Caho1/open-claude-ui](https://github.com/Caho1/open-claude-ui) 的规格落地——桌面宽度侧栏常驻（本设计 264px，参考实现 288px），手机宽度改为汉堡召唤的**覆盖抽屉**；「设置」放侧栏脚部（Claude 惯例），经 `PokeClawChat.openSettings` 桥进原生设置——否则 LLM / MCP / 无障碍全在设置里而主界面无门可入。pin / 拖拽重排（4px 死区 / Alt+↑↓）需要会话模型，刻意未抄。见 `mockup/claude-ui/README.md`。
+  - ✅ **真机 PASS（全过，2026-10-24）**：设备 `10AG4J1THX00524` / V2502DA，release 45（`PokeClaw_v0.8.3_20261024_180810.apk`）。证据取自 `uiautomator dump` 文字节点 + 像素扫描（Node 解码 PNG，H24/H28 的方法）。
+    - **① 落地面**：`am start -n …/.ui.splash.SplashActivity` 冷启动 → `mCurrentFocus = …ui.web.ClaudeUiPreviewActivity`；feed 里是恢复的 H28 真实 transcript（`h28 recall H28` 与 chips），三段虚构会话标题在 dump 中 **0 命中**——`enterLiveMode` 在主屏上照常清示例。
+    - **② 抽屉**：汉堡（`content-desc=会话列表`，bounds [98,153][192,251]）点开 → 「设置」[21,444][857,536]、「主题 · …」[21,355][857,447] 进屏；抽屉关着时这些节点整棵被 a11y 树剔除，开合状态因此可判。
+    - **③ 设置回环**：点「设置」→ `mCurrentFocus = …ui.settings.SettingsActivity`；BACK → 回主界面；再 BACK → `com.bbk.launcher2.Launcher`（主界面即任务根）。
+    - **④ 遮罩关闭**：开抽屉 → 点 (1050,1400) 遮罩 → 稳态 dump 里「设置」不在屏、汉堡与 transcript 原位。（中间一次 dump 撞上 240ms 关闭动画拿到空树——**uiautomator dump 要等动画结束再取稳态**。）
+  - ⚠️ **连带修掉真 bug（build 43/44 现场抓的）**：WebView 面的顶栏一直**压在状态栏底下**——V2502DA 的 StatusBar `touchableRegion=[0,0][1260,123]` 全宽吞掉 y<123 的触摸，而汉堡 bounds 是 y=30..128（像素扫描：三条横线在 y 64–96，与 15px 图标的 ~11.5px 间距逐条吻合）。预览页时代顶栏没有活控件、从未暴露；升格主屏后汉堡是唯一导航，bug 才现形——点击坐标（79 / 122 / 126）全部无响应，其中 79 和 122 直接被状态栏吃掉。修法踩了两个坑：**BaseActivity 的 BarUtils 状态栏 padding 在此 Activity 实测未生效**，改用 WindowInsets 权威值；**WebView 忽略自身 padding 渲染网页内容**——build 44 把 padding 打在 WebView 上像素纹丝不动，build 45 打在 FrameLayout 包装容器上顶栏整体下移 ≈124px 才生效。
+  - **QA 脚本随改**：`ui_cycle_test.py` 的 `back_to_chat` → `back_to_home`（主界面抽屉路径进设置）；`theme_persist_test.py` 的「BACK 两次找设置页入口」→「BACK 退出 + launcher 重进」（预览页已是任务根，BACK 即离应用）。
+  - **单测**：346 / 0 / 0（本轮无新增——路由与 inset 是 Activity 层，抽屉是页面 DOM/CSS/JS；全量回归在 feat 提交前跑过）。
+
 - [x] **H24. Long unbroken text does not overflow its container [PASS — 2026-10-22]**: 发一条会回很长连续文本的消息（截图文件路径、无空格的工具输出）→ 确认文本**换行**而不是被裁掉或撑破卡片。
   - **起因（先量出来的，不是猜的）**：411 dp（V2502DA 逻辑宽度）下 `pre-wrap` **只认换行符，不认超长单词**：
     | 容器 | 修前 `scrollWidth` / `clientWidth` | 修前溢出 |

@@ -141,6 +141,9 @@ section is not empty, the release is not ready.
   - ✅ **2026-10-19 入口改名**：「Claude UI 设计稿 / mockup」→「**Claude UI 实验版 / experimental**」（三语）。理由：它已接真实任务流，「设计稿」名不副实；而 MCP 卡 / 记忆 chips 仍是静态示例，「实验版」如实反映成熟度。
     - 顺带清掉五处「发布前必删」「不连后端」「计划移除」等**与现状相反**的表述（`SettingsActivity` 横幅、`mockup/claude-ui/README.md` 开篇、`NOTICE`、`BACKLOG` 删除清单、`scripts/ui_cycle_test.py` 的旧入口名）。最危险的是 `SettingsActivity` 那条横幅——它会告诉下一个人删掉一个能用的功能。
   - ✅ **2026-10-24 入口二次改名**：「Claude UI 实验版 / experimental」→「**Claude UI 聊天 / chat**」（三语）。理由：「实验版」的依据是三类卡全是静态示例（上一条改名的原话），如今 MCP 卡（H27）与记忆 chips（同日）都有真实数据源，依据全部失效——标签应描述界面是什么，而不是它最好听的那一面。`SettingsActivity` 注释、`ui_cycle_test.py` 的 `ENTRY`、QA 用例里的入口名一并跟改（沿用 2026-10-19 的惯例：用例名跟当前 UI，历史判定保留）。
+  - ✅ **2026-10-24 升格主界面**：Splash 落地面从 `ComposeChatActivity` 换成 `ClaudeUiPreviewActivity`；浮动球点击（`bringAppToForeground`）与前台服务通知（两处纯「打开应用」语义、无 extra）随之指向新主界面。**外部 `task` 契约不动**：`ExternalAutomationEntrypoint` / `TaskTriggerReceiver` / Splash 自带的 `--es task` 调试转发仍走聊天页——那条契约（extra 消费、外部回调回执）只存在于聊天页，重定向等于静默丢任务。
+    - **新主界面必须有设置出口**：页面在手机宽度没有常驻侧栏，按参考实现 Caho1/open-claude-ui 的侧栏逻辑（288px 常驻、头部新建 + 分组会话、脚部功能行）把 ≤760px 的侧栏从 `display:none` 改为**覆盖抽屉**（汉堡 + 遮罩 / Esc 关闭），脚部新增「设置」行经 `PokeClawChat.openSettings` 桥进 SettingsActivity——否则 LLM / MCP / 无障碍全在设置里而主界面无门可入。参考实现的 pin / 拖拽重排（4px 死区 / Alt+↑↓）需要会话模型，刻意未抄。
+    - QA 脚本导航随改：`ui_cycle_test.py` 的 `back_to_chat` → `back_to_home`（抽屉路径进设置）、`theme_persist_test.py` 的「BACK 两次找设置入口」→「BACK 退出 + launcher 重进」。
 
   Same class of leak as `.github/FUNDING.yml` shipping `github: ithiria894` (§10.2).
 
