@@ -583,6 +583,21 @@ class TaskFlowController(
         sink.append(ChatMessage(ChatMessage.Role.USER, text))
     }
 
+    /**
+     * Write a system line into the transcript from outside the controller.
+     *
+     * Exists for [McpConfirmationSurface]: an MCP confirmation parks the agent
+     * thread inside `ToolRegistry.executeTool`, so the record of "asked, then
+     * allowed / refused" is written by the surface that drew the card, not by
+     * this flow — which is blocked and cannot write it. Persisted straight
+     * away, because a task that dies mid-wait must still show what it waited
+     * for.
+     */
+    fun noteSystem(text: String) {
+        addSystem(text)
+        onPersistConversation()
+    }
+
     private fun addSystem(text: String) {
         sink.append(ChatMessage(ChatMessage.Role.SYSTEM, text))
     }

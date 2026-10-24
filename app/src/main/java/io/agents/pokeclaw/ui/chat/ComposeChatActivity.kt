@@ -16,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.collectAsState
 import io.agents.pokeclaw.TaskEvent
 import io.agents.pokeclaw.agent.llm.ModelConfigRepository
+import io.agents.pokeclaw.agent.mcp.McpConfirmationCoordinator
 import io.agents.pokeclaw.automation.ExternalAutomationContract
 import io.agents.pokeclaw.automation.ExternalAutomationEntrypoint
 import io.agents.pokeclaw.appViewModel
@@ -104,6 +105,20 @@ class ComposeChatActivity : ComponentActivity() {
 
     private val activeTaskShellController by lazy {
         ActiveTaskShellController(appViewModel = appViewModel)
+    }
+
+    /**
+     * Answers MCP confirmations while the chat screen is in the foreground.
+     *
+     * Registered with the process-wide coordinator rather than handed to the
+     * task flow, because the thing that needs the answer is a tool call
+     * blocked on the agent thread — which knows nothing about Activities.
+     */
+    private val mcpConfirmationSurface by lazy {
+        McpConfirmationSurface(
+            activity = this,
+            onNote = { taskFlowController.noteSystem(it) },
+        )
     }
 
     // Permission polling
@@ -247,6 +262,11 @@ class ComposeChatActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        // The chat screen is the screen the user is looking at, so it is the
+        // surface that answers MCP confirmations. The Claude UI preview
+        // registers the same way; the coordinator keeps the last one attached.
+        mcpConfirmationSurface.isForeground = true
+        McpConfirmationCoordinator.attach(mcpConfirmationSurface)
         _needsPermission.value =
             AppCapabilityCoordinator.accessibilityState(this) != ServiceBindingState.READY
         _isLocalModelActive.value = ModelConfigRepository.isLocalActive()
@@ -265,6 +285,10 @@ class ComposeChatActivity : ComponentActivity() {
 
     override fun onPause() {
         super.onPause()
+        // Stays attached — a task keeps running while the app is backgrounded —
+        // but can no longer show a dialog, which the coordinator treats as
+        // "refuse now" rather than "wait for nobody".
+        mcpConfirmationSurface.isForeground = false
         saveChat()
         permHandler.removeCallbacks(permPoller)
         activeTaskShellController.onPause()
@@ -273,6 +297,10 @@ class ComposeChatActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        // A wait this screen cannot answer must be refused now, not left to
+        // time out against a dialog that no longer exists.
+        McpConfirmationCoordinator.detach(mcpConfirmationSurface)
+        mcpConfirmationSurface.dismiss()
         chatSessionController.onDestroy()
         executor.shutdown()
     }
