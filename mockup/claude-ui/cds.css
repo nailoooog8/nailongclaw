@@ -1315,20 +1315,23 @@ body {
 
 /* 任务卡：一行头（状态点 + 标题 + 状态标）+ 一行 meta（渠道 · 步数 ·
    耗时）+ 一行最近步骤。整卡可点，进详情。 */
+/* 任务行 = 列表行，不是卡。NNGroup：卡片用于浏览、列表用于扫描，账本是
+   扫描场景。廉价感的经典配方就是「近色填充 + 1px 边框 + 圆角盒」摆在
+   另一层暖白上——所以这里无填充、无边框、无圆角，行直接坐在 sheet 面上，
+   行间一条全宽发丝线，hover 才出现一层极淡的填充。 */
 .task-card {
   display: block; width: 100%; text-align: left;
-  padding: 11px 12px;
-  border: var(--cds-ring-hairline) solid var(--cds-border);
-  border-radius: var(--cds-radius);
-  background: var(--cds-surface-2);
+  padding: 11px 4px 12px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
   color: var(--cds-text-primary);
   font: inherit; cursor: pointer;
-  transition: background-color 150ms var(--cds-ease-swift),
-    transform var(--cds-dur-fast) ease-out;
+  transition: background-color 120ms var(--cds-ease-swift);
 }
-.task-card + .task-card { margin-top: 8px; }
+.task-card + .task-card { border-top: var(--cds-ring-hairline) solid var(--cds-border); }
 .task-card:hover { background: var(--cds-fill-ghost-hover); }
-.task-card:active { transform: scale(0.985); }
+.task-card:active { background: var(--cds-fill-ghost-selected); }
 .task-card-head { display: flex; align-items: center; gap: 8px; }
 .task-card-title {
   flex: 1; min-width: 0;
@@ -1342,48 +1345,39 @@ body {
 }
 .task-card-last {
   margin-top: 4px;
-  font-size: 12px; color: var(--cds-text-secondary);
+  font-size: 12px; color: var(--cds-text-muted);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 /* 渠道：分类信息，但一行里出现第二个「药丸」会让状态信号翻倍。降为
    正文灰字——位置即扫描依据，quiet panels 的纪律。 */
 .task-channel { font-size: 11.5px; color: var(--cds-text-muted); }
 
-/* 状态点：表面色描边把它从卡面上「摘」出来（Setproduct 的 single fix：
-   1-2px 同色环让标志在任何背景上都脱得开）。没有这道环，点直接坐在
-   卡面上，和卡沿、和文字糊在一起。 */
-.task-card .status-dot { box-shadow: 0 0 0 2px var(--cds-surface-2); }
+/* 状态点：颜色只住在这一颗点里（colour spent on data）。无描边硬环——
+   行本来就坐在统一的 sheet 面上，环是「卡」才需要的贴纸感补丁。 */
+.task-card .status-dot { box-shadow: none; }
 
-/* 状态标：无底色彩字，Linear/Slack 式安静行。一个状态一个信号——点管
-   扫描、文字管读屏与精确读法（Setproduct：纯色点对读屏不可见），
-   「淡染底 + 淡染边框 + 点」三保险是 UI 套装感，不是设计。
-   ✓/✕ 字形保留：扫读时比辨色更快，且不依赖颜色感知。 */
+/* 状态标：中性文字。点管扫描、文字管读屏与精确读法（Setproduct：纯色点
+   对读屏不可见），✓/✕ 字形保留——扫读时比辨色快，且不依赖颜色感知。
+   彩色文字是残余的塑料感来源之一：同一行里第二处饱和色。 */
 .task-state {
   flex: none;
-  font-size: 11px; font-weight: 600;
+  font-size: 11px; font-weight: 500;
+  color: var(--cds-text-secondary);
   white-space: nowrap;
 }
-.task-state[data-state="RUNNING"] { color: var(--cds-fill-brand); }
-.task-state[data-state="WAITING_CONFIRM"] {
-  color: color-mix(in srgb, var(--cds-fill-warning) 75%, var(--cds-text-primary));
-}
-.task-state[data-state="SUCCEEDED"] {
-  color: color-mix(in srgb, var(--cds-fill-success) 75%, var(--cds-text-primary));
-}
-.task-state[data-state="FAILED"] {
-  color: color-mix(in srgb, var(--cds-fill-danger) 80%, var(--cds-text-primary));
-}
-.task-state[data-state="CANCELLED"] { color: var(--cds-text-muted); }
 
 /* 详情头：标题 + meta（状态/渠道/发起/完成/耗时）+ 原始请求 */
 .task-detail-title { font-size: 15px; font-weight: 600; color: var(--cds-text-primary); }
 .task-detail-meta { margin-top: 5px; font-size: 11.5px; line-height: 1.8; color: var(--cds-text-muted); }
+/* 原始请求 = 引用，不是又一个组件盒：左边线 + 无填充。详情页里已经有
+   console 块（深色输出层）这种「重物」，请求原文用轻的引用式，一页
+   两种层次而不是三种盒子。 */
 .task-detail-prompt {
-  margin-top: 10px; padding: 10px 12px;
-  border: var(--cds-ring-hairline) solid var(--cds-border);
-  border-radius: var(--cds-radius);
-  background: var(--cds-surface-2);
-  font-size: 12.5px; color: var(--cds-text-secondary);
+  margin-top: 12px;
+  padding: 2px 0 2px 12px;
+  border-left: 2px solid var(--cds-border-strong);
+  font-size: 12.5px; line-height: 1.7;
+  color: var(--cds-text-secondary);
 }
 
 /* 终态载荷块：失败原因与最终答案。形态抄 open-claude-ui 的终态输出面——
