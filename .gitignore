@@ -23,6 +23,9 @@ thoughts/
 .claudeignore
 /.kotlin/
 
+# ZCode local session state (plans, scratch — same rationale as .claude/)
+/.zcode/
+
 # Python bytecode (scripts/ tooling)
 /__pycache__/
 *.pyc

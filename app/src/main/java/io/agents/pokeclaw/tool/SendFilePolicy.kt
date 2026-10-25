@@ -76,11 +76,6 @@ object SendFilePolicy {
     }
 
     /**
-     * Normalizes [raw] without touching the filesystem for existence: `File`
-     * resolves `.`/`..` and, when the path exists, symlinks. A path that does
-     * not exist yet still gets its `..` folded, which is the part that matters.
-     */
-    /**
      * Normalizes a path into the form the root rules are written against.
      *
      * On the device this is a near no-op (Android paths are already `/`-rooted
