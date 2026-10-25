@@ -86,7 +86,7 @@ public class SendMessageTool extends BaseTool {
                 return ToolResult.error("Failed to open " + app + ". Is it installed?");
             }
             XLog.i(TAG, "Step 1: Opened " + app + " (" + packageName + ")");
-            Thread.sleep(2000);
+            service.awaitUiStable(3000, 500);
 
             // Step 2: Wait for the messaging app window to become active
             if (!waitForActiveWindow(service, packageName, 8000)) {
@@ -109,7 +109,7 @@ public class SendMessageTool extends BaseTool {
                     return ToolResult.error("Could not find '" + contact + "' in " + app + " chat list.");
                 }
                 XLog.i(TAG, "Step 3: Tapped " + contact);
-                Thread.sleep(3000);
+                service.awaitUiStable(4000, 600);
                 waitForActiveWindow(service, packageName, 5000);
             }
 
@@ -273,7 +273,7 @@ public class SendMessageTool extends BaseTool {
         // Focus + click + set text
         best.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
         best.performAction(AccessibilityNodeInfo.ACTION_CLICK);
-        Thread.sleep(500);
+        service.awaitUiStable(2000, 400);
 
         Bundle args = new Bundle();
         args.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, message);
@@ -335,7 +335,11 @@ public class SendMessageTool extends BaseTool {
             String expectedMessage,
             String pathLabel
     ) throws InterruptedException {
-        Thread.sleep(500);
+        // Composer clearing can be quieter than a full content change, and a
+        // false "still typed" read here would report an honest send as failed.
+        // A 500ms quiet period doubles as the minimum wait, matching the fixed
+        // sleep this replaced.
+        service.awaitUiStable(1500, 500);
         AccessibilityNodeInfo root = service.getRootInActiveWindow();
         if (root == null) {
             XLog.i(TAG, "tapSendOrEnter: " + pathLabel + " verification root missing; treating as success");

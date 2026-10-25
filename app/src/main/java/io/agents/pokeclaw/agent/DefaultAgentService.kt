@@ -3,6 +3,7 @@
 
 package io.agents.pokeclaw.agent
 
+import android.app.Notification
 import android.os.Build
 import android.util.DisplayMetrics
 import android.view.WindowManager
@@ -15,6 +16,7 @@ import io.agents.pokeclaw.agent.llm.LlmResponse
 import io.agents.pokeclaw.agent.llm.StreamingListener
 import io.agents.pokeclaw.agent.skill.ToolCallRecorder
 import io.agents.pokeclaw.service.ClawAccessibilityService
+import io.agents.pokeclaw.service.ClawNotificationListener
 import io.agents.pokeclaw.tool.ToolRegistry
 import io.agents.pokeclaw.tool.impl.GetScreenInfoTool
 import io.agents.pokeclaw.tool.ToolResult
@@ -60,21 +62,24 @@ class DefaultAgentService : AgentService {
 - Press back/home/enter → system_key(key="back")
 - Scroll to find something → scroll_to_find(text="Settings")
 - Find and tap text → find_and_tap(text="Send")
-- Send a message → send_message(contact="Mom", message="hi", app="WhatsApp")
+- Send a message → reply_via_notification(contact="Mom", message="hi", app="WhatsApp") FIRST (replies through the notification, no app opened); if it fails → send_message(contact="Mom", message="hi", app="WhatsApp")
+- Read an open chat's messages → read_conversation(scroll_back=2 if older history needed)
 - Make a phone call → make_call(contact="Mom")
 - Check battery/wifi/storage/bluetooth/screen/device/time → get_device_info(category="battery")
 - Read notifications → get_notifications()
 - Read clipboard → clipboard(action="get")
 - Write text to clipboard → clipboard(action="set", text="...")
 - List installed apps → get_installed_apps()
-- Take screenshot → take_screenshot()
+- Take screenshot → take_screenshot() (ONLY for photos/images/maps/games the node tree cannot show; never for reading text)
 - Wait for loading → wait(duration_ms=2000)
+- Look up web information (news, weather, prices, facts you are unsure about) → web_search(query="...") — do NOT open a browser or search app for this; if it errors, the feature is not configured, say so and answer from your own knowledge
 
 ## Rules
 - One tool call per turn. Check screen after each action.
 - If something doesn't work, try a different approach. After 3 failures, call finish and explain what went wrong.
 - finish(summary) must contain the ACTUAL DATA the user asked for. "Battery is at 73%" not "I checked battery."
 - Use get_device_info for battery/wifi/storage/bluetooth/screen/device/time queries. Do NOT open Settings app for these.
+- For knowledge or real-time questions use web_search(query="..."). Do NOT open a browser or search app just to look something up.
 - Use get_notifications to read notifications. Do NOT pull down notification shade.
 - Use clipboard(action="get") ONLY when the user asks about the CURRENT clipboard contents (for example "read my clipboard" or "what did I copy").
 - If the user asks you to copy/search/send/summarize information FROM another source (email, browser, notes, messages, screen, etc), first go to that source and find the information there. Do NOT assume it is already on the clipboard.
@@ -229,6 +234,44 @@ class DefaultAgentService : AgentService {
     }
 
     // ==================== Device Context ====================
+
+    /**
+     * Compact digest of the most recent active notifications, attached to the
+     * task prompt so the model knows which conversations are waiting without
+     * pulling down the shade or screenshotting. Empty string when the listener
+     * is off or nothing is active.
+     */
+    private fun notificationDigest(max: Int = 5): String {
+        return try {
+            val sbns = ClawNotificationListener.getActiveNotificationList() ?: return ""
+            val self = ClawApplication.instance.packageName
+            val lines = sbns.asSequence()
+                .mapNotNull { sbn -> val n = sbn.notification; if (n?.extras == null) null else sbn to n }
+                .filter { (sbn, _) -> sbn.packageName != self }
+                .sortedByDescending { (sbn, _) -> sbn.postTime }
+                .take(max)
+                .map { (sbn, n) ->
+                    val title = n.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
+                    val text = (n.extras.getCharSequence(Notification.EXTRA_BIG_TEXT)
+                        ?: n.extras.getCharSequence(Notification.EXTRA_TEXT))?.toString().orEmpty()
+                    if (title.isBlank() && text.isBlank()) null
+                    else "- ${appLabelOf(sbn.packageName)}: $title${if (text.isNotBlank()) " — ${text.take(80)}" else ""}"
+                }
+                .filterNotNull()
+                .toList()
+            if (lines.isEmpty()) "" else lines.joinToString("\n")
+        } catch (e: Exception) {
+            XLog.w(TAG, "notificationDigest failed", e)
+            ""
+        }
+    }
+
+    private fun appLabelOf(pkg: String): String = try {
+        val pm = ClawApplication.instance.packageManager
+        pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
+    } catch (_: Exception) {
+        pkg.substringAfterLast('.')
+    }
 
     private fun buildDeviceContext(): String {
         val app = ClawApplication.instance
@@ -529,16 +572,27 @@ class DefaultAgentService : AgentService {
             lowerPrompt.contains("call ") || lowerPrompt.contains("dial ")
 
         val enrichedPrompt = if (looksLikeTask) {
-            try {
-                val screenTool = ToolRegistry.getInstance().getTool("get_screen_info")
-                if (screenTool != null) {
-                    val screenResult = screenTool.execute(emptyMap())
-                    if (screenResult.isSuccess && !screenResult.data.isNullOrBlank()) {
-                        XLog.i(TAG, "runAgentLoop: pre-warm screen attached (${screenResult.data!!.length} chars)")
-                        "$promptForModel\n\nCurrent screen:\n${screenResult.data}"
-                    } else promptForModel
-                } else promptForModel
-            } catch (e: Exception) { promptForModel }
+            buildString {
+                append(promptForModel)
+                try {
+                    val screenTool = ToolRegistry.getInstance().getTool("get_screen_info")
+                    if (screenTool != null) {
+                        val screenResult = screenTool.execute(emptyMap())
+                        if (screenResult.isSuccess && !screenResult.data.isNullOrBlank()) {
+                            XLog.i(TAG, "runAgentLoop: pre-warm screen attached (${screenResult.data!!.length} chars)")
+                            append("\n\nCurrent screen (snapshot at task start — the user may have navigated away since; re-check with get_screen_info before acting on it):\n")
+                            append(screenResult.data)
+                        }
+                    }
+                } catch (e: Exception) {
+                    XLog.w(TAG, "runAgentLoop: pre-warm screen failed", e)
+                }
+                val digest = notificationDigest()
+                if (digest.isNotEmpty()) {
+                    append("\n\nRecent notifications (unread context; the user may have handled some of them already):\n")
+                    append(digest)
+                }
+            }
         } else {
             XLog.i(TAG, "runAgentLoop: chat-like prompt, skipping pre-warm screen")
             promptForModel

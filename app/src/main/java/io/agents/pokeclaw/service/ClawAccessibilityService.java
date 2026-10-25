@@ -130,9 +130,26 @@ public class ClawAccessibilityService extends AccessibilityService {
     private long lastKeepAliveSyncTime = 0L;
     private static final long KEEP_ALIVE_SYNC_INTERVAL_MS = 60_000L;
 
+    /**
+     * Monotonic counter bumped on every content/window-change event. Tools use
+     * it via {@link #awaitUiStable(long, long)} to wait for "the screen stopped
+     * changing" instead of a fixed sleep, and to detect "my action changed
+     * nothing" by comparing versions before and after.
+     */
+    private final java.util.concurrent.atomic.AtomicLong contentVersion = new java.util.concurrent.atomic.AtomicLong(0);
+
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
         KVUtils.INSTANCE.noteAccessibilityHeartbeat();
+
+        if (event != null) {
+            int type = event.getEventType();
+            if (type == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
+                    || type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+                    || type == AccessibilityEvent.TYPE_VIEW_SCROLLED) {
+                contentVersion.incrementAndGet();
+            }
+        }
 
         long now = System.currentTimeMillis();
         if (now - lastKeepAliveSyncTime > KEEP_ALIVE_SYNC_INTERVAL_MS) {
@@ -163,6 +180,41 @@ public class ClawAccessibilityService extends AccessibilityService {
         KVUtils.INSTANCE.noteAccessibilityInterrupted();
         XLog.w(TAG, "Accessibility service interrupted");
         ForegroundService.Companion.syncToBackgroundState(this);
+    }
+
+    /** Current content version — see {@link #awaitUiStable(long, long)}. */
+    public long getContentVersion() {
+        return contentVersion.get();
+    }
+
+    /**
+     * Waits until the screen stops changing: returns once no content-change
+     * event has arrived for [quietPeriodMs], or after [timeoutMs] at the
+     * latest. Replaces fixed {@code Thread.sleep} waits after actions, so a
+     * fast phone returns early and a slow one still gets its full window.
+     *
+     * @return true when the content settled, false on timeout/interrupt.
+     */
+    public boolean awaitUiStable(long timeoutMs, long quietPeriodMs) {
+        long deadline = System.currentTimeMillis() + timeoutMs;
+        long lastVersion = contentVersion.get();
+        long lastChangeAt = System.currentTimeMillis();
+        while (System.currentTimeMillis() < deadline) {
+            try {
+                Thread.sleep(80);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+            long version = contentVersion.get();
+            if (version != lastVersion) {
+                lastVersion = version;
+                lastChangeAt = System.currentTimeMillis();
+            } else if (System.currentTimeMillis() - lastChangeAt >= quietPeriodMs) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

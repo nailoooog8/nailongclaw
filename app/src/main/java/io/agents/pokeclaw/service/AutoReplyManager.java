@@ -42,9 +42,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *   AutoReplyManager.getInstance().setEnabled(true);
  *   AutoReplyManager.getInstance().addTarget("Mom", "WhatsApp");
  *
- * When enabled, intercepts notifications from messaging apps,
- * extracts sender + message, generates a reply via on-device LLM,
- * and sends it via SendMessageTool.
+ * When enabled, intercepts notifications from messaging apps, extracts sender
+ * + message, and replies. The fast path sends the reply through the
+ * notification's own direct-reply action (no UI, works while locked); when
+ * the app does not expose one (WeChat/QQ) it falls back to opening the chat
+ * via SendMessageTool and the accessibility pipeline.
  */
 public class AutoReplyManager {
 
@@ -259,7 +261,9 @@ public class AutoReplyManager {
         if (!enabled) return;
         if (!monitoredApps.contains(packageName)) return;
         if (title.isEmpty() || text.isEmpty()) return;
-        if (!isAccessibilityHealthyForReply()) return;
+        // No accessibility gate here: the notification direct-reply fast path
+        // needs neither the UI nor the accessibility service. The UI pipeline
+        // checks accessibility health itself once the fast path is ruled out.
 
         XLog.d(TAG, "Notification from " + packageName + ": title='" + title + "' text='" + text + "'");
         handleIncomingMessage(packageName, title, text);
@@ -385,17 +389,6 @@ public class AutoReplyManager {
             return;
         }
 
-        if (!isAccessibilityHealthyForReply()) {
-            failAutoReply(
-                matchedTarget,
-                text,
-                AutoReplyFailureStage.ACCESSIBILITY_UNAVAILABLE,
-                "Accessibility became unhealthy before auto-reply was queued",
-                null
-            );
-            return;
-        }
-
         // If already replying, just flag it — after current reply we'll re-open chat,
         // read the full screen (all messages including new ones), and reply to latest.
         if (!replying.compareAndSet(false, true)) {
@@ -416,6 +409,24 @@ public class AutoReplyManager {
         executor.submit(() -> {
             try {
                 logAutoReplyStep(finalTarget, "start", "incoming='" + incomingMessage + "'");
+
+                // Fast path first: reply through the notification's own
+                // direct-reply action. No app is opened, nothing is tapped,
+                // and the phone can even stay locked.
+                NotificationDirectOutcome outcome = attemptNotificationDirectReply(
+                        finalTarget, packageName, finalContact, incomingMessage);
+                if (outcome == NotificationDirectOutcome.REPLIED) {
+                    lastReplyTime.put(finalTarget.getKey(), System.currentTimeMillis());
+                    logAutoReplyStep(finalTarget, "send-success", "notification-direct");
+                    ClawNotificationListener.dismissNotifications(packageName);
+                    XLog.i(TAG, "Auto-reply sent to " + finalContact + " via notification direct reply");
+                    return;
+                }
+                if (outcome == NotificationDirectOutcome.HANDLED_FAILURE) {
+                    return;
+                }
+                logAutoReplyStep(finalTarget, "send-path", "notification-direct-unavailable");
+
                 if (!isAccessibilityHealthyForReply()) {
                     failAutoReply(finalTarget, incomingMessage, AutoReplyFailureStage.ACCESSIBILITY_UNAVAILABLE,
                         "Accessibility became unhealthy before auto-reply execution", null);
@@ -594,6 +605,62 @@ public class AutoReplyManager {
                 }
             }
         });
+    }
+
+    private enum NotificationDirectOutcome {
+        /** Reply delivered through the notification's direct-reply action. */
+        REPLIED,
+        /** The fast path took over and already reported a terminal failure. */
+        HANDLED_FAILURE,
+        /** No replyable notification — fall back to the UI pipeline. */
+        UNAVAILABLE,
+    }
+
+    /**
+     * Fast path: reply through the notification's own RemoteInput action.
+     * Works with the screen off and without the accessibility service; the
+     * reply is generated from the incoming message alone because the chat is
+     * never opened.
+     */
+    private NotificationDirectOutcome attemptNotificationDirectReply(
+            MonitorTarget target, String packageName, String contact, String incomingMessage) {
+        try {
+            android.service.notification.StatusBarNotification sbn =
+                    io.agents.pokeclaw.utils.NotificationReplyUtils.findReplyableNotification(
+                            packageName,
+                            ContactMatchUtils.buildNormalizedAliases(contact),
+                            ContactMatchUtils.buildDigitAliases(contact));
+            if (sbn == null) {
+                logAutoReplyStep(target, "notification-direct", "no replyable notification");
+                return NotificationDirectOutcome.UNAVAILABLE;
+            }
+            logAutoReplyStep(target, "notification-direct", "found: " + io.agents.pokeclaw.utils.NotificationReplyUtils.describe(sbn));
+
+            // The chat is never opened, so the context comes from the
+            // notification itself: MessagingStyle carries the last few
+            // messages of the conversation in its extras.
+            String context = io.agents.pokeclaw.utils.NotificationReplyUtils.conversationContext(sbn);
+            logAutoReplyStep(target, "notification-direct", "context=" + (context.isEmpty() ? "none" : context.length() + " chars"));
+            String reply = generateReply(contact, incomingMessage, context);
+            if (reply == null || reply.trim().isEmpty()) {
+                failAutoReply(target, incomingMessage, AutoReplyFailureStage.GENERATION_FAILED,
+                        "LLM did not produce a safe auto-reply (notification path)", null);
+                return NotificationDirectOutcome.HANDLED_FAILURE;
+            }
+            logAutoReplyStep(target, "generation", "reply='" + reply + "'");
+
+            String error = io.agents.pokeclaw.utils.NotificationReplyUtils.sendReply(sbn, reply);
+            if (error != null) {
+                logAutoReplyStep(target, "notification-direct", "send failed: " + error);
+                return NotificationDirectOutcome.UNAVAILABLE;
+            }
+
+            ownSentMessages.add(reply);
+            return NotificationDirectOutcome.REPLIED;
+        } catch (Exception e) {
+            XLog.w(TAG, "Notification direct reply failed, falling back to UI path", e);
+            return NotificationDirectOutcome.UNAVAILABLE;
+        }
     }
 
     private MonitorTarget buildTarget(String name, String appName) {

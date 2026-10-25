@@ -40,7 +40,7 @@ abstract class BaseTool {
     fun getParametersWithWaitAfter(): List<ToolParameter> {
         val params = getParameters().toMutableList()
         // Do not add wait_after to observation tools like wait / finish / get_screen_info
-        if (getName() !in listOf("wait", "finish", "get_screen_info", "take_screenshot", "get_installed_apps", "find_node_info", "scroll_to_find", "list_scheduled_tasks", "schedule_task", "cancel_scheduled_task")) {
+        if (getName() !in listOf("wait", "finish", "get_screen_info", "take_screenshot", "get_installed_apps", "find_node_info", "scroll_to_find", "read_conversation", "list_scheduled_tasks", "schedule_task", "cancel_scheduled_task", "web_search")) {
             params.add(WAIT_AFTER_PARAM)
         }
         return params

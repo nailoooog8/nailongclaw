@@ -112,6 +112,24 @@ public class ClawNotificationListener extends NotificationListenerService {
         }
     }
 
+    /**
+     * Dismiss exactly one notification by key — the surgical counterpart of
+     * [dismissNotifications]. Used after replying to a specific conversation
+     * so the app's OTHER unread notifications survive the reply.
+     */
+    public static void dismissNotification(StatusBarNotification sbn) {
+        ClawNotificationListener listener = instance;
+        if (listener == null || sbn == null) {
+            return;
+        }
+        try {
+            listener.cancelNotification(sbn.getKey());
+            XLog.i(TAG, "Dismissed replied notification " + sbn.getKey());
+        } catch (Exception e) {
+            XLog.w(TAG, "Failed to dismiss notification " + sbn.getKey(), e);
+        }
+    }
+
     public static boolean isConnected() {
         return instance != null;
     }

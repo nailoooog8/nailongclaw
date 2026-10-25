@@ -35,3 +35,6 @@ baseline_build.log
 
 # MCP echo test server runtime log (QA H27 evidence is regenerated each run)
 scripts/mcp-echo-calls.log
+
+# QA uiautomator dumps collected at repo root during device runs
+/*.xml

@@ -52,6 +52,7 @@ object ToolRiskPolicy {
         // Outward-facing: another human receives the result.
         "make_call",
         "send_message",
+        "reply_via_notification",
         "send_file",
         "auto_reply",
         // Acts on whatever happens to be focused, including the lock screen.
@@ -79,10 +80,14 @@ object ToolRiskPolicy {
         "take_screenshot",
         "scroll_to_find",
         "find_and_tap",
+        "read_conversation",
         "search_app_in_store",
         "kb_read",
         "kb_search",
         "memory_recall",
+        // Spend is capped by the configured API key and returns public data only;
+        // remote channels asking knowledge questions are the primary use case.
+        "web_search",
     )
 
     /**

@@ -49,6 +49,7 @@ object ToolRegistry {
         register(SendFileTool())
         register(GetDeviceInfoTool())
         register(GetNotificationsTool())
+        register(ReplyViaNotificationTool())
         register(MakeCallTool())
         register(FinishTool())
         // Knowledge Base tools — shared vault available in all modes
@@ -61,6 +62,8 @@ object ToolRegistry {
         register(MemorySaveTool())
         register(MemoryRecallTool())
         register(MemoryForgetTool())
+        // Web information retrieval — knowledge questions without touching the UI
+        register(WebSearchTool())
     }
 
     private fun registerTvTools() {
@@ -82,6 +85,7 @@ object ToolRegistry {
         register(SwipeTool())
         register(ScrollToFindTool())
         register(FindAndTapTool())
+        register(ReadConversationTool())
         register(SendMessageTool())
         register(AutoReplyTool())
     }
