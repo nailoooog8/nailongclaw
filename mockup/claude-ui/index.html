@@ -56,6 +56,13 @@
     </nav>
 
     <div class="sidebar-foot">
+      <!-- 任务账本入口。只读任务页（列表卡 + 详情步骤账本）从这进；
+           计数徽标只反映真实数据（有桥且有待处理任务时才亮）。 -->
+      <button class="row-btn" id="tasksBtn" type="button">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h6"/></svg>
+        任务
+        <span class="tasks-badge" id="tasksBadge" data-show="false"></span>
+      </button>
       <!-- 主题：深浅 × 底色 × 强调色，三个维度合并在一个面板里。
            侧边栏只留这一个入口（原来的「深浅色」独立行已合并进面板，
            记忆库 / 技能管理快捷行移入设置面板的「功能」区，避免同一
@@ -196,6 +203,26 @@
       </button>
       <p class="settings-foot">深浅、底色与强调色在侧边栏「主题」里，随手可调。</p>
     </div>
+  </section>
+
+  <!-- ============================= 任务账本 =============================
+     只读任务页：列表卡 + 详情（步骤账本）。从侧栏「任务」进入，与设置面板
+     同为弹层 sheet 形态、同一套 CDS 令牌。数据经 PokeClawChat.readTaskList /
+     readTaskDetail 桥读取——真实账本（TaskRecordStore）落地前桥返回空数组，
+     页面显示空态；纯浏览器打开时显示设计样例。确认与操作仍在聊天线程里
+     （M2 的确认卡才进这里），所以本页没有任何写操作按钮。 -->
+  <div class="tasks-scrim" id="tasksScrim"></div>
+  <section class="tasks-view" id="tasksView" data-open="false" role="dialog" aria-label="任务">
+    <header class="tasks-topbar">
+      <button class="icon-btn" id="tasksBackBtn" type="button" aria-label="返回">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="tasks-title" id="tasksTitle">任务</div>
+    </header>
+    <!-- 列表与详情两级都在这个容器里换画，不各自建 view —— 账本以
+         「一轮任务」计，整表重建比维护两套 DOM 便宜，且不会出现某一级
+         忘了隐藏。空态也画在这里。 -->
+    <div class="tasks-body scroller" id="tasksBody"></div>
   </section>
 
   <!-- ============================= 主区 ============================= -->

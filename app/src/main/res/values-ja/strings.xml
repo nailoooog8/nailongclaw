@@ -322,6 +322,7 @@
     <string name="chat_send_word_on"> 経由 </string>
     <string name="chat_monitoring_single">監視中: %s</string>
     <string name="chat_monitoring_multiple">%d 件を監視中</string>
+    <string name="chat_active_task_ledger">タスク記録</string>
     <string name="chat_btn_stop_all">すべて停止</string>
 
     <string name="chat_drawer_recent">履歴</string>

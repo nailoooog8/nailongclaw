@@ -23,6 +23,7 @@ import io.agents.pokeclaw.appViewModel
 import io.agents.pokeclaw.floating.FloatingCircleManager
 import io.agents.pokeclaw.ui.settings.LlmConfigActivity
 import io.agents.pokeclaw.ui.settings.SettingsActivity
+import io.agents.pokeclaw.ui.web.ClaudeUiPreviewActivity
 import io.agents.pokeclaw.utils.KVUtils
 import io.agents.pokeclaw.utils.XLog
 import java.util.concurrent.Executors
@@ -210,6 +211,14 @@ class ComposeChatActivity : ComponentActivity() {
                         activeTaskShellController.stopAllTasks(),
                         Toast.LENGTH_SHORT
                     ).show()
+                },
+                onOpenLedger = {
+                    // 任务账本长在主界面（Claude UI 表面）上，带 extra 直接
+                    // 翻开任务页而不是落在聊天流——这个入口的意图就是看账本。
+                    startActivity(
+                        Intent(this, ClaudeUiPreviewActivity::class.java)
+                            .putExtra(ClaudeUiPreviewActivity.EXTRA_SHOW_TASKS, true)
+                    )
                 },
                 onModelSwitch = { modelId, displayName -> switchModel(modelId, displayName) },
                 colors = composeColors,

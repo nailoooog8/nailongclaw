@@ -137,6 +137,10 @@
   --cds-fill-brand-hover: var(--theme-accent-hover);
   --cds-fill-brand-subtle: var(--theme-accent-subtle);
   --cds-fill-danger: #ef4444;
+  /* 任务账本的两个状态色：待确认（琥珀）与完成（绿）。与 danger 一样是
+     裸 hex —— 它们不随底色 scheme 变，文字对比度靠 color-mix 混正文色保证。 */
+  --cds-fill-warning: #f59e0b;
+  --cds-fill-success: #34c759;
 
   /* 7. 圆角阶梯 */
   --radius-xs: .125rem;
@@ -240,6 +244,7 @@ button:focus,
 .icon-btn:focus,
 .session:focus,
 .settings-row:focus,
+.task-card:focus,
 .pop-item:focus,
 .base-row:focus,
 .swatch-row:focus,
@@ -547,6 +552,9 @@ button:focus,
 .status-dot[data-kind="running"] { background: var(--cds-fill-brand); animation: 1.2s ease-in-out infinite dframe-dot-blink; }
 .status-dot[data-kind="error"]   { background: var(--cds-fill-danger); }
 .status-dot[data-kind="clay"]    { background: var(--cds-clay); animation: 3s ease-in-out infinite dframe-clay-breathe; }
+/* 取消：不借 ready（那是成功色），也不借 error（那是危险色）—— 一个
+   不闪不动的灰点，读作「这条路没走完，也没有出错」。 */
+.status-dot[data-kind="muted"]   { background: var(--cds-text-muted); }
 
 /* ==========================================================================
    布局
@@ -1233,6 +1241,223 @@ body {
   padding: 12px 4px 0; text-align: center;
 }
 
+/* ---- 任务账本 ----
+   只读任务页，sheet 形态与设置面板同构（scrim + view + topbar + body），
+   令牌全部复用。新构件只有四样：任务卡、状态标、渠道标、步骤账本。
+   状态色不新造记号：运行=品牌色（与 status-dot[running] 同源）、
+   待确认=警告色、失败=危险色、完成/取消走弱化，避免一套页面两套语义。 */
+.tasks-scrim {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 60;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms ease;
+}
+.tasks-view {
+  position: fixed;
+  top: 0; bottom: 0; left: 50%;
+  width: 100%; max-width: 560px;
+  z-index: 70;
+  transform: translate(-50%, 12px);
+  background: var(--cds-surface-1);
+  display: flex; flex-direction: column;
+  opacity: 0;
+  pointer-events: none;
+  /* 同 .settings-view：visibility 把关着的面板从无障碍树里摘掉，
+     否则 uiautomator dump 会看到一堆不可见的按钮。 */
+  visibility: hidden;
+  transition: opacity 200ms ease, transform 240ms var(--cds-ease-swift),
+    visibility 0s linear 240ms;
+}
+.tasks-scrim[data-open="true"] { opacity: 1; pointer-events: auto; }
+.tasks-view[data-open="true"] {
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+  transform: translate(-50%, 0);
+  transition: opacity 200ms ease, transform 240ms var(--cds-ease-swift),
+    visibility 0s;
+}
+.tasks-topbar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 14px;
+  border-bottom: var(--cds-ring-hairline) solid var(--cds-border);
+  flex: none;
+}
+.tasks-title { font-weight: 600; font-size: 14.5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tasks-body {
+  flex: 1; min-height: 0;
+  overflow-y: auto;
+  padding: 12px 12px 24px;
+}
+.tasks-body .group-label { margin: 14px 4px 6px; }
+
+/* 侧栏「任务」行的待处理计数。只在有真实数据时亮（data-show），
+   无桥预览与空账本都不显示 —— 徽标是状态不是装饰。 */
+.tasks-badge {
+  margin-left: auto;
+  min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: 999px;
+  background: var(--cds-fill-brand);
+  color: #fff;
+  font-size: 10.5px; font-weight: 600;
+  align-items: center; justify-content: center;
+  display: none;
+}
+.tasks-badge[data-show="true"] { display: inline-flex; }
+
+/* 任务卡：一行头（状态点 + 标题 + 状态标）+ 一行 meta（渠道 · 步数 ·
+   耗时）+ 一行最近步骤。整卡可点，进详情。 */
+.task-card {
+  display: block; width: 100%; text-align: left;
+  padding: 11px 12px;
+  border: var(--cds-ring-hairline) solid var(--cds-border);
+  border-radius: var(--cds-radius);
+  background: var(--cds-surface-2);
+  color: var(--cds-text-primary);
+  font: inherit; cursor: pointer;
+  transition: background-color 150ms var(--cds-ease-swift),
+    transform var(--cds-dur-fast) ease-out;
+}
+.task-card + .task-card { margin-top: 8px; }
+.task-card:hover { background: var(--cds-fill-ghost-hover); }
+.task-card:active { transform: scale(0.985); }
+.task-card-head { display: flex; align-items: center; gap: 8px; }
+.task-card-title {
+  flex: 1; min-width: 0;
+  font-size: 13.5px; font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.task-card-meta {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  margin-top: 5px;
+  font-size: 11px; color: var(--cds-text-muted);
+}
+.task-card-last {
+  margin-top: 5px;
+  font-size: 11.5px; color: var(--cds-text-secondary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.task-channel {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--cds-fill-secondary);
+  font-size: 10.5px; color: var(--cds-text-secondary);
+}
+
+/* 状态标：文字色用 color-mix 混一点正文色，深浅两 mode 都保对比度，
+   不必为每个 mode 各写一份 hex。 */
+.task-state {
+  flex: none;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 10.5px; font-weight: 600;
+}
+.task-state[data-state="RUNNING"] {
+  color: var(--cds-fill-brand);
+  background: var(--cds-fill-brand-subtle);
+}
+.task-state[data-state="WAITING_CONFIRM"] {
+  color: color-mix(in srgb, var(--cds-fill-warning) 75%, var(--cds-text-primary));
+  background: color-mix(in srgb, var(--cds-fill-warning) 14%, transparent);
+}
+.task-state[data-state="SUCCEEDED"] {
+  color: color-mix(in srgb, var(--cds-fill-success) 75%, var(--cds-text-primary));
+  background: color-mix(in srgb, var(--cds-fill-success) 12%, transparent);
+}
+.task-state[data-state="FAILED"] {
+  color: color-mix(in srgb, var(--cds-fill-danger) 80%, var(--cds-text-primary));
+  background: color-mix(in srgb, var(--cds-fill-danger) 12%, transparent);
+}
+.task-state[data-state="CANCELLED"] {
+  color: var(--cds-text-muted);
+  background: var(--cds-fill-ghost-hover);
+}
+
+/* 详情头：标题 + meta（状态/渠道/发起/完成/耗时）+ 原始请求 */
+.task-detail-title { font-size: 15px; font-weight: 600; color: var(--cds-text-primary); }
+.task-detail-meta { margin-top: 5px; font-size: 11.5px; line-height: 1.8; color: var(--cds-text-muted); }
+.task-detail-prompt {
+  margin-top: 10px; padding: 10px 12px;
+  border: var(--cds-ring-hairline) solid var(--cds-border);
+  border-radius: var(--cds-radius);
+  background: var(--cds-surface-2);
+  font-size: 12.5px; color: var(--cds-text-secondary);
+}
+
+/* 终态载荷块：失败原因（危险染）与结果（中性）。失败原因必须比步骤更
+   早被看见——用户打开一个失败任务的详情，第一个问题就是「它怎么死的」。
+   所以错误块排在步骤账本之前，见 cds.js 的 append 顺序。 */
+.task-detail-block-label {
+  font-size: 10.5px; font-weight: 600;
+  letter-spacing: .03em;
+  margin-bottom: 3px;
+}
+.task-detail-block-text { font-size: 12.5px; line-height: 1.6; }
+.task-detail-error {
+  margin-top: 10px; padding: 10px 12px;
+  border: var(--cds-ring-hairline) solid color-mix(in srgb, var(--cds-fill-danger) 35%, transparent);
+  border-radius: var(--cds-radius);
+  background: color-mix(in srgb, var(--cds-fill-danger) 8%, transparent);
+}
+.task-detail-error .task-detail-block-label { color: var(--cds-fill-danger); }
+.task-detail-error .task-detail-block-text {
+  color: color-mix(in srgb, var(--cds-fill-danger) 85%, var(--cds-text-primary));
+}
+.task-detail-answer {
+  margin-top: 10px; padding: 10px 12px;
+  border: var(--cds-ring-hairline) solid var(--cds-border);
+  border-radius: var(--cds-radius);
+  background: var(--cds-surface-2);
+}
+.task-detail-answer .task-detail-block-label { color: var(--cds-text-muted); }
+.task-detail-answer .task-detail-block-text { color: var(--cds-text-secondary); }
+
+/* 卡片末行是失败原因时整行染危险色——列表里一眼看出谁没成。 */
+.task-card-last[data-kind="error"] {
+  color: color-mix(in srgb, var(--cds-fill-danger) 85%, var(--cds-text-primary));
+}
+
+/* 步骤账本：日志面。编号等宽右对齐，工具名等宽，时间右对齐 tabular-nums；
+   失败行整行染危险色 —— 真正的 error 必须在设备上看得到（BACKLOG 里
+   Tier-1 失败只显示 Failed: <description> 的旧账就在这里补）。 */
+.ledger { list-style: none; margin: 0; padding: 0; }
+.ledger-step { display: flex; gap: 10px; padding: 9px 8px; }
+.ledger-step + .ledger-step { border-top: var(--cds-ring-hairline) solid var(--cds-border); }
+.ledger-idx {
+  flex: none; width: 18px; text-align: right;
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--cds-text-muted); padding-top: 1px;
+}
+.ledger-main { flex: 1; min-width: 0; }
+.ledger-head { display: flex; align-items: baseline; gap: 8px; }
+.ledger-name {
+  font-family: var(--font-mono); font-size: 12px;
+  color: var(--cds-text-primary); overflow-wrap: anywhere;
+}
+.ledger-at {
+  margin-left: auto; flex: none;
+  font-size: 10.5px; color: var(--cds-text-muted);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.ledger-summary { margin-top: 2px; font-size: 12.5px; color: var(--cds-text-secondary); }
+.ledger-step[data-ok="false"] .ledger-name { color: var(--cds-fill-danger); }
+.ledger-step[data-ok="false"] .ledger-summary {
+  color: color-mix(in srgb, var(--cds-fill-danger) 85%, var(--cds-text-primary));
+}
+.tasks-foot {
+  font-size: 11px; color: var(--cds-text-muted);
+  padding: 14px 4px 0; text-align: center;
+}
+
+/* 空态：只有「有桥且账本为空」才出现。文案说清楚这个页是什么、
+   数据从哪来，不留一个让人猜的白屏。 */
+.tasks-empty { text-align: center; padding: 72px 24px; }
+.tasks-empty svg { opacity: .45; margin-bottom: 14px; }
+.tasks-empty-title { font-size: 13.5px; font-weight: 600; color: var(--cds-text-secondary); }
+.tasks-empty-desc { font-size: 12px; line-height: 1.7; color: var(--cds-text-muted); margin: 6px auto 0; max-width: 260px; }
+
 /* ============================================================ 真实模式收敛
    接上真实任务流之后，设计稿里这些元素**没有数据也没有行为**：会话列表、
    搜索框、重命名与「更多」按钮、新建任务按钮。留着它们等于承诺一个点不动
@@ -1254,6 +1479,7 @@ body {
 
 [data-live="true"] #themePickerBtn { display: flex; }
 [data-live="true"] #settingsBtn { display: flex; }
+[data-live="true"] #tasksBtn { display: flex; }
 [data-live="true"] .sidebar-head { border-bottom: none; }
 
 /* 顶栏图标按钮（重命名 / 更多）在真实模式下没有任何行为，

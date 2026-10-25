@@ -858,6 +858,9 @@
 
   function openSettingsView() {
     if (!settingsView) return;
+    // 两个全屏 sheet 互斥：任务页开着时从侧栏摸到设置入口是可能的
+    // （侧栏在 sheet 之下但抽屉断点里侧栏浮在上面），不互斥就会叠层。
+    closeTasksView();
     settingsView.setAttribute('data-open', 'true');
     if (settingsScrim) settingsScrim.setAttribute('data-open', 'true');
     if (window.PokeClawChat && window.PokeClawChat.notifySettingsView) {
@@ -910,6 +913,535 @@
     settingsBtn.addEventListener('click', function () {
       closeNav();
       openSettingsView();
+    });
+  }
+
+  /* ------------------------------------------------------------ 任务账本
+     只读任务页。两级：列表（task-card）与详情（步骤账本），都在 #tasksBody
+     里整表重建 —— 与 renderLive 同一个取舍：一个账本按「几十条」计，重建
+     比维护 key 对齐的 diff 便宜，且 diff 漏一次就永久错位、没有自愈路径。
+
+     数据两条来路，界限划在「有没有桥」上：
+       · 有桥（真机）：PokeClawChat.readTaskList() / readTaskDetail(id)，
+         账本（TaskRecordStore）是唯一事实源。桥返回空数组 = 空账本，
+         显示空态 —— 宁空不假，绝不拿样例冒充真实数据。
+       · 无桥（纯浏览器预览）：TASK_SAMPLES 设计样例，与 feed 里的静态
+         示例 turn 同性质，只给评审看。
+
+     推送入口 __cds.renderTasks / renderTaskDetail 留给 Kotlin 侧
+     （TaskSink 落地后由它调）；本页只读，没有任何写操作按钮 ——
+     确认与操作留在聊天线程里，M2 的卡才进这里。 */
+  var tasksView = document.getElementById('tasksView');
+  var tasksScrim = document.getElementById('tasksScrim');
+  var tasksBody = document.getElementById('tasksBody');
+  var tasksTitle = document.getElementById('tasksTitle');
+  var tasksBackBtn = document.getElementById('tasksBackBtn');
+  var tasksBadge = document.getElementById('tasksBadge');
+
+  var TASK_STATES = {
+    RUNNING:         { label: '运行中', dot: 'running' },
+    WAITING_CONFIRM: { label: '待确认', dot: 'clay' },
+    SUCCEEDED:       { label: '已完成', dot: 'ready' },
+    FAILED:          { label: '失败',   dot: 'error' },
+    CANCELLED:       { label: '已取消', dot: 'muted' }
+  };
+
+  function taskState(key) {
+    return TASK_STATES[key] || { label: key || '未知状态', dot: 'muted' };
+  }
+
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+
+  /* 时间格式：同年 MM-DD HH:MM，跨年补年份。账本混排多年时
+     「10-25」单独一个会张冠李戴。 */
+  function fmtClock(ts) {
+    var d = new Date(ts);
+    var now = new Date();
+    var md = pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) + ' ' +
+      pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+    return d.getFullYear() === now.getFullYear()
+      ? md
+      : d.getFullYear() + '-' + md;
+  }
+
+  /* 耗时只说事实：起止时间差。没有百分比、没有预估 —— 任务步数
+     不可预知，任何进度条都是编的。 */
+  function fmtElapsed(ms) {
+    var s = Math.max(0, Math.floor(ms / 1000));
+    if (s < 60) return s + ' 秒';
+    var m = Math.floor(s / 60);
+    if (m < 60) return m + ' 分钟';
+    return Math.floor(m / 60) + ' 小时 ' + (m % 60) + ' 分';
+  }
+
+  /* 设计样例（仅无桥预览）。相对时刻算时间，评审时「已耗时 4 分钟」
+     永远读得通；故事线与 feed 里的静态示例同一桩（12306 订票）。 */
+  function minutesAgo(n) { return Date.now() - n * 60000; }
+
+  var TASK_SAMPLES = [
+    {
+      id: 'sample-running',
+      title: '给妈妈订高铁票',
+      state: 'RUNNING',
+      channel: '本机',
+      origin: 'Claude UI 聊天',
+      prompt: '帮我在 12306 买一张后天从杭州东到上海虹桥的票，二等座，优先上午出发。',
+      createdAt: minutesAgo(4),
+      finishedAt: null,
+      steps: [
+        { name: 'memory_recall', summary: '召回 3 条：妈妈出行优先上午车次 / 常买杭州东→上海虹桥 / 身份证已存', success: true, at: minutesAgo(4) },
+        { name: 'accessibility.open_app', summary: 'PACKAGE=com.MobileTicket · ACTION=LAUNCH', success: true, at: minutesAgo(4) + 12000 },
+        { name: 'accessibility.read_tree', summary: '128 节点 · 定位到「车票查询」入口', success: true, at: minutesAgo(3) },
+        { name: 'mcp_12306_search', summary: '后天 3 趟上午车次：G7307 07:12 / G7303 08:03 / G1201 09:15', success: true, at: minutesAgo(2) },
+        { name: 'accessibility.perform_action', summary: 'NODE_ID=btn_confirm · ACTION=click', success: true, at: minutesAgo(1) }
+      ]
+    },
+    {
+      id: 'sample-waiting',
+      title: '微信里回复张工',
+      state: 'WAITING_CONFIRM',
+      channel: 'Telegram',
+      origin: 'ExternalAutomation',
+      prompt: '回复张工：验收报告已发他邮箱，下周一现场演示。',
+      createdAt: minutesAgo(26),
+      finishedAt: null,
+      steps: [
+        { name: 'accessibility.open_app', summary: 'PACKAGE=com.tencent.mm · ACTION=LAUNCH', success: true, at: minutesAgo(26) },
+        { name: 'mcp_wechat_send', summary: '等待确认：是否允许以本人身份发送这条消息？', success: true, at: minutesAgo(25) }
+      ]
+    },
+    {
+      id: 'sample-failed',
+      title: '清理相册重复照片',
+      state: 'FAILED',
+      channel: '微信',
+      origin: 'WeChatChannel',
+      prompt: '把相册里重复的照片清一下，留最清楚的那张。',
+      createdAt: minutesAgo(95),
+      finishedAt: minutesAgo(88),
+      error: 'accessibility.perform_action 失败：当前界面里找不到删除按钮——相册在系统弹窗确认后重画了，节点 id 全部失效。',
+      steps: [
+        { name: 'accessibility.open_app', summary: 'PACKAGE=com.android.gallery3d · ACTION=LAUNCH', success: true, at: minutesAgo(95) },
+        { name: 'accessibility.read_tree', summary: '412 节点 · 按拍摄时间分组完成', success: true, at: minutesAgo(93) },
+        { name: 'accessibility.perform_action', summary: 'error: node btn_delete not found in current tree（相册在系统弹窗后重画了）', success: false, at: minutesAgo(88) }
+      ]
+    },
+    {
+      id: 'sample-done',
+      title: '导出记忆库并分享',
+      state: 'SUCCEEDED',
+      channel: '本机',
+      origin: 'Claude UI 聊天',
+      prompt: '把记忆库导出成文件，发到我的微信。',
+      createdAt: minutesAgo(180),
+      finishedAt: minutesAgo(176),
+      answer: '已导出 128 条记忆（46 KB），发送到微信·文件传输助手。',
+      steps: [
+        { name: 'memory_export', summary: '128 条记忆 → memories.json（46 KB）', success: true, at: minutesAgo(180) },
+        { name: 'send_file', summary: '已发送至 微信 · 文件传输助手', success: true, at: minutesAgo(176) }
+      ]
+    }
+  ];
+
+  var TASKS_EMPTY_ICON =
+    '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+    'stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">' +
+    '<path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/>' +
+    '<rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h6"/></svg>';
+
+  function buildEmptyState(title, desc) {
+    var box = el('div', 'tasks-empty');
+    box.innerHTML = TASKS_EMPTY_ICON +
+      '<div class="tasks-empty-title"></div><p class="tasks-empty-desc"></p>';
+    box.querySelector('.tasks-empty-title').textContent = title;
+    box.querySelector('.tasks-empty-desc').textContent = desc;
+    return box;
+  }
+
+  /* 详情里的终态载荷块：标签 + 正文。className 决定配色（error 危险 /
+     answer 中性），文字一律 textContent——失败原因与最终答案都来自任务
+     执行过程，拼 innerHTML 就是注入面。 */
+  function buildDetailBlock(label, text, className) {
+    var box = el('div', className);
+    box.innerHTML =
+      '<div class="task-detail-block-label"></div>' +
+      '<div class="task-detail-block-text"></div>';
+    box.querySelector('.task-detail-block-label').textContent = label;
+    box.querySelector('.task-detail-block-text').textContent = text;
+    return box;
+  }
+
+  /* ------------------------------------------------------------ 桥读取
+     null = 没有桥（预览模式，由调用方决定用样例）；[] = 有桥、空账本。
+     这两种「没有数据」含义相反，不能混成一个返回值。 */
+  function readTasksFromBridge() {
+    var b = bridge();
+    if (!b || !b.readTaskList) return null;
+    try {
+      var raw = b.readTaskList();
+      if (!raw) return [];
+      var arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) {
+      console.warn('[cds] readTaskList failed:', e);
+      return [];   // 桥在但读坏了：显示空态，不拿样例冒充
+    }
+  }
+
+  function readTaskDetailFromBridge(id) {
+    var b = bridge();
+    if (!b || !b.readTaskDetail) return null;
+    try {
+      var task = JSON.parse(b.readTaskDetail(id) || 'null');
+      return task && typeof task === 'object' ? task : null;
+    } catch (e) {
+      console.warn('[cds] readTaskDetail failed:', e);
+      return null;
+    }
+  }
+
+  /* ------------------------------------------------------------ 徽标
+     只数真实数据里的待处理任务（运行中 + 待确认）。关着的页面不亮 ——
+     徽标是状态不是装饰；预览样例照亮，那是设计的一部分。 */
+  function updateTasksBadge(tasks) {
+    if (!tasksBadge) return;
+    var pending = 0;
+    (tasks || []).forEach(function (t) {
+      if (t.state === 'RUNNING' || t.state === 'WAITING_CONFIRM') pending += 1;
+    });
+    tasksBadge.textContent = String(pending);
+    tasksBadge.setAttribute('data-show', pending > 0 ? 'true' : 'false');
+  }
+
+  /* ------------------------------------------------------------ 列表级 */
+  function buildTaskCard(t) {
+    var st = taskState(t.state);
+    var card = el('button', 'task-card');
+    card.type = 'button';
+    card.setAttribute('data-task-id', String(t.id == null ? '' : t.id));
+    card.innerHTML =
+      '<div class="task-card-head">' +
+        '<span class="status-dot"></span>' +
+        '<span class="task-card-title"></span>' +
+        '<span class="task-state"></span>' +
+      '</div>' +
+      '<div class="task-card-meta"></div>' +
+      '<div class="task-card-last"></div>';
+    card.querySelector('.status-dot').setAttribute('data-kind', st.dot);
+    card.querySelector('.task-card-title').textContent = t.title || '（无标题任务）';
+    var pill = card.querySelector('.task-state');
+    pill.setAttribute('data-state', String(t.state || ''));
+    pill.textContent = st.label;
+
+    var meta = card.querySelector('.task-card-meta');
+    if (t.channel) {
+      meta.appendChild(el('span', 'task-channel', t.channel));
+      meta.appendChild(document.createTextNode(' · '));
+    }
+    var stepCount = t.stepCount != null
+      ? t.stepCount
+      : (t.steps ? t.steps.length : 0);
+    meta.appendChild(document.createTextNode(stepCount + ' 步'));
+    meta.appendChild(document.createTextNode(' · '));
+    var elapsed = el('span', 'task-elapsed');
+    if (t.state === 'RUNNING') {
+      var since = t.createdAt || Date.now();
+      elapsed.textContent = '已耗时 ' + fmtElapsed(Date.now() - since);
+      elapsed.setAttribute('data-since', String(since));   // ticker 按它续算
+    } else if (t.finishedAt) {
+      elapsed.textContent = fmtClock(t.finishedAt) + ' 完成';
+    } else {
+      elapsed.textContent = '发起于 ' + fmtClock(t.createdAt || Date.now());
+    }
+    meta.appendChild(elapsed);
+
+    var last = card.querySelector('.task-card-last');
+    var lastStep = t.lastStep || (t.steps && t.steps.length ? t.steps[t.steps.length - 1] : null);
+    if (t.error) {
+      // 失败原因优先于最近一步：卡片要回答「为什么没成」，而那才是答案。
+      // （Failed 事件不产步骤，原因只存在于 error 字段——见 TaskLedgerBridge。）
+      last.textContent = t.error;
+      last.setAttribute('data-kind', 'error');
+    } else if (t.answer) {
+      last.textContent = t.answer;
+    } else if (lastStep) {
+      last.textContent = (lastStep.name || '') + (lastStep.summary ? ' · ' + lastStep.summary : '');
+    } else {
+      last.parentNode.removeChild(last);   // 没有最近一步就不留空行
+    }
+    return card;
+  }
+
+  function renderTaskList(tasks) {
+    tasksBody.textContent = '';
+    updateTasksBadge(tasks);
+    if (!tasks.length) {
+      tasksBody.appendChild(buildEmptyState(
+        '还没有任务记录',
+        '在聊天页发起一个任务，它的每一步都会记在这里——跑了多久、调用了哪些工具、结果如何，任务结束后也能回看。'
+      ));
+      return;
+    }
+    var frag = document.createDocumentFragment();
+    tasks.forEach(function (t) { frag.appendChild(buildTaskCard(t)); });
+    tasksBody.appendChild(frag);
+  }
+
+  /* ------------------------------------------------------------ 详情级 */
+  function buildLedgerStep(s, idx) {
+    var li = el('li', 'ledger-step');
+    li.setAttribute('data-ok', s.success === false ? 'false' : 'true');
+    li.innerHTML =
+      '<div class="ledger-idx"></div>' +
+      '<div class="ledger-main">' +
+        '<div class="ledger-head">' +
+          '<span class="ledger-name"></span>' +
+          '<span class="ledger-at"></span>' +
+        '</div>' +
+        '<div class="ledger-summary"></div>' +
+      '</div>';
+    li.querySelector('.ledger-idx').textContent = String(idx);
+    li.querySelector('.ledger-name').textContent = s.name || '（未命名步骤）';
+    li.querySelector('.ledger-at').textContent = s.at ? fmtClock(s.at) : '';
+    var summary = li.querySelector('.ledger-summary');
+    summary.textContent = s.summary || '';
+    if (!s.summary) summary.parentNode.removeChild(summary);
+    return li;
+  }
+
+  function renderTaskDetail(task) {
+    tasksBody.textContent = '';
+    openTaskId = task.id;
+    var st = taskState(task.state);
+
+    var wrap = el('div', 'task-detail');
+    wrap.innerHTML =
+      '<div class="task-detail-title"></div>' +
+      '<div class="task-detail-meta"></div>';
+    wrap.querySelector('.task-detail-title').textContent = task.title || '任务详情';
+
+    var meta = wrap.querySelector('.task-detail-meta');
+    var metaBits = [st.label];
+    if (task.channel) metaBits.push('来源 ' + task.channel);
+    if (task.origin) metaBits.push(task.origin);
+    metaBits.forEach(function (bit, i) {
+      if (i > 0) meta.appendChild(document.createTextNode(' · '));
+      meta.appendChild(document.createTextNode(bit));
+    });
+    if (task.state === 'RUNNING') {
+      // 运行中：meta 末项挂可续算的耗时，ticker 每 30s 刷
+      meta.appendChild(document.createTextNode(' · '));
+      var since = task.createdAt || Date.now();
+      var span = el('span', 'task-elapsed', '已耗时 ' + fmtElapsed(Date.now() - since));
+      span.setAttribute('data-since', String(since));
+      meta.appendChild(span);
+    } else {
+      meta.appendChild(document.createTextNode(' · 发起于 ' + fmtClock(task.createdAt || Date.now())));
+      if (task.finishedAt) {
+        meta.appendChild(document.createTextNode(' · 完成于 ' + fmtClock(task.finishedAt)));
+      }
+    }
+
+    if (task.prompt) {
+      var prompt = el('div', 'task-detail-prompt');
+      prompt.textContent = task.prompt;
+      wrap.appendChild(prompt);
+    }
+
+    // 终态载荷两个块：失败原因（危险色）与最终答案。Failed 事件在账本里
+    // 不产步骤，没有这个块，失败任务的详情就只剩一串正常步骤、看不到
+    // 它是怎么死的——设备上看不见失败原因正是这个页面要补的旧账。
+    if (task.error) {
+      wrap.appendChild(buildDetailBlock('失败原因', task.error, 'task-detail-error'));
+    }
+    if (task.answer) {
+      wrap.appendChild(buildDetailBlock('结果', task.answer, 'task-detail-answer'));
+    }
+
+    var steps = task.steps || [];
+    wrap.appendChild(el('div', 'group-label', '步骤账本 · ' + steps.length + ' 步'));
+    if (steps.length) {
+      var ol = el('ol', 'ledger');
+      steps.forEach(function (s, i) { ol.appendChild(buildLedgerStep(s, i + 1)); });
+      wrap.appendChild(ol);
+    } else {
+      wrap.appendChild(buildEmptyState('这条任务还没有步骤记录', '步骤随任务执行逐条落账。刚发起或已被清理的任务可能暂时没有。'));
+    }
+    wrap.appendChild(el('p', 'tasks-foot', '只读视图：确认与操作在聊天线程里进行。'));
+
+    tasksBody.appendChild(wrap);
+    tasksTitle.textContent = task.title || '任务详情';
+    tasksBackBtn.setAttribute('aria-label', '返回列表');
+    setTasksLevel('detail');
+  }
+
+  function renderTaskDetailMissing() {
+    tasksBody.textContent = '';
+    tasksBody.appendChild(buildEmptyState(
+      '任务不存在或已被清理',
+      '账本里找不到这条记录。它可能来自一次已经清除的应用数据。'
+    ));
+    tasksTitle.textContent = '任务详情';
+    tasksBackBtn.setAttribute('aria-label', '返回列表');
+    setTasksLevel('detail');   // 停在这一级，返回键回列表而不是直接关页
+  }
+
+  /* ------------------------------------------------------------ 开关与层级
+     level 三级：closed / list / detail。每次过渡都经 notifyTasksView
+     报给 Kotlin —— Android BACK 的处理完全读这个镜像状态，不搞异步
+     回查（evaluateJavascript 的回调进不了同步的 BACK 链）。 */
+  var tasksLevel = 'closed';
+  var openTaskId = null;
+
+  function setTasksLevel(level) {
+    tasksLevel = level;
+    var b = bridge();
+    if (b && b.notifyTasksView) {
+      try { b.notifyTasksView(level); }
+      catch (e) { console.warn('[cds] notifyTasksView failed:', e); }
+    }
+  }
+
+  function loadTaskList() {
+    var tasks = readTasksFromBridge();
+    if (tasks === null) tasks = TASK_SAMPLES;   // 无桥：设计样例
+    openTaskId = null;
+    tasksTitle.textContent = '任务';
+    tasksBackBtn.setAttribute('aria-label', '关闭');
+    renderTaskList(tasks);
+    setTasksLevel('list');
+    startTasksTicker();
+  }
+
+  function openTasksView() {
+    if (!tasksView) return;
+    closeSettingsView();
+    closeNav();
+    tasksScrim.setAttribute('data-open', 'true');
+    tasksView.setAttribute('data-open', 'true');
+    loadTaskList();
+  }
+
+  function closeTasksView() {
+    if (!tasksView) return;
+    tasksScrim.setAttribute('data-open', 'false');
+    tasksView.setAttribute('data-open', 'false');
+    stopTasksTicker();
+    openTaskId = null;
+    setTasksLevel('closed');
+  }
+
+  function openTaskDetail(id) {
+    var task = readTaskDetailFromBridge(id);
+    if (!task) {
+      // 无桥时详情也只在样例里找；有桥但读不到 = 诚实的缺失态
+      var b = bridge();
+      if (!b || !b.readTaskDetail) {
+        for (var i = 0; i < TASK_SAMPLES.length; i++) {
+          if (TASK_SAMPLES[i].id === id) { task = TASK_SAMPLES[i]; break; }
+        }
+      }
+    }
+    if (!task) { renderTaskDetailMissing(); return; }
+    renderTaskDetail(task);
+  }
+
+  /* Kotlin BACK 键的页面侧答复：处理了返回 true，没开任何一层返回 false。
+     detail → 回列表（重读，推送过的变化此时进来）；list → 关页。 */
+  function tasksBack() {
+    if (tasksLevel === 'detail') { loadTaskList(); return true; }
+    if (tasksLevel === 'list') { closeTasksView(); return true; }
+    return false;
+  }
+
+  /* ------------------------------------------------------------ 耗时 ticker
+     运行中卡的「已耗时」按 createdAt 现算，30s 一次。只认 data-since
+     （运行中行才有），终态行的完成时间是静态文本，不会被刷掉。 */
+  var tasksTimer = null;
+
+  function startTasksTicker() {
+    if (tasksTimer) return;
+    tasksTimer = setInterval(tickTasksElapsed, 30000);
+  }
+
+  function stopTasksTicker() {
+    if (tasksTimer) { clearInterval(tasksTimer); tasksTimer = null; }
+  }
+
+  function tickTasksElapsed() {
+    var nodes = tasksBody.querySelectorAll('.task-elapsed[data-since]');
+    for (var i = 0; i < nodes.length; i++) {
+      var since = parseInt(nodes[i].getAttribute('data-since'), 10);
+      if (!isNaN(since)) {
+        nodes[i].textContent = '已耗时 ' + fmtElapsed(Date.now() - since);
+      }
+    }
+  }
+
+  /* ------------------------------------------------------------ Kotlin 推送
+     TaskSink 落地后由它调用。关着时只更新徽标 —— 下次打开从桥重读，
+     推送无需缓存；开着详情时若当前任务被推送更新就重读详情，若它从
+     账本里消失了就回列表（不留一个详情指向不存在的记录）。 */
+  function renderTasks(payload) {
+    var tasks = payload;
+    if (typeof payload === 'string') {
+      try { tasks = JSON.parse(payload || '[]'); }
+      catch (e) { console.warn('[cds] renderTasks: bad json', e); return; }
+    }
+    if (!Array.isArray(tasks)) { console.warn('[cds] renderTasks: not an array'); return; }
+    updateTasksBadge(tasks);
+    if (tasksLevel === 'closed') return;
+    if (tasksLevel === 'detail') {
+      var stillThere = tasks.some(function (t) { return String(t.id) === String(openTaskId); });
+      if (stillThere) {
+        var fresh = readTaskDetailFromBridge(openTaskId);
+        if (fresh) renderTaskDetail(fresh);
+      } else {
+        loadTaskList();
+      }
+      return;
+    }
+    renderTaskList(tasks);
+  }
+
+  function renderTaskDetailPush(payload) {
+    var task = payload;
+    if (typeof payload === 'string') {
+      try { task = JSON.parse(payload || 'null'); }
+      catch (e) { console.warn('[cds] renderTaskDetail: bad json', e); return; }
+    }
+    if (task && typeof task === 'object' && tasksLevel === 'detail' &&
+        String(task.id) === String(openTaskId)) {
+      renderTaskDetail(task);
+    }
+  }
+
+  /* ------------------------------------------------------------ 接线 */
+  var tasksBtn = document.getElementById('tasksBtn');
+  if (tasksBtn) {
+    tasksBtn.addEventListener('click', function () {
+      closeNav();
+      openTasksView();
+    });
+  }
+  if (tasksScrim) {
+    tasksScrim.addEventListener('click', closeTasksView);
+  }
+  if (tasksBackBtn) {
+    tasksBackBtn.addEventListener('click', tasksBack);
+  }
+  if (tasksBody) {
+    tasksBody.addEventListener('click', function (e) {
+      var card = e.target && e.target.closest ? e.target.closest('.task-card') : null;
+      if (!card) return;
+      openTaskDetail(card.getAttribute('data-task-id'));
     });
   }
 
@@ -1059,6 +1591,12 @@
     openSettingsView: openSettingsView,
     closeSettingsView: closeSettingsView,
     settingsViewIsOpen: settingsViewIsOpen,
+    openTasksView: openTasksView,
+    closeTasksView: closeTasksView,
+    tasksBack: tasksBack,
+    tasksLevel: function () { return tasksLevel; },
+    renderTasks: renderTasks,
+    renderTaskDetail: renderTaskDetailPush,
     rateLimit: triggerBackoff,
     resetRateLimit: function () {
       clearInterval(backoff.timer); backoff.timer = null;

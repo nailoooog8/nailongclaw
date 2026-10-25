@@ -2049,6 +2049,32 @@ adb shell run-as io.agents.pokeclaw logcat -d | grep -i "web_search is not confi
 adb shell run-as io.agents.pokeclaw strings /data/data/io.agents.pokeclaw/files/mmkv/mmkv.default | grep -c "enc:v1:"
 ```
 
+## AD. 任务账本（只读任务页，M1-部二） — 2026-10-25
+
+侧栏「任务」入口 + 只读任务页（列表卡 + 详情步骤账本）。数据经 `PokeClawChat.readTaskList / readTaskDetail` 桥读取 `TaskRecordStore`（部一 M1 已落地双写：`TaskFlowController` 在任务过闸后 `start`、每个 `TaskEvent` 过 `onEvent`），变化经 `WebTaskLedgerSink` 推送。取舍与桥接缝见 `mockup/claude-ui/README.md` 第六轮与 `ui/web/TaskLedgerBridge.kt`。
+**浏览器预览已验证**（无桥样例路径）：四状态卡 / 徽标 / 账本与失败行 / BACK 三级 / 空账本与坏 JSON 均落空态 / 详情缺失态 / 桥数据与推送刷新。本组是真机项。
+**单测:** `TaskLedgerBridgeTest` 14 例（状态映射/终态载荷/来源标签/读坏降级/待确认往返/手工映射），`WebTaskLedgerSinkTest` 2 例。
+
+- [ ] **AD1. 侧栏入口与徽标纪律**: 主界面侧栏脚部出现「任务」行；账本为空时徽标不显示（`data-show="false"`）——徽标是状态不是装饰，空数不亮。
+- [ ] **AD2. 空态诚实**: 全新安装（或清除数据）首次打开任务页 → **Expected**: 「还没有任务记录」+ 说明文案；无样例任务、无白屏、不崩。
+- [ ] **AD3. 列表卡与真实耗时**: 发起一个任务后打开任务页 → **Expected**: 新卡在列表顶部，状态 / 渠道 / 步数 / 最近一步与聊天页工具轨迹一致；运行中卡的「已耗时」随时间增长（30s 一跳），**没有任何百分比或进度条**。
+- [ ] **AD4. 详情账本与失败行**: 点开一张卡 → **Expected**: 步骤按序带工具名 / 时间 / 摘要；失败任务的 error 原文在设备上可见（整行危险色），不是一句 `Failed: <description>` 就完了。
+- [ ] **AD5. BACK 三级**: 详情态按 BACK → 回列表；列表态按 BACK → 关页回聊天；关页态按 BACK → 退出应用。不出现「按一次直接退应用」。
+- [ ] **AD6. Compose 侧入口**: 聊天页（`ComposeChatActivity`，外部 task 契约面）有监听任务时，ActiveTaskBar 行尾出现账本图标 → 点击 → **Expected**: 直接打开主界面的任务页（不落在聊天流），BACK 行为同 AD5。
+- [ ] **AD7. 真实性回归**: 真机（有桥）打开任务页 → **Expected**: 没有任何 `TASK_SAMPLES` 样例任务（「给妈妈订高铁票」等只属于无桥预览）；空账本只显示空态。
+
+### ADB verification commands
+
+```bash
+# 任务页状态探针：uiautomator 看不见 WebView 内部，这是 ground truth
+adb shell am broadcast -a io.agents.pokeclaw.DUMP_DOM
+adb logcat -d | grep domDump        # 看 tasksOpen / tasksLevel / taskCards
+# AD5 — 每次层级过渡页面都上报（detail / list / closed）
+adb logcat -d | grep "notifyTasksView"
+# AD6 — 入口确实带了 extra（onCreate 只打这一行）
+adb logcat -d | grep "opened with the task ledger requested"
+```
+
 ---
 
 ## QA Debug Changelog

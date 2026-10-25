@@ -102,6 +102,58 @@
 >   已收口到 `widget/CdsDialog.kt`（面板 + 衬线标题 + accent/danger 确认键 +
 >   单选行），删除的 `AlertDialog` / `InputDialog` / `ConfirmDialog` 不再有调用方。
 
+**2026-10-25 第六轮：任务账本（只读任务页，M1-部二）**。
+
+侧栏脚部新增「**任务**」入口（`#tasksBtn`，待处理计数徽标只数真实数据里的
+运行中 + 待确认），打开 `#tasksView`——与设置面板同构的全屏 sheet，两级：
+
+- **列表**：任务卡 = 状态点 + 标题 + 状态标 + `渠道 · N 步 · 耗时/完成时间`
+  + 最近一步摘要。整表重建（同 `renderLive` 的取舍），运行中卡的「已耗时」
+  按 `createdAt` 现算、30s 一跳——**没有进度条**：任务步数不可预知，任何
+  百分比都是编的。
+- **详情**：步骤账本（编号 / 工具名 / 时间 / 摘要，失败行整行染危险色——
+  真正的 error 必须在设备上看得到）+ 原始请求 + 状态 meta。**只读**：
+  确认与操作留在聊天线程里，M2 的卡才进这里。
+
+数据只走桥，页面自己不存账本（每次打开重读；`__cds.renderTasks` /
+`renderTaskDetail` 推送只做「开着时的刷新」，关着时下次开自然最新）：
+
+```
+PokeClawChat.readTaskList()            -> JSON 数组（摘要，新→旧）
+PokeClawChat.readTaskDetail(id)        -> JSON 对象（摘要 + steps），找不到 "null"
+PokeClawChat.notifyTasksView(level)    -> "closed" | "list" | "detail"（BACK 镜像）
+window.__cds.renderTasks(jsonArray)    <- 账本变化时 Kotlin 推
+window.__cds.renderTaskDetail(json)    <- 当前详情变化时推
+```
+
+列表项字段：`id / title / state / channel / createdAt / finishedAt /
+stepCount / lastStep{name,summary} / error / answer`；详情追加 `origin`
+（TaskRecord 的 originActivity）、`prompt`、`steps[{name,summary,success,at}]`。
+时间戳一律毫秒；`state` 五个值（RUNNING / WAITING_CONFIRM / SUCCEEDED /
+FAILED / CANCELLED），未知值渲染成灰点 + 原样标签，不崩不猜。`error` /
+`answer` 是终态载荷：失败原因在卡片末行与详情块双重呈现（Failed 事件
+在账本里不产步骤，原因只活在 error 字段），结果只进详情块。
+
+**接缝是两个类：`ui/web/TaskLedgerBridge.kt`（读）+ `WebTaskLedgerSink.kt`
+（推）**。桥把 `TaskRecordStore.list()/get(id)` 投影成页面契约
+（`status`→五态、`channel`→displayName、`originActivity`→短标签、
+`taskText`→title/prompt、终态 `error`/`answer` 落到卡片末行与详情块），
+读失败降级为空账本并落 logcat——页面分不出「空」和「读坏」，logcat 分得清。
+sink 实现部一的 `TaskSink`，在 `ClaudeUiPreviewActivity` 注册，账本每次
+变化（步骤落账、状态翻转）经 `runOnUiThread` 推全量快照给 `renderTasks`；
+页面关着时只更新徽标。映射是纯函数，由 `TaskLedgerBridgeTest` 12 例钉住
+（部二/部一字段漂移的警报器——漂移的 symptoms 是说谎的卡片，不是崩溃）。
+Compose 侧入口在 `ActiveTaskBar` 行尾（`onOpenLedger` →
+`ClaudeUiPreviewActivity` 带 `show_tasks` extra 直接翻开任务页），BACK 在
+任务页按 详情→列表→关页 三级消费（层级由页面经 `notifyTasksView` 镜像，
+见 Activity 里 `tasksLevel`）。
+
+已在浏览器（无桥预览）验证：四种状态卡 / 徽标 / 详情账本与失败行 /
+详情→列表→关闭的 BACK 层级 / 空账本与坏 JSON 均落空态 / 详情缺失态 /
+桥数据与推送刷新。真机 QA 条目见 `QA_CHECKLIST.md` AD 组（待设备；
+`DUMP_DOM` 广播已带 `tasksOpen/tasksLevel/taskCards` 三个探针，
+uiautomator 看不见 WebView 内部，这是任务页的真机取证口）。
+
 ## 来源
 
 设计令牌与交互物理抄自 **[Caho1/open-claude-ui](https://github.com/Caho1/open-claude-ui)**（MIT © Caho1）。

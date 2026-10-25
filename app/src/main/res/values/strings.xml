@@ -322,6 +322,7 @@
     <string name="chat_send_word_on"> on </string>
     <string name="chat_monitoring_single">Monitoring: %s</string>
     <string name="chat_monitoring_multiple">%d monitoring</string>
+    <string name="chat_active_task_ledger">Task ledger</string>
     <string name="chat_btn_stop_all">Stop All</string>
 
     <string name="chat_drawer_recent">Recent</string>

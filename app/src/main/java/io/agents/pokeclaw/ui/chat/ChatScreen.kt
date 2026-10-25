@@ -148,6 +148,7 @@ fun ChatScreen(
     activeTasks: List<String> = emptyList(),
     onStopTask: (String) -> Unit = {},
     onStopAllTasks: () -> Unit = {},
+    onOpenLedger: () -> Unit = {},
     inputEnabled: Boolean = true,
     onModelSwitch: (modelId: String, displayName: String) -> Unit = { _, _ -> },
     colors: PokeclawColors = AbyssDark,
@@ -273,6 +274,7 @@ fun ChatScreen(
                             tasks = activeTasks,
                             onStopTask = onStopTask,
                             onStopAll = onStopAllTasks,
+                            onOpenLedger = onOpenLedger,
                             colors = colors,
                         )
                     }
@@ -2411,6 +2413,7 @@ private fun ActiveTaskBar(
     tasks: List<String>,
     onStopTask: (String) -> Unit,
     onStopAll: () -> Unit,
+    onOpenLedger: () -> Unit,
     colors: PokeclawColors,
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -2446,6 +2449,20 @@ private fun ActiveTaskBar(
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
+                // 任务账本入口：监听条是「此刻在跑什么」，账本是「历来跑过
+                // 什么」——从这一行进主界面（Claude UI）的任务页。bar 只在
+                // 有监听任务时出现，所以这是个上下文入口，不是常驻导航。
+                IconButton(
+                    onClick = onOpenLedger,
+                    modifier = Modifier.size(34.dp),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Assignment,
+                        contentDescription = stringResource(R.string.chat_active_task_ledger),
+                        tint = colors.textSecondary,
+                        modifier = Modifier.size(17.dp),
+                    )
+                }
                 Text(
                     text = if (expanded) "▴" else "▾",
                     color = colors.textSecondary,

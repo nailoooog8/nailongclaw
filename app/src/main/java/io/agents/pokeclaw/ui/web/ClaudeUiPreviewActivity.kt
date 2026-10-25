@@ -48,6 +48,7 @@ import io.agents.pokeclaw.ui.settings.SettingsActivity
 import io.agents.pokeclaw.ui.settings.ThemeActivity
 import io.agents.pokeclaw.ui.settings.ToolsActivity
 import io.agents.pokeclaw.ui.settings.UserSkillsActivity
+import io.agents.pokeclaw.task.TaskRecordStore
 import io.agents.pokeclaw.utils.KVUtils
 import io.agents.pokeclaw.utils.XLog
 import java.util.concurrent.Executors
@@ -93,11 +94,32 @@ class ClaudeUiPreviewActivity : BaseActivity() {
      */
     private var settingsViewOpen = false
 
+    /**
+     * Task-page level mirrored from the page via `notifyTasksView`.
+     *
+     * `@Volatile` because the write lands on the WebView's JavaScript
+     * thread while BACK reads it on MAIN. A stale read degrades to "BACK
+     * leaves the page instead of closing the sheet" — the same failure
+     * class as the settings flag, one annotation cheaper to be correct.
+     */
+    @Volatile
+    private var tasksLevel: String = TASKS_LEVEL_CLOSED
+
     private val sink by lazy {
         WebChatSink(
             onRender = { messages -> publish(messages) },
             onConfirmation = { request -> publishConfirmation(request) },
         )
+    }
+
+    /**
+     * Live ledger deltas → the task page. The sink's callback may arrive on
+     * any thread (the ledger is written from the UI thread and the agent
+     * thread), and the WebView push is a UI-thread operation — hence the
+     * hop through [runOnUiThread] here rather than inside the sink.
+     */
+    private val taskLedgerSink = WebTaskLedgerSink {
+        runOnUiThread { publishTaskLedger() }
     }
 
     private val taskFlowController by lazy {
@@ -349,6 +371,42 @@ class ClaudeUiPreviewActivity : BaseActivity() {
         }
 
         /**
+         * JS → Kotlin: the task ledger page's list, as JSON.
+         *
+         * Read path of the 部二/部一 seam: the page never touches a store
+         * directly, it asks this bridge. [TaskLedgerBridge] maps the ledger
+         * to the page's contract and degrades to an honest empty array when
+         * the read fails — never to fabricated records.
+         */
+        @JavascriptInterface
+        fun readTaskList(): String = TaskLedgerBridge.readList()
+
+        /** JS → Kotlin: one task's detail (step ledger included), or `null`. */
+        @JavascriptInterface
+        fun readTaskDetail(id: String?): String = TaskLedgerBridge.readDetail(id)
+
+        /**
+         * JS → Kotlin: the task page's level — "closed" / "list" / "detail".
+         *
+         * Mirrored here so BACK can be answered synchronously off [tasksLevel];
+         * an evaluateJavascript round-trip cannot join the synchronous BACK
+         * chain. Every transition reports, so the mirror cannot drift.
+         */
+        @JavascriptInterface
+        fun notifyTasksView(level: String?) {
+            // 显式判空：`normalized !in TASKS_LEVELS` 对 null 也成立（null 不在
+            // 集合里），编译器不会据此智能转型——少了这个 == null，赋值处就是
+            // String? → String 的编译错误。
+            val normalized = level?.trim()?.lowercase()
+            if (normalized == null || normalized !in TASKS_LEVELS) {
+                XLog.e(TAG, "[chat] notifyTasksView('$level') ignored — unknown level")
+                return
+            }
+            runOnUiThread { tasksLevel = normalized }
+            XLog.e(TAG, "[chat] notifyTasksView($normalized)")
+        }
+
+        /**
          * JS → Kotlin: the page's settings sheet opened or closed.
          *
          * Only used for BACK handling: while the sheet is up, BACK should
@@ -447,6 +505,30 @@ class ClaudeUiPreviewActivity : BaseActivity() {
             webView.evaluateJavascript(
                 "window.__cds && window.__cds.renderConfirmation($json);", null
             )
+        }
+    }
+
+    /**
+     * Kotlin → JS: push the current ledger to the task page.
+     *
+     * Full snapshot, not a delta — the same reasoning as [publish]: the page
+     * rebuilds its list from whatever it is handed, and a missed delta has
+     * no recovery path while a snapshot can always be re-derived from the
+     * store. Called on every ledger change (a step landing, a status flip);
+     * the page ignores it while closed and re-reads on its next open, so a
+     * backgrounded surface costs one small evaluateJavascript per event.
+     */
+    private fun publishTaskLedger() {
+        if (!::webView.isInitialized) return
+        // Gson 不转义 U+2028/U+2029，而它们在 JS 源码里是（ES2019 前仍是）
+        // 断行符——任务文本里出现一个，整段 evaluateJavascript 就是语法错误，
+        // 推送静默全丢。转义成 \uXXXX 序列：JSON 值不变，JS 源码安全。
+        // 既有的 appendJsonString 对消息流也做同样两行，同理。
+        val json = TaskLedgerBridge.readList()
+            .replace("\u2028", "\\u2028")
+            .replace("\u2029", "\\u2029")
+        webView.post {
+            webView.evaluateJavascript("window.__cds && window.__cds.renderTasks($json);", null)
         }
     }
 
@@ -654,7 +736,15 @@ class ClaudeUiPreviewActivity : BaseActivity() {
         // the sheet's own close handler reports the transition.
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (settingsViewOpen) {
+                // 任务页优先：它和设置面板同为最上层全屏 sheet（z-index
+                // 70），且在文档里更靠后——同开时它在上。back 是「详情回
+                // 列表」还是「关页」由页面自己决定（tasksBack），Kotlin 只
+                // 在两层都没开时放行默认返回。
+                if (tasksLevel != TASKS_LEVEL_CLOSED) {
+                    webView.evaluateJavascript(
+                        "window.__cds && window.__cds.tasksBack();", null
+                    )
+                } else if (settingsViewOpen) {
                     webView.evaluateJavascript(
                         "window.__cds && window.__cds.closeSettingsView();", null
                     )
@@ -677,11 +767,26 @@ class ClaudeUiPreviewActivity : BaseActivity() {
         // window.__cds.renderLiveRaw — which does not exist until cds.js has
         // finished loading. Restore after, never before.
         webView.postDelayed({ restoreChat() }, RESTORE_DELAY_MS)
+        // 从 Compose 聊天页的 ActiveTaskBar 进来时，直接翻开任务页。
+        // 同样的延迟纪律：__cds 要等 cds.js 加载完才存在。
+        if (intent.getBooleanExtra(EXTRA_SHOW_TASKS, false)) {
+            webView.postDelayed({
+                webView.evaluateJavascript(
+                    "window.__cds && window.__cds.openTasksView();", null
+                )
+            }, RESTORE_DELAY_MS)
+            XLog.e(TAG, "onCreate: opened with the task ledger requested")
+        }
         // e, not i — see the XLog.setDEBUG note on the chrome client below. In a
         // release build XLog.i never reaches logcat, and QA runs release
         // packages, so an `i` here would make the checklist's "the page loaded
         // this URL" assertion unobservable on the only build QA can install.
         XLog.e(TAG, "onCreate: loaded $MOCKUP_URL?v=${BuildConfig.VERSION_CODE}")
+
+        // 账本变化 → 任务页推送。整个 Activity 生命周期注册：页面关着时
+        // 推送只更新侧栏徽标（renderTasks 的 closed 分支），开着时刷新列表
+        // 或详情——两条路都由页面自己决定，这里只负责把变化送到。
+        TaskRecordStore.addSink(taskLedgerSink)
 
         // Registered at runtime rather than declared in the manifest: a
         // manifest receiver here would have to be exported to be reachable by
@@ -753,6 +858,11 @@ class ClaudeUiPreviewActivity : BaseActivity() {
                 "o.cdsExists=!!window.__cds;" +
                 "o.effort=String(window.__cds&&window.__cds.state?window.__cds.state().effort:'');" +
                 "o.policy=String(window.__cds&&window.__cds.state?window.__cds.state().policy:'');" +
+                // 任务页状态：uiautomator 看不见 WebView 内部，任务页的
+                // 开合/层级/卡数只能从这里取证（QA AD 组的 ground truth）。
+                "o.tasksOpen=String(!!document.querySelector('#tasksView[data-open=\"true\"]'));" +
+                "o.tasksLevel=String(window.__cds&&window.__cds.tasksLevel?window.__cds.tasksLevel():'');" +
+                "o.taskCards=document.querySelectorAll('.task-card').length;" +
                 "JSON.stringify(o);"
             )
         webView.evaluateJavascript(js) { value ->
@@ -822,6 +932,9 @@ class ClaudeUiPreviewActivity : BaseActivity() {
         // A wait this surface cannot answer must be refused now, not left to
         // time out against a screen that no longer exists.
         McpConfirmationCoordinator.detach(confirmationSurface)
+        // 与 addSink 成对：sink 持的是 Activity 的 lambda（经 runOnUiThread
+        // 碰 WebView），漏掉这一行会把一个已销毁的 Activity 泄漏给账本。
+        TaskRecordStore.removeSink(taskLedgerSink)
         qaReceiver?.let {
             runCatching { unregisterReceiver(it) }
             qaReceiver = null
@@ -874,6 +987,17 @@ class ClaudeUiPreviewActivity : BaseActivity() {
         private const val PREVIEW_CONVERSATION_ID = "preview_claude_ui"
         private const val ASSET_DOMAIN = "appassets.androidplatform.net"
         private const val PROBE_DELAY_MS = 2500L
+
+        /**
+         * Set by the Compose chat's ActiveTaskBar entry: open this surface
+         * straight into the task ledger page. Without it the page opens on
+         * the chat feed, which is the right default for every other entry.
+         */
+        const val EXTRA_SHOW_TASKS = "show_tasks"
+
+        /** Task-page levels the page reports through `notifyTasksView`. */
+        private val TASKS_LEVELS = setOf("closed", "list", "detail")
+        private const val TASKS_LEVEL_CLOSED = "closed"
 
         /**
          * Later than [PROBE_DELAY_MS] on purpose: the probe proves the page is

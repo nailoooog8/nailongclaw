@@ -322,6 +322,7 @@
     <string name="chat_send_word_on"> 通过 </string>
     <string name="chat_monitoring_single">正在监听：%s</string>
     <string name="chat_monitoring_multiple">%d 项监听运行中</string>
+    <string name="chat_active_task_ledger">任务记录</string>
     <string name="chat_btn_stop_all">全部停止</string>
 
     <string name="chat_drawer_recent">最近对话</string>
