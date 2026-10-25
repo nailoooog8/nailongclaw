@@ -31,7 +31,11 @@ class AppViewModel : ViewModel() {
 
     val taskOrchestrator = TaskOrchestrator(
         agentConfigProvider = { getAgentConfig() },
-        onTaskFinished = { /* refresh */ }
+        onTaskFinished = {
+            // Any task ending is the queue's chance to drain: a scheduled
+            // task that fired while this one ran has been waiting visibly.
+            io.agents.pokeclaw.task.ScheduleDispatcher.onAnyTaskFinished()
+        }
     )
 
     private val channelSetup = ChannelSetup(taskOrchestrator = taskOrchestrator)
@@ -54,6 +58,13 @@ class AppViewModel : ViewModel() {
         taskId: String,
         agentPromptOverride: String? = null,
         originActivity: String? = null,
+        /**
+         * Where the task came from. Defaults to [Channel.LOCAL] — the app's own
+         * UI. An external-automation task passes [Channel.EXTERNAL] so
+         * ToolRiskPolicy gates it like any other unwatched source instead of
+         * silently inheriting the local tier (R3-01).
+         */
+        channel: Channel = Channel.LOCAL,
         onEvent: (TaskEvent) -> Unit,
     ) {
         onBeforeTask?.invoke()
@@ -63,7 +74,7 @@ class AppViewModel : ViewModel() {
             return
         }
         taskOrchestrator.startNewTask(
-            Channel.LOCAL,
+            channel,
             task,
             taskId,
             agentPromptOverride = agentPromptOverride,

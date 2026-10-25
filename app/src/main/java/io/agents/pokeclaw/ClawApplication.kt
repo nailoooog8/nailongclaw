@@ -43,6 +43,12 @@ class ClawApplication : BaseApp() {
         io.agents.pokeclaw.agent.PlaybookManager.loadAll(this)
         // Memory bank: parse memories.json so the first task already has the bank warm
         io.agents.pokeclaw.agent.memory.MemoryStore.init(this)
+        // Task ledger: durable record of accepted tasks — the task page reads
+        // only from here, never from the volatile session store
+        io.agents.pokeclaw.task.TaskRecordStore.init(this)
+        // Scheduled tasks: the durable timer half; alarms themselves are
+        // re-armed by BootReceiver after a reboot
+        io.agents.pokeclaw.task.ScheduledTaskStore.init(this)
         // Watchdog: periodic job (persisted across reboots) that re-syncs the
         // foreground service and revives dropped channels if the process was killed
         io.agents.pokeclaw.service.KeepAliveJobService.schedule(this)

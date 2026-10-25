@@ -3,6 +3,7 @@
 
 package io.agents.pokeclaw.agent.mcp
 
+import io.agents.pokeclaw.task.TaskRecordStore
 import io.agents.pokeclaw.utils.XLog
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -185,6 +186,11 @@ object McpConfirmationCoordinator {
             return finish(current, waiting, timeoutMs, answered = true)
         }
 
+        // The card is on screen — the task ledger flips to WAITING_CONFIRM so
+        // the task page shows the "waiting for you" state. Best-effort: a
+        // store that cannot record this must not break the wait itself.
+        TaskRecordStore.noteWaitingConfirm(waiting.displayName)
+
         val answered = try {
             done.await(timeoutMs, TimeUnit.MILLISECONDS)
         } catch (e: InterruptedException) {
@@ -282,6 +288,9 @@ object McpConfirmationCoordinator {
                 gate.timeout() ?: McpConfirmationGate.Outcome.DENY_TIMED_OUT
             }
         val verdict = verdictFor(outcome, request, timeoutMs)
+        // Symmetric with noteWaitingConfirm above; a no-op unless a wait was
+        // actually recorded (fast paths never parked the ledger).
+        TaskRecordStore.noteConfirmResolved(outcome.toString())
         try {
             surface?.hideConfirmation(verdict)
         } catch (e: Exception) {

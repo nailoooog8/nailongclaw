@@ -21,10 +21,12 @@ import io.agents.pokeclaw.agent.PipelineRouter
 import io.agents.pokeclaw.agent.TaskPromptEnvelope
 import io.agents.pokeclaw.agent.llm.ModelConfigRepository
 import io.agents.pokeclaw.agent.memory.MemoryRecallFormat
+import io.agents.pokeclaw.channel.Channel
 import io.agents.pokeclaw.service.ClawAccessibilityService
 import io.agents.pokeclaw.service.ClawNotificationListener
 import io.agents.pokeclaw.service.ForegroundService
 import io.agents.pokeclaw.service.AutoReplyManager
+import io.agents.pokeclaw.task.TaskRecordStore
 import io.agents.pokeclaw.tool.ToolRegistry
 import io.agents.pokeclaw.ui.settings.SettingsActivity
 import io.agents.pokeclaw.utils.KVUtils
@@ -131,7 +133,18 @@ class TaskFlowController(
     private var assistantResponsePublished = false
     private val pipelineRouter = PipelineRouter(activity)
 
-    fun sendTask(text: String) {
+    /**
+     * Ledger id of the task this controller is currently driving, or null.
+     * The ledger half of the dual-write — see [ledgerOnEvent].
+     */
+    private var ledgerRecordId: String? = null
+
+    /**
+     * @param channel where the task came from. Defaults to [Channel.LOCAL] —
+     * the user typing in this app. An external-automation intent passes
+     * [Channel.EXTERNAL]; see [Channel.EXTERNAL] for why that is not LOCAL.
+     */
+    fun sendTask(text: String, channel: Channel = Channel.LOCAL) {
         if (appViewModel.isTaskRunning()) {
             addSystem("Another task is still running. Stop it first.")
             onTaskTerminal?.invoke(TaskEvent.Failed("Another task is still running. Stop it first."))
@@ -150,7 +163,7 @@ class TaskFlowController(
 
         DirectDeviceDataGuard.deterministicToolCall(text)?.let { directTool ->
             XLog.i(TAG, "sendTask: executing deterministic direct tool before LLM/accessibility gates")
-            executeDirectToolTask(text, directTool)
+            executeDirectToolTask(text, directTool, channel)
             return
         }
 
@@ -159,7 +172,7 @@ class TaskFlowController(
                 val directTool = DirectDeviceDataGuard.deterministicToolCall(text)
                 if (directTool != null) {
                     XLog.i(TAG, "sendTask: executing non-interactive direct tool without Accessibility")
-                    executeDirectToolTask(text, directTool)
+                    executeDirectToolTask(text, directTool, channel)
                     return
                 }
                 if (canRunWithoutAccessibility(text)) {
@@ -177,7 +190,7 @@ class TaskFlowController(
                 val directTool = DirectDeviceDataGuard.deterministicToolCall(text)
                 if (directTool != null) {
                     XLog.i(TAG, "sendTask: executing non-interactive direct tool while Accessibility connects")
-                    executeDirectToolTask(text, directTool)
+                    executeDirectToolTask(text, directTool, channel)
                     return
                 }
                 if (canRunWithoutAccessibility(text)) {
@@ -197,7 +210,7 @@ class TaskFlowController(
                     val connected = ClawAccessibilityService.awaitRunning(5000)
                     activity.runOnUiThread {
                         if (connected) {
-                            sendTask(text)
+                            sendTask(text, channel)
                         } else {
                             Toast.makeText(activity, "Accessibility service didn't connect", Toast.LENGTH_LONG).show()
                             addSystem("Accessibility service didn't connect. Go to Settings and toggle it off then on.")
@@ -213,7 +226,7 @@ class TaskFlowController(
                 val directTool = DirectDeviceDataGuard.deterministicToolCall(text)
                 if (directTool != null) {
                     XLog.i(TAG, "sendTask: executing non-interactive direct tool while Accessibility is degraded")
-                    executeDirectToolTask(text, directTool)
+                    executeDirectToolTask(text, directTool, channel)
                     return
                 }
                 if (canRunWithoutAccessibility(text)) {
@@ -249,6 +262,13 @@ class TaskFlowController(
         sink.append(ChatMessage(ChatMessage.Role.ASSISTANT, ChatSink.TYPING_INDICATOR))
 
         val taskId = "task_${System.currentTimeMillis()}"
+        TaskRecordStore.start(
+            id = taskId,
+            taskText = text,
+            channel = channel,
+            originActivity = activity.javaClass.name,
+        )
+        ledgerRecordId = taskId
 
         executor.submit {
             chatSessionController.prepareForTaskStart()
@@ -260,23 +280,40 @@ class TaskFlowController(
                         taskId = taskId,
                         agentPromptOverride = agentPromptOverride,
                         originActivity = activity.javaClass.name,
+                        channel = channel,
                     ) { event ->
                         activity.runOnUiThread { handleTaskEvent(event) }
                     }                } catch (e: Exception) {
                     XLog.e(TAG, "sendTask failed: ${e.message}", e)
                     addSystem("Error: ${e.message}")
+                    ledgerOnEvent(TaskEvent.Failed("Error: ${e.message}"))
                     cleanupAfterTask()
                 }
             }
         }
     }
 
-    private fun executeDirectToolTask(text: String, toolCall: DirectDeviceDataGuard.DeterministicToolCall) {
+    private fun executeDirectToolTask(
+        text: String,
+        toolCall: DirectDeviceDataGuard.DeterministicToolCall,
+        channel: Channel,
+    ) {
         ensureNotificationPermission()
         addUser(text)
         sink.awaitingReply = true
         sink.taskRunning = false
         sink.append(ChatMessage(ChatMessage.Role.ASSISTANT, ChatSink.TYPING_INDICATOR))
+
+        // Direct-tool tasks are real tasks too: one step, one answer, and a
+        // record in the ledger so the task page does not silently omit them.
+        val recordId = "direct_${System.currentTimeMillis()}"
+        TaskRecordStore.start(
+            id = recordId,
+            taskText = text,
+            channel = channel,
+            originActivity = activity.javaClass.name,
+        )
+        ledgerRecordId = recordId
 
         executor.submit {
             try {
@@ -284,6 +321,7 @@ class TaskFlowController(
                 activity.runOnUiThread {
                     val answer = result.data ?: result.error ?: "Done."
                     publishAssistantResponse(answer)
+                    ledgerOnEvent(TaskEvent.Completed(answer))
                     onTaskTerminal?.invoke(TaskEvent.Completed(answer))
                     cleanupAfterTask()
                 }
@@ -291,6 +329,7 @@ class TaskFlowController(
                 XLog.e(TAG, "executeDirectToolTask failed: ${e.message}", e)
                 activity.runOnUiThread {
                     publishAssistantResponse("Error: ${e.message}")
+                    ledgerOnEvent(TaskEvent.Failed(e.message ?: "Direct tool failed"))
                     onTaskTerminal?.invoke(TaskEvent.Failed(e.message ?: "Direct tool failed"))
                     cleanupAfterTask()
                 }
@@ -423,6 +462,7 @@ class TaskFlowController(
 
     private fun handleTaskEvent(event: TaskEvent) {
         try {
+            ledgerOnEvent(event)
             when (event) {
                 is TaskEvent.Completed -> {
                     publishAssistantResponse(event.answer, event.modelName)
@@ -545,10 +585,29 @@ class TaskFlowController(
         sink.removeTypingIndicator()
     }
 
+    /**
+     * The ledger half of the dual-write: every event this controller renders
+     * into the chat transcript is also folded into the durable task record,
+     * so the task page and the conversation tell the same story about one
+     * task. See [TaskRecordStore] for the M1 boundary — only tasks that pass
+     * through this controller are recorded.
+     */
+    private fun ledgerOnEvent(event: TaskEvent) {
+        val id = ledgerRecordId ?: return
+        try {
+            TaskRecordStore.onEvent(id, event)
+        } catch (e: Exception) {
+            // The transcript stays the source of truth for the conversation;
+            // a ledger hiccup must not eat the task's rendering.
+            XLog.w(TAG, "ledger write failed for '$id'", e)
+        }
+    }
+
     private fun cleanupAfterTask() {
         XLog.i(TAG, "cleanupAfterTask: isProcessing=FALSE")
         sink.awaitingReply = false
         sink.taskRunning = false
+        ledgerRecordId = null
         appViewModel.clearTaskCallback()
         onTaskSettled?.invoke()
         Handler(Looper.getMainLooper()).postDelayed({

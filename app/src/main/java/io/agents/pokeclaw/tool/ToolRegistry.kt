@@ -64,6 +64,12 @@ object ToolRegistry {
         register(MemoryForgetTool())
         // Web information retrieval — knowledge questions without touching the UI
         register(WebSearchTool())
+        // Device calendar read — schedule questions without opening the app
+        register(io.agents.pokeclaw.agent.calendar.CalendarReadTool())
+        // Scheduled tasks — durable timers, honest queue, calendar anchor
+        register(ScheduleTaskTool())
+        register(ListScheduledTasksTool())
+        register(CancelScheduledTaskTool())
     }
 
     private fun registerTvTools() {
@@ -163,8 +169,40 @@ object ToolRegistry {
             io.agents.pokeclaw.agent.skill.ToolCallRecorder.record(name, params, result)
             result
         } catch (e: Exception) {
-            io.agents.pokeclaw.utils.XLog.e("ToolRegistry", "Tool '$name' execution failed with params=$params", e)
+            // Params are redacted before they are written: a failed input_text
+            // carries the user's text, a failed send_message the whole message,
+            // a failed make_call the phone number. This log is on disk in every
+            // build (XLog.e ignores the DEBUG flag) and DebugReportManager ships
+            // it to whoever the user asks for help. See F8.
+            io.agents.pokeclaw.utils.XLog.e(
+                "ToolRegistry",
+                "Tool '$name' execution failed with params=${redactParams(params)}",
+                e
+            )
             ToolResult.error("Tool execution failed: ${e.message}")
+        }
+    }
+
+    /** Parameter name fragments whose value must not be written to a log. */
+    private val SENSITIVE_PARAM_MARKERS = listOf(
+        "text", "message", "content", "body", "phone", "number", "contact",
+        "password", "passwd", "pin", "code", "otp", "token", "key", "secret",
+        "query", "prompt", "subject", "note",
+    )
+
+    /**
+     * Renders [params] for a log line with credential-ish values replaced.
+     *
+     * Keep-list by fragment rather than an exact allow-list of tool parameter
+     * names: a new tool with a new parameter name must not silently start
+     * logging user content.
+     */
+    internal fun redactParams(params: Map<String, Any>): String {
+        if (params.isEmpty()) return "{}"
+        return params.entries.joinToString(prefix = "{", postfix = "}") { (key, value) ->
+            val lower = key.lowercase()
+            val sensitive = SENSITIVE_PARAM_MARKERS.any { lower.contains(it) }
+            if (sensitive) "$key=<redacted:${value.javaClass.simpleName}>" else "$key=$value"
         }
     }
 

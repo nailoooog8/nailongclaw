@@ -19,20 +19,37 @@ class ToolRiskPolicyTest {
     // ---- Risk classification ----
 
     @Test
-    fun `outward facing tools are high impact`() {
-        val highImpact = listOf(
-            "make_call",
+    fun `ordinary world-acting tools are write tier`() {
+        val write = listOf(
             "send_message",
             "send_file",
             "auto_reply",
             "input_text",
-            "system_key",
             "clipboard",
+            "reply_via_notification",
+            // Agent-trusted persistent state.
+            "kb_write",
+            "memory_save",
+            "memory_forget",
+            // Registered by the UI track; classified here so it lands
+            // classified on the day it first appears.
+            "calendar_create",
         )
-        for (name in highImpact) {
+        for (name in write) {
             assertEquals(
-                "$name should be HIGH_IMPACT",
-                ToolRiskPolicy.Risk.HIGH_IMPACT,
+                "$name should be WRITE",
+                ToolRiskPolicy.Risk.WRITE,
+                ToolRiskPolicy.riskOf(name),
+            )
+        }
+    }
+
+    @Test
+    fun `irreversible tools are destructive tier`() {
+        for (name in listOf("make_call", "system_key")) {
+            assertEquals(
+                "$name should be DESTRUCTIVE",
+                ToolRiskPolicy.Risk.DESTRUCTIVE,
                 ToolRiskPolicy.riskOf(name),
             )
         }
@@ -52,6 +69,7 @@ class ToolRiskPolicyTest {
             "kb_search",
             "memory_recall",
             "web_search",
+            "calendar_read",
         )
         for (name in readOnly) {
             assertEquals(
@@ -63,29 +81,31 @@ class ToolRiskPolicyTest {
     }
 
     @Test
-    fun `an unclassified tool defaults to high impact`() {
+    fun `an unclassified tool defaults to destructive`() {
         // Fail closed: a tool nobody classified must not become remotely
-        // reachable just by being added to the registry.
+        // reachable — or eligible for a remembered yes — just by being added
+        // to the registry.
         assertEquals(
-            ToolRiskPolicy.Risk.HIGH_IMPACT,
+            ToolRiskPolicy.Risk.DESTRUCTIVE,
             ToolRiskPolicy.riskOf("some_future_tool"),
         )
     }
 
     @Test
-    fun `remote mcp tools are treated as high impact`() {
+    fun `remote mcp tools are treated as destructive`() {
         // MCP servers are third parties; their tools can do anything the
-        // server decides, so they never get a remote-source exemption.
+        // server decides, so they never get a remote-source exemption and
+        // never earn a remembered blanket yes.
         assertEquals(
-            ToolRiskPolicy.Risk.HIGH_IMPACT,
+            ToolRiskPolicy.Risk.DESTRUCTIVE,
             ToolRiskPolicy.riskOf("mcp_my_server_do_anything"),
         )
     }
 
     @Test
-    fun `blank tool name is high impact`() {
-        assertEquals(ToolRiskPolicy.Risk.HIGH_IMPACT, ToolRiskPolicy.riskOf(""))
-        assertEquals(ToolRiskPolicy.Risk.HIGH_IMPACT, ToolRiskPolicy.riskOf("   "))
+    fun `blank tool name is destructive`() {
+        assertEquals(ToolRiskPolicy.Risk.DESTRUCTIVE, ToolRiskPolicy.riskOf(""))
+        assertEquals(ToolRiskPolicy.Risk.DESTRUCTIVE, ToolRiskPolicy.riskOf("   "))
     }
 
     // ---- Source gating ----
@@ -143,5 +163,32 @@ class ToolRiskPolicyTest {
         val reason = ToolRiskPolicy.blockReason("make_call", Channel.TELEGRAM)
         assertTrue(reason.contains("make_call"))
         assertTrue(reason.contains("Telegram"))
+    }
+
+    // ---- External automation (R3-01) ----
+
+    @Test
+    fun `external automation tasks are gated like any remote source`() {
+        // The external-automation broadcast is not the user, even when the user
+        // enabled the feature: no one is watching the screen when a Tasker task
+        // runs. It used to be recorded as Channel.LOCAL and therefore had every
+        // tool, which turned the feature into full remote control of the phone.
+        for (name in listOf("make_call", "send_message", "send_file", "input_text", "system_key", "clipboard")) {
+            assertTrue(
+                "$name must be blocked for Channel.EXTERNAL",
+                ToolRiskPolicy.isBlockedForChannel(name, Channel.EXTERNAL),
+            )
+        }
+        // Read-only observation still works, so the feature stays useful.
+        assertFalse(ToolRiskPolicy.isBlockedForChannel("get_screen_info", Channel.EXTERNAL))
+        assertFalse(ToolRiskPolicy.isBlockedForChannel("web_search", Channel.EXTERNAL))
+    }
+
+    @Test
+    fun `external automation block reason points the user back at the app`() {
+        val reason = ToolRiskPolicy.blockReason("send_file", Channel.EXTERNAL)
+        assertTrue(reason.contains("send_file"))
+        assertTrue(reason.contains("External Automation"))
+        assertTrue(reason.contains("PokeClaw app"))
     }
 }

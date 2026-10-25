@@ -197,4 +197,39 @@ class McpConfirmationGateTest {
         assertFalse(gate.isAlwaysAllowed(req.toolName))
         assertEquals(McpConfirmationGate.Outcome.ASK, gate.request(req, true, true))
     }
+
+    // ---- Destructive tier: no remembered yes (M2) ----
+
+    @Test
+    fun `allow always on a destructive call is downgraded to allow once and never remembered`() {
+        val gate = McpConfirmationGate()
+        val req = request().copy(risk = io.agents.pokeclaw.tool.ToolRiskPolicy.Risk.DESTRUCTIVE)
+        assertEquals(McpConfirmationGate.Outcome.ASK, gate.request(req, true, true))
+
+        // A surface offering the button anyway (or a hostile one submitting
+        // it) must not mint a blanket yes for the worst tier.
+        assertEquals(
+            McpConfirmationGate.Outcome.ALLOW_ONCE,
+            gate.resolve(McpConfirmationGate.Decision.ALLOW_ALWAYS),
+        )
+        assertFalse(gate.isAlwaysAllowed(req.toolName))
+        // …so the very next call asks again instead of sailing through.
+        assertEquals(McpConfirmationGate.Outcome.ASK, gate.request(req, true, true))
+    }
+
+    @Test
+    fun `allow always still works for the write tier`() {
+        val gate = McpConfirmationGate()
+        val req = request().copy(risk = io.agents.pokeclaw.tool.ToolRiskPolicy.Risk.WRITE)
+        gate.request(req, true, true)
+        assertEquals(
+            McpConfirmationGate.Outcome.ALLOW_ALWAYS,
+            gate.resolve(McpConfirmationGate.Decision.ALLOW_ALWAYS),
+        )
+        assertTrue(gate.isAlwaysAllowed(req.toolName))
+        assertEquals(
+            McpConfirmationGate.Outcome.ALLOW_REMEMBERED,
+            gate.request(req, true, true),
+        )
+    }
 }

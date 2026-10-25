@@ -4,6 +4,7 @@
 package io.agents.pokeclaw.agent.mcp
 
 import com.google.gson.JsonObject
+import io.agents.pokeclaw.agent.ContextFence
 import io.agents.pokeclaw.tool.BaseTool
 import io.agents.pokeclaw.tool.ToolParameter
 import io.agents.pokeclaw.tool.ToolResult
@@ -88,7 +89,13 @@ class McpTool(
 
     override fun execute(params: Map<String, Any>): ToolResult {
         return try {
-            ToolResult.success(client.callTool(remote.name, params))
+            // The description was already fenced by McpDescriptionSanitizer;
+            // this is the *result*, which is the same third-party server
+            // talking — fence it too so only one half of the exchange is
+            // trusted (R3-03).
+            ToolResult.success(
+                ContextFence.wrap("mcp:${server.name}", client.callTool(remote.name, params))
+            )
         } catch (e: Exception) {
             ToolResult.error("MCP tool '${remote.name}' failed: ${e.message}")
         }
@@ -121,6 +128,9 @@ class McpTool(
                 "远程工具 ${remote.name}（来自 MCP 服务器 ${server.name}）"
             },
             paramsPreview = if (omitted > 0) "$preview\n…另有 $omitted 个参数" else preview,
+            // The card's tier (and whether 始终允许 may be offered). mcp_* is
+            // DESTRUCTIVE by fail-closed default — see ToolRiskPolicy.
+            risk = io.agents.pokeclaw.tool.ToolRiskPolicy.riskOf(registeredName),
         )
     }
 

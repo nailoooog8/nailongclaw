@@ -10,6 +10,13 @@ package io.agents.pokeclaw.agent.mcp
  * was registered under (`mcp_<server>_echo`) — the card shows the former, the
  * allow-always memory keys on the latter, because that is what a later call
  * arrives with.
+ *
+ * [risk] is the tier the confirmation is shown at, from
+ * [io.agents.pokeclaw.tool.ToolRiskPolicy] — it decides what the card offers
+ * (a destructive call has no 始终允许) and the gate enforces the same rule on
+ * whatever the surface submits back. Defaults to WRITE only so pre-tier
+ * call sites keep compiling; the real value is always filled in by
+ * [McpTool.describeForConfirmation].
  */
 data class McpConfirmationRequest(
     val toolName: String,
@@ -17,6 +24,8 @@ data class McpConfirmationRequest(
     val serverName: String,
     val description: String,
     val paramsPreview: String,
+    val risk: io.agents.pokeclaw.tool.ToolRiskPolicy.Risk =
+        io.agents.pokeclaw.tool.ToolRiskPolicy.Risk.WRITE,
 )
 
 /**
@@ -147,8 +156,17 @@ class McpConfirmationGate {
         return when (decision) {
             Decision.ALLOW_ONCE -> Outcome.ALLOW_ONCE
             Decision.ALLOW_ALWAYS -> {
-                alwaysAllowed += current.toolName
-                Outcome.ALLOW_ALWAYS
+                // Destructive calls never earn a remembered yes — each run is
+                // approved on its own card (M2). A surface that offers the
+                // button anyway (or one that was never supposed to) gets its
+                // blanket yes downgraded to a single one: the run the user
+                // meant to allow proceeds, the memory does not exist.
+                if (current.risk == io.agents.pokeclaw.tool.ToolRiskPolicy.Risk.DESTRUCTIVE) {
+                    Outcome.ALLOW_ONCE
+                } else {
+                    alwaysAllowed += current.toolName
+                    Outcome.ALLOW_ALWAYS
+                }
             }
             Decision.DENY -> Outcome.DENY_BY_USER
         }

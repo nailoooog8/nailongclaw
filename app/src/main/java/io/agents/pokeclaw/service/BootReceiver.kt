@@ -24,6 +24,9 @@ class BootReceiver : BroadcastReceiver() {
             intent.action == "android.intent.action.QUICKBOOT_POWERON") {
             XLog.i(TAG, "Boot broadcast received, scheduling keep-alive watchdog")
             KeepAliveJobService.schedule(context)
+            // Alarms do not survive a reboot; the scheduled-task store does.
+            // Reconcile (skip what was missed while off) and re-arm the rest.
+            io.agents.pokeclaw.task.TaskScheduler.rearmAll(context)
         }
     }
 }

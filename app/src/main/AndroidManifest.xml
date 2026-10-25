@@ -11,6 +11,9 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <!-- Calendar: runtime-granted, asked for by the calendar tools/settings page -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <uses-permission android:name="android.permission.WRITE_CALENDAR" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
@@ -218,6 +221,13 @@
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
         </receiver>
+
+        <!-- Scheduled tasks: reached only through TaskScheduler's explicit
+             PendingIntent — exported=false so no other app can forge a fire -->
+        <receiver
+            android:name=".task.TaskAlarmReceiver"
+            android:enabled="true"
+            android:exported="false" />
 
         <!-- Debug: trigger tasks via ADB broadcast -->
         <receiver

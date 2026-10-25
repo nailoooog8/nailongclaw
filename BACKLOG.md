@@ -196,6 +196,16 @@ section is not empty, the release is not ready.
 - [ ] **P3** ChatViewModel extraction: move business logic out of ComposeChatActivity god class
 - [x] ~~**P1** Full i18n refactor for ChatScreen.kt~~ (2026-10-10) — 75+ user-facing hardcoded English strings (quick task templates, intro text, monitor labels, workflows, send/cancel dialogs, active task bar, token info, model picker) extracted to strings.xml + values-zh + values-ja translation. Requested by realme RMX3823 user (#50) for thorough Chinese localization.
 
+## Task ledger, calendar, three-tier risk, scheduling — 部一 data line (2026-10-25)
+
+One round landed the whole state/data track of the two-track plan: P0 contracts (`TaskSink` / `TaskRecord` / `CalendarGateway`), the M1 ledger (`TaskRecordStore` + `handleTaskEvent` dual-write + pure `TaskStateMachine`), M2.5 calendar (`CalendarGatewayImpl` over Instances + `calendar_read` + ContextFence), M2 approval semantics (`READ_ONLY`/`WRITE`/`DESTRUCTIVE` tiers, `WAITING_CONFIRM`, destructive never earns a remembered yes), and M4 scheduling (`ScheduledTaskStore` + AlarmManager + the reserved `schedule_task` trio + a visible queue). Tests 363 → 487. QA H60–H64 pending on device. Known boundaries, all deliberate:
+
+- [ ] **P1 — M1 boundary: channel-initiated tasks are not in the ledger.** The dual-write sits in `TaskFlowController.handleTaskEvent`, so Telegram/Discord/WeChat/QQ/Douyin tasks (which enter via `ChannelSetup` → `TaskOrchestrator` without any UI callback) leave no `task_records.json` entry. Moving the write point into the orchestrator's event emission is the fix, but that file is owned by neither track — do it as its own change when the queue work next touches `TaskOrchestrator`, not as a drive-by.
+- [ ] **P1 — scheduled tasks run as `Channel.LOCAL`.** A fired task gets full local tool privileges because nothing in the `Channel` enum says "scheduled". A 07:30 brief only needs read tools, but nothing *enforces* that — a scheduled `make_call` would run unattended. Whether "scheduled" deserves its own source tier (or a WRITE-only ceiling) is an open security question in the same family as R3-01; decide before anyone ships a scary schedule.
+- [ ] **P2 — `calendar_create` is classified but not registered.** Its WRITE-tier entry and wait-after exemption are in place; the registration line lands with the UI track's class per the ownership handoff (部二 writes the tool, 部一 registers it).
+- [ ] **P2 — morning brief is a notification, not a surface.** The M4 prototype delivers via notification + ledger entry; the 呈现面 (chips, task-page card) is the UI track's M4. The anchor (`calendar_anchor_hours`) is wired and fenced.
+- [ ] **P3 — exact-alarm degradation is silent to the user.** When `canScheduleExactAlarms()` is false the alarm is set inexact and only XLog knows. A one-line honest note belongs in the schedule_task result / settings when that page exists.
+
 ## QA Gaps
 
 - [ ] **P1** The floating task pill is unreachable dead code, which blocks QA **F3 / F4 / F5(floating-button half)**. Verified on device 2026-10-23 (`10AG4J1THX00524`, release 39): while an agent-loop task ran inside `com.android.settings`, `dumpsys window windows` showed exactly one pokeclaw window (the activity) and a screenshot had 0 pixels of `colorBrandPrimary`.
