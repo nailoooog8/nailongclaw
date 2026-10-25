@@ -12,9 +12,13 @@ import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import io.agents.pokeclaw.ui.cds.CdsUi
+import kotlin.math.max
 
 /**
  * The Claude Design System dialog: the sheet's `--cds-panel` treatment applied
@@ -35,6 +39,12 @@ import io.agents.pokeclaw.ui.cds.CdsUi
  *  - confirm button → `--theme-accent` on `--theme-accent-on`; cancel → muted
  *  - content → whatever the caller built; use [label] / [field] to get CDS
  *    typography and the composer's input treatment
+ *
+ * Keyboard contract: a body holding fields opens with the IME up under
+ * `SOFT_INPUT_ADJUST_PAN`, and the body itself is a bounded [BoundedScrollView]
+ * rebound from the ime inset on every change — AlertDialog scrolls only its
+ * message, never a custom view, so without the bound a tall editor runs under
+ * the keyboard and drags the button bar with it.
  *
  * Validation belongs in the confirm click, not the builder callback: the
  * builder callback fires after dismissal, so a rejected value there throws
@@ -89,9 +99,23 @@ object CdsDialog {
         onCancel: (() -> Unit)? = null,
     ): Handle {
         val p = CdsUi.palette(context)
+        val hasField = containsField(content)
+        // AlertDialog's own scroll view wraps only the message; a custom view
+        // lands in an unbounded panel of its own, so a tall editor (MCP
+        // 添加服务器: template chips + name/url/auth + header fields + checkbox)
+        // runs under the keyboard and takes the button bar down with it. The
+        // bounded scroller caps the body at the space the keyboard leaves and
+        // keeps the rest reachable by scrolling.
+        val body = if (content is ScrollView) content
+        else BoundedScrollView(context).apply {
+            addView(content)
+            // Pre-insets fallback: tight enough that a keyboard-open first
+            // frame does not flash the button bar under the IME.
+            maxHeightPx = (context.resources.displayMetrics.heightPixels * 0.45).toInt()
+        }
         val builder = AlertDialog.Builder(context)
             .setTitle(title)
-            .setView(content)
+            .setView(body)
             .setOnCancelListener { onCancel?.invoke() }
         if (confirmText != null) builder.setPositiveButton(confirmText, null)
         if (cancelText != null) builder.setNegativeButton(cancelText, null)
@@ -141,14 +165,88 @@ object CdsDialog {
             // A dialog whose body holds a field opens with the keyboard up —
             // the old bottom-sheet InputDialog did this, and a confirm-style
             // dialog with no field must not summon the IME.
-            if (containsField(content)) {
+            if (hasField) {
+                // The AppCompat dialog theme ships stateUnspecified|adjustPan.
+                // setSoftInputMode takes the whole mode word, so the state-only
+                // constant zeroed the adjust bits: the floating window then sat
+                // exactly where it was while the keyboard rose over it. PAN is
+                // what moves a dialog window up; keep it and keep the auto-open.
                 dialog.window?.setSoftInputMode(
-                    android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE
+                    android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN or
+                        android.view.WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE
                 )
+            }
+            // Rebound the body as the keyboard comes and goes. The ime inset is
+            // the reliable height signal now that adjustResize is deprecated
+            // (API 36); same contract as
+            // BaseActivity.installKeyboardAwareScrolling. The reserve covers
+            // the title panel + button bar, which stay fixed outside the
+            // scroller.
+            if (body is BoundedScrollView) {
+                val screenHeight = context.resources.displayMetrics.heightPixels
+                val chrome = CdsUi.dp(context, 150)
+                val minBody = CdsUi.dp(context, 200)
+                ViewCompat.setOnApplyWindowInsetsListener(body) { view, insets ->
+                    val imeBottom = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+                    val barsBottom = insets.getInsets(WindowInsetsCompat.Type.systemBars()).bottom
+                    body.maxHeightPx =
+                        (screenHeight - max(imeBottom, barsBottom) - chrome).coerceAtLeast(minBody)
+                    if (imeBottom > 0) {
+                        val focused = dialog.currentFocus
+                        if (focused is EditText) {
+                            body.post { scrollFieldIntoView(body, focused) }
+                        }
+                    }
+                    insets
+                }
             }
         }
         dialog.show()
+        ViewCompat.requestApplyInsets(body)
         return AlertDialogHandle(dialog)
+    }
+
+    /**
+     * A [ScrollView] that never grows past [maxHeightPx] (0 = unbounded). The
+     * child still measures at its full height, so overflowing content scrolls
+     * instead of being clipped away.
+     */
+    private class BoundedScrollView(context: Context) : ScrollView(context) {
+        var maxHeightPx: Int = 0
+
+        override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+            val bounded = if (maxHeightPx > 0) {
+                android.view.View.MeasureSpec.makeMeasureSpec(
+                    maxHeightPx,
+                    android.view.View.MeasureSpec.AT_MOST
+                )
+            } else {
+                heightMeasureSpec
+            }
+            super.onMeasure(widthMeasureSpec, bounded)
+        }
+    }
+
+    /**
+     * Pull a focused field into the scroller's viewport — pan lifts the window,
+     * but a field below the body's fold still needs the body itself to scroll.
+     */
+    private fun scrollFieldIntoView(scroller: ScrollView, field: android.view.View) {
+        val rect = android.graphics.Rect()
+        field.getDrawingRect(rect)
+        scroller.offsetDescendantRectToMyCoords(field, rect)
+        val margin = CdsUi.dp(field.context, 16)
+        val visibleTop = scroller.scrollY + margin
+        val visibleBottom = scroller.scrollY + scroller.height - scroller.paddingBottom - margin
+        when {
+            rect.top < visibleTop ->
+                scroller.smoothScrollTo(0, (rect.top - margin).coerceAtLeast(0))
+            rect.bottom > visibleBottom ->
+                scroller.smoothScrollTo(
+                    0,
+                    scroller.scrollY + (rect.bottom - visibleBottom) + margin
+                )
+        }
     }
 
     /** True when any descendant of [root] is an [EditText]. */

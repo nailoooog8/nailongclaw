@@ -5,9 +5,12 @@ package io.agents.pokeclaw.base
 
 import android.content.res.Configuration
 import android.content.res.Resources
+import android.graphics.Rect
 import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
+import android.widget.EditText
+import android.widget.ScrollView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -15,6 +18,7 @@ import androidx.core.view.updatePadding
 import com.blankj.utilcode.util.AdaptScreenUtils
 import com.blankj.utilcode.util.BarUtils
 import io.agents.pokeclaw.R
+import kotlin.math.max
 
 /**
  *
@@ -84,6 +88,63 @@ open class BaseActivity : AppCompatActivity() {
      * Subclasses can override this method to disable automatic status bar height padding
      */
     protected open fun isApplyStatusBarPadding(): Boolean = true
+
+    /**
+     * Keep focused fields visible above the IME on edge-to-edge layouts.
+     * `adjustResize` alone is not reliable here because the ScrollView content
+     * still needs extra bottom inset + explicit scroll after the keyboard opens.
+     *
+     * Shared by the credential editors that hold their fields inside a
+     * ScrollView (LlmConfigActivity's cloud form, ChannelConfigActivity's
+     * channel credentials). Pass an empty [fields] list for screens whose only
+     * input sits above the list — the padding alone is what those need, and
+     * scrolling a non-descendant into view is meaningless.
+     */
+    protected fun installKeyboardAwareScrolling(scrollView: ScrollView, fields: List<EditText>) {
+        val baseBottomPadding = scrollView.paddingBottom
+
+        val focusListener = View.OnFocusChangeListener { view, hasFocus ->
+            if (hasFocus) {
+                scrollView.postDelayed({ scrollFieldIntoView(scrollView, view) }, 180)
+            }
+        }
+        fields.forEach { it.onFocusChangeListener = focusListener }
+
+        ViewCompat.setOnApplyWindowInsetsListener(scrollView) { view, insets ->
+            val imeInsets = insets.getInsets(WindowInsetsCompat.Type.ime())
+            val systemInsets = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.updatePadding(bottom = baseBottomPadding + max(imeInsets.bottom, systemInsets.bottom))
+
+            if (imeInsets.bottom > 0) {
+                val focused = currentFocus
+                if (focused is EditText && fields.contains(focused)) {
+                    view.post { scrollFieldIntoView(scrollView, focused) }
+                }
+            }
+            insets
+        }
+        ViewCompat.requestApplyInsets(scrollView)
+    }
+
+    private fun scrollFieldIntoView(scrollView: ScrollView, field: View) {
+        val rect = Rect()
+        field.getDrawingRect(rect)
+        scrollView.offsetDescendantRectToMyCoords(field, rect)
+
+        val margin = (16 * resources.displayMetrics.density).toInt()
+        val visibleTop = scrollView.scrollY + margin
+        val visibleBottom = scrollView.scrollY + scrollView.height - scrollView.paddingBottom - margin
+
+        when {
+            rect.top < visibleTop -> {
+                scrollView.smoothScrollTo(0, (rect.top - margin).coerceAtLeast(0))
+            }
+            rect.bottom > visibleBottom -> {
+                val targetScroll = scrollView.scrollY + (rect.bottom - visibleBottom) + margin
+                scrollView.smoothScrollTo(0, targetScroll)
+            }
+        }
+    }
 
     /**
      * Screen adaptation - design spec size

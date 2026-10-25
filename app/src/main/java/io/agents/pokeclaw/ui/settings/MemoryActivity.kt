@@ -74,6 +74,11 @@ class MemoryActivity : BaseActivity() {
             })
         }
 
+        // The search field rides above the list, so there is nothing to scroll
+        // into view — the padding alone keeps the list's tail clear of the
+        // keyboard (adjustResize no longer shrinks an edge-to-edge window).
+        installKeyboardAwareScrolling(findViewById(R.id.scrollContent), emptyList())
+
         memoryGroup = findViewById(R.id.memoryGroup)
         memoryGroup.applyCds(cds)
 

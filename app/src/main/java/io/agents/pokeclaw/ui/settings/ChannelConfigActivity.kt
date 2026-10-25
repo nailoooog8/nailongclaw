@@ -82,6 +82,14 @@ class ChannelConfigActivity : BaseActivity() {
         etInput2 = findViewById(R.id.etInput2)
         val ivToggle = findViewById<ImageView>(R.id.ivTogglePassword)
 
+        // The fields and the save button all sit inside the ScrollView, so the
+        // keyboard must not eat the button below the fields — same contract as
+        // the LlmConfig cloud form.
+        installKeyboardAwareScrolling(
+            findViewById(R.id.scrollContent),
+            listOf(etInput1, etInput2)
+        )
+
         // CDS treatment: the two input wells are the composer field
         // (surface-3 + hairline + 8px corners), painted by id — the old code
         // found the CardView through parent.parent and only the second well

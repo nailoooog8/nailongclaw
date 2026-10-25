@@ -3,7 +3,6 @@
 
 package io.agents.pokeclaw.ui.settings
 
-import android.graphics.Rect
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.StateListDrawable
 import android.os.Bundle
@@ -14,9 +13,6 @@ import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.updatePadding
 import io.agents.pokeclaw.ClawApplication
 import io.agents.pokeclaw.R
 import io.agents.pokeclaw.agent.CloudProvider
@@ -29,7 +25,6 @@ import io.agents.pokeclaw.utils.KVUtils
 import io.agents.pokeclaw.widget.CommonToolbar
 import io.agents.pokeclaw.widget.KButton
 import java.util.concurrent.Executors
-import kotlin.math.max
 
 /**
  * 模型选择 — the sheet's 模型与任务 landing spot.
@@ -692,57 +687,6 @@ class LlmConfigActivity : BaseActivity() {
         }
 
         // Active model card is already set in onCreate based on actual provider
-    }
-
-    /**
-     * Keep focused fields visible above the IME on edge-to-edge layouts.
-     * `adjustResize` alone is not reliable here because the ScrollView content
-     * still needs extra bottom inset + explicit scroll after the keyboard opens.
-     */
-    private fun installKeyboardAwareScrolling(scrollView: android.widget.ScrollView, fields: List<EditText>) {
-        val baseBottomPadding = scrollView.paddingBottom
-
-        val focusListener = View.OnFocusChangeListener { view, hasFocus ->
-            if (hasFocus) {
-                scrollView.postDelayed({ scrollFieldIntoView(scrollView, view) }, 180)
-            }
-        }
-        fields.forEach { it.onFocusChangeListener = focusListener }
-
-        ViewCompat.setOnApplyWindowInsetsListener(scrollView) { view, insets ->
-            val imeInsets = insets.getInsets(WindowInsetsCompat.Type.ime())
-            val systemInsets = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            view.updatePadding(bottom = baseBottomPadding + max(imeInsets.bottom, systemInsets.bottom))
-
-            if (imeInsets.bottom > 0) {
-                val focused = currentFocus
-                if (focused is EditText && fields.contains(focused)) {
-                    view.post { scrollFieldIntoView(scrollView, focused) }
-                }
-            }
-            insets
-        }
-        ViewCompat.requestApplyInsets(scrollView)
-    }
-
-    private fun scrollFieldIntoView(scrollView: android.widget.ScrollView, field: View) {
-        val rect = Rect()
-        field.getDrawingRect(rect)
-        scrollView.offsetDescendantRectToMyCoords(field, rect)
-
-        val margin = dp(16)
-        val visibleTop = scrollView.scrollY + margin
-        val visibleBottom = scrollView.scrollY + scrollView.height - scrollView.paddingBottom - margin
-
-        when {
-            rect.top < visibleTop -> {
-                scrollView.smoothScrollTo(0, (rect.top - margin).coerceAtLeast(0))
-            }
-            rect.bottom > visibleBottom -> {
-                val targetScroll = scrollView.scrollY + (rect.bottom - visibleBottom) + margin
-                scrollView.smoothScrollTo(0, targetScroll)
-            }
-        }
     }
 
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()

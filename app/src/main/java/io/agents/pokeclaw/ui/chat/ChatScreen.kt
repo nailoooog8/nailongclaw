@@ -1674,6 +1674,10 @@ private fun SidebarContent(
     if (renameTarget != null) {
         AlertDialog(
             onDismissRequest = { renameTarget = null },
+            // Compose dialog windows get SOFT_INPUT_ADJUST_NOTHING (API 31+), so
+            // the window itself never moves for the keyboard — the padding is
+            // what lifts the body above it.
+            modifier = Modifier.imePadding(),
             title = { Text(stringResource(R.string.chat_dialog_rename_title), color = colors.textPrimary) },
             text = {
                 androidx.compose.material3.OutlinedTextField(
@@ -2081,6 +2085,9 @@ private fun MonitorDialog(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            // Fake dialog living in the activity window: center the card in the
+            // space the keyboard leaves, or the bottom rows sit under it.
+            .imePadding()
             .background(Color.Black.copy(alpha = 0.44f))
             .clickable(
                 interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
@@ -2288,6 +2295,9 @@ private fun SendMessageDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = colors.surface,
+        // Same as the rename dialog — the dialog window won't pan, so the
+        // padding lifts the fill-in-the-blank fields above the keyboard.
+        modifier = Modifier.imePadding(),
         title = {
             Text(stringResource(R.string.chat_workflow_send_title), fontSize = 18.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
         },
