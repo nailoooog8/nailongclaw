@@ -125,6 +125,54 @@ of assertions if you do not know about it:
   impossible on a release build — verify task behaviour through the UI
   (FAB contentDescription, tool cards, final answer), not through logs.
 
+### Observation Channels — pick by question, not by habit
+
+Measured 2026-10-25 on `10AG4J1THX00524` (1260×2800). "Screenshot then read the
+image" is slow because the **read** half dominates, not the capture half.
+
+| channel | wall clock | payload | ~tokens to the model |
+|---|---|---|---|
+| `adb exec-out screencap -p` | **350 ms** | 331 KB PNG → 442 KB base64 | **~4,700** image tokens (1260×2800 ÷ 750) |
+| same, `pngpix.js --scale 0.5` | ~350 ms | 73 KB | ~1,176 |
+| `uiautomator dump` + `cat` | **2,200 ms** (dump alone ~2,100 ms, waits for UI idle) | XML 23.8 KB | see below |
+| `android_ui_describe` default JSON (65 nodes, incl. `className`/`clickable`/`enabled`) | — | 20.8 KB | **~5,200** — *worse than the screenshot* |
+| same tree via `ui_probe.py` (labelled, deduped, screen order) | 2,200 ms | 1.6 KB | **~410** |
+| `dumpsys window` | **133 ms** | small | negligible |
+
+The counter-intuitive part: `android_ui_describe` is both slower in wall clock
+*and* more expensive in tokens than a screenshot as shipped. Its value only
+appears after filtering — the same tree drops to a thirteenth. The MCP
+`screenshot` tool itself is not the problem; it already uses the fast
+`exec-out` path with no intermediate file and no `adb pull`.
+
+**The rule:**
+
+- *"What does the screen say / where is this control?"* → `py scripts/ui_probe.py`
+  (optionally `--file` to re-parse a saved dump and skip the 2.2 s). Never read
+  text out of an image — H24's `设备截图` misreading is what OCR on small CJK
+  costs.
+- *"Is this pixel this colour?"* → `node scripts/pngpix.js --px X Y shot.png`.
+  Never spend ~4,700 tokens of vision on a question a decoder answers in 13 ms.
+- *"Which surface am I on?"* → `py scripts/ui_probe.py --surface` (133 ms),
+  before deciding to look at all.
+- Do **not** screenshot *and* `Read` the saved file — `android_screenshot`
+  already returns the image inline, so that is the same picture twice.
+- When vision is genuinely required (layout, spacing, overlap), downscale or
+  crop first: `node scripts/pngpix.js --scale 0.5 shot.png half.png`.
+- `pngpix.js --diff a.png b.png` answers "did the screen change?" and where,
+  which is the cheap gate before any second look.
+
+**Host gotchas these two scripts exist to absorb:** only the `py` launcher is on
+PATH (no `python3`), so the shebang alone will not run `ui_probe.py`; a fixed
+remote dump path lets a failed dump be mistaken for the previous success, so the
+remote name is per-pid and removed afterwards; and adb accepts `input tap` with
+empty stdout and exit 0, so `--tap` reports the exit code rather than claiming
+the tap landed — verify the effect with a fresh dump, never by retrying.
+
+`uiautomator dump` rebinds PokeClaw's own accessibility service 1–3 s later
+(Device Notes above), so never interleave a UI dump with binding-state
+measurement.
+
 ### Pre-Tag Release Smoke — MANDATORY before pushing any vX.Y.Z tag
 
 CLAUDE.md says: full QA triggers before any release/version bump. v0.7.0 violated this gate (QA was run after tag). To make the gate physically present in this checklist, do the following EVERY release, IN ORDER:
@@ -1981,11 +2029,11 @@ adb shell run-as io.agents.pokeclaw strings /data/data/io.agents.pokeclaw/files/
 
 ## AC. 网络搜索（web_search 工具） — 2026-10-25
 
-内置 `web_search` 工具（博查 Bocha / Tavily 双服务商，密钥加密存于 MMKV），系统提示词在纯聊天例外区增加了「实时/知识类问题 → web_search」路由。取舍记录见 `docs/WEB_SEARCH_DESIGN.md`。
+内置 `web_search` 工具（博查 Bocha / DeepSeek / Tavily 三服务商，密钥加密存于 MMKV），系统提示词在纯聊天例外区增加了「实时/知识类问题 → web_search」路由。取舍记录见 `docs/WEB_SEARCH_DESIGN.md`。
 **单测:** `WebSearchClientTest` 9 例（解析/截断/错误提取），`ToolRiskPolicyTest` 补 `web_search` 白名单两例。
 **注意:** 「在某 App 里搜索」仍走设备自动化（InAppSearchGuard 不变），W 组验证不覆盖也不改动该路径。
 
-- [ ] **AC1. Knowledge question uses web_search when configured**: 设置 → 功能 → 网络搜索，配置博查（或 Tavily）Key 并设为当前服务后，问「今天上海天气怎么样？」→ **Expected**: 工具轨迹出现 `web_search`，回答带结果依据（如温度区间），全程不打开浏览器/搜索 App、不调 `get_screen_info`。
+- [ ] **AC1. Knowledge question uses web_search when configured**: 设置 → 功能 → 网络搜索，配置任一服务（博查/DeepSeek/Tavily）Key 并设为当前服务后，问「今天上海天气怎么样？」→ **Expected**: 工具轨迹出现 `web_search`，回答带结果依据（如温度区间），全程不打开浏览器/搜索 App、不调 `get_screen_info`。
 - [ ] **AC2. Unconfigured web_search fails soft**: 未配置 Key 时问知识题 → **Expected**: 模型收到「未配置」错误后明确告知需要去设置页配置，随后凭自身知识作答；不崩、不重试轰炸。
 - [ ] **AC3. Remote channel may search**: 微信/QQ/Telegram 任一通道问「最近有什么科技新闻」→ **Expected**: 远程通道不被 ToolRiskPolicy 拒绝（READ_ONLY 白名单生效），回复基于搜索结果。
 - [ ] **AC4. In-app search path unchanged**: 「在淘宝搜运动鞋」→ **Expected**: 仍走 open_app → input_text 自动化，InAppSearchGuard 照常拦截未打字的提前完成（回归确认，行为与改动前一致）。
