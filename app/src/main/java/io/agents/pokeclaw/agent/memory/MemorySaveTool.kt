@@ -24,10 +24,12 @@ class MemorySaveTool : BaseTool() {
             "Do NOT store transient state (what is on screen, today's to-dos, temporary errors). " +
             "Near-duplicates are merged automatically. Pass related_ids when this fact is about the " +
             "same thing as memories you can see in the briefing or memory_recall results. " +
-            "If the fact contradicts something already " +
-            "stored, or restates something the user asked you to forget — including the same claim " +
-            "with a different value — the result says so. Report that to the user instead of retrying; " +
-            "if they do want it back, they can restore it under Settings > Tools > Memory bank."
+            "A fact that contradicts stored memories SUPERSEDES them: the old ones are invalidated " +
+            "(kept for history, never recalled by default) and the result lists them — tell the user " +
+            "what was replaced; they can restore it under Settings > Tools > Memory bank. " +
+            "Only pinned memories are exempt and flagged with ⚠ instead — ask the user about those. " +
+            "A fact that restates something the user asked you to forget is refused; if they do want " +
+            "it back, they can restore it under Settings > Tools > Memory bank."
 
     override fun getDescriptionCN() =
         "把一条值得长期记住的事存入记忆库，跨会话保留。适用于：了解到的用户身份与习惯偏好、" +
@@ -35,9 +37,11 @@ class MemorySaveTool : BaseTool() {
             "不要存临时状态（当前屏幕内容、今天的待办、偶发报错）。相近的内容会自动合并。" +
             "若要记的事和简报或 memory_recall 结果里某条记忆是同一件事，"+
             "用 related_ids 带上它的编号（只连真正相关的）。" +
-            "若与已有记忆矛盾、或与用户让你忘掉的内容相似（包括同一说法换了值：次数变了、型号变了），" +
-            "返回结果会明说——请转告用户，不要重试；用户确实想加回来的，可在 设置 → 工具 → 记忆库 " +
-            "的「遗忘抑制」里自行恢复。"
+            "与已有记忆矛盾的新事实会**顶替**旧记忆：旧的自动作废（保留可查，默认不再召回），" +
+            "返回结果会列出作废了哪些——请转告用户；作废错了的可在 设置 → 工具 → 记忆库 点那条恢复。" +
+            "只有置顶记忆例外（标 ⚠ 请用户裁决，不会被顶替）。" +
+            "若与用户让你忘掉的内容相似（包括同一说法换了值：次数变了、型号变了），保存会被拒绝——" +
+            "请转告用户，不要重试；用户确实想加回来的，可在 设置 → 工具 → 记忆库 的「遗忘抑制」里自行恢复。"
 
     override fun getParameters() = listOf(
         ToolParameter(
@@ -96,10 +100,15 @@ class MemorySaveTool : BaseTool() {
                     } else {
                         sb.append("已记住 [${entry.entry.kindLabel}] ${entry.entry.content}")
                     }
+                    if (entry.superseded.isNotEmpty()) {
+                        sb.append("\n⏳ 这条顶替了 ${entry.superseded.size} 条旧记忆（已作废，默认不再召回）：")
+                        for (s in entry.superseded) sb.append("\n  - ${s.content}")
+                        sb.append("\n请把被顶替的内容转告用户；作废错了的，用户可在 设置 → 工具 → 记忆库 点那条记忆恢复。")
+                    }
                     if (entry.conflicts.isNotEmpty()) {
-                        sb.append("\n⚠ 注意，这条与已有记忆矛盾：")
+                        sb.append("\n⚠ 注意，这条与置顶记忆矛盾：")
                         for (c in entry.conflicts) sb.append("\n  - ${c.content}")
-                        sb.append("\n两条都已标记冲突，向用户确认哪个是对的，不要默默选一条。")
+                        sb.append("\n置顶不会被自动顶替——向用户确认哪个是对的，不要默默选一条。")
                     }
                     val kept = entry.entry.relatedIds
                     if (kept.isNotEmpty()) {

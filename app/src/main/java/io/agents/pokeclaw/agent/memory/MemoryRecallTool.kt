@@ -20,13 +20,17 @@ class MemoryRecallTool : BaseTool() {
         "Search the long-term memory bank by topic or keyword. Returns the most relevant remembered " +
             "facts (identity, preferences, device/account facts, past outcomes). " +
             "A blank query lists the most relevant recent and pinned memories. " +
+            "By default only currently-valid facts come back — a fact replaced by a newer one stays " +
+            "out unless include_history is true, which surfaces superseded entries marked as such. " +
             "Each result carries a #id you can pass to memory_save's related_ids to link a new " +
             "memory to it."
 
     override fun getDescriptionCN() =
         "按主题或关键词检索长期记忆库，返回最相关的已记住事实（身份、偏好、设备/账号信息、" +
-            "过往结果）。query 留空则返回最近与置顶的记忆。每条结果带 #编号，" +
-            "可用 memory_save 的 related_ids 把新记忆关联到它。"
+            "过往结果）。query 留空则返回最近与置顶的记忆。" +
+            "默认只返回仍有效的事实——被新事实顶替的旧记忆不会出现，" +
+            "除非 include_history 为 true（此时会带「已作废」标注）。" +
+            "每条结果带 #编号，可用 memory_save 的 related_ids 把新记忆关联到它。"
 
     override fun getParameters() = listOf(
         ToolParameter(
@@ -43,6 +47,12 @@ class MemoryRecallTool : BaseTool() {
             "kind", "string",
             "Filter by category: profile | preference | fact | event (default: no filter)",
             false
+        ),
+        ToolParameter(
+            "include_history", "boolean",
+            "Also return superseded memories (marked 已作废), for questions like " +
+                "'what did you used to believe'. Default: false (only currently-valid facts).",
+            false
         )
     )
 
@@ -51,23 +61,29 @@ class MemoryRecallTool : BaseTool() {
             val query = optionalString(params, "query", "")
             val limit = optionalInt(params, "limit", 5)
             val kind = optionalString(params, "kind", "").takeIf { it.isNotBlank() }
+            val includeHistory = optionalBoolean(params, "include_history", false)
 
             val total = MemoryStore.count()
             if (total == 0) {
                 return ToolResult.success("记忆库还是空的（0 条）。")
             }
 
-            val results = MemoryStore.recall(query, limit, kind)
+            val results = MemoryStore.recall(query, limit, kind, includeHistory)
             if (results.isEmpty()) {
+                val scope = if (includeHistory) "全部（含已作废）" else query.ifBlank { "全部" }
                 return ToolResult.success(
-                    "记忆库里没有匹配「${query.ifBlank { "全部" }}」的内容（共 $total 条）。"
+                    "记忆库里没有匹配「$scope」的内容（共 $total 条）。"
                 )
             }
             // The line format is a UI contract, not just model-facing text: the
             // web surface reads chips back out of this exact text. Format and
             // parser live together in MemoryRecallFormat so they cannot drift.
             val body = results.joinToString("\n") { r ->
-                MemoryRecallFormat.chipLine(r.entry.kindLabel, r.entry.id, r.entry.content, r.entry.hits + 1)
+                val e = r.entry
+                val content =
+                    if (e.isInvalidated) e.content + MemoryRecallFormat.historyMark(e.supersededBy)
+                    else e.content
+                MemoryRecallFormat.chipLine(e.kindLabel, e.id, content, e.hits + 1)
             }
             ToolResult.success(MemoryRecallFormat.header(query) + "\n" + body)
         } catch (e: Exception) {

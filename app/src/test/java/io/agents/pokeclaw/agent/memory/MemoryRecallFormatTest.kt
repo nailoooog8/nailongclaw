@@ -115,4 +115,24 @@ class MemoryRecallFormatTest {
         assertEquals("记忆检索「全部」：", MemoryRecallFormat.header(""))
         assertEquals("记忆检索「车票」：", MemoryRecallFormat.header("车票"))
     }
+
+    @Test
+    fun `a superseded entry's history mark survives the round trip inside the content`() {
+        // The mark rides in the content region on purpose: the `(命中 N 次)`
+        // tail is the parser's anchor, and anything between the tail and the
+        // next `- [` would break the lookahead and lose the chip entirely.
+        val dead = "用户的手机是Pixel。" + MemoryRecallFormat.historyMark("0f9e8d7c6b5a")
+        val out = text(
+            "手机",
+            line("事实", "a1b2c3d4e5f6", "用户的手机是小米。", 1),
+            line("事实", "0f9e8d7c6b5a", dead, 2),
+        )
+
+        val chips = MemoryRecallFormat.chips(out)
+        assertEquals(2, chips.size)
+        assertEquals("0f9e8d7c6b5a", chips[1].id)
+        assertTrue(chips[1].content.contains("已作废，被 #0f9e8d7c6b5a 接替"))
+        // And the flattened transcript shape keeps it too.
+        assertEquals(chips, MemoryRecallFormat.chips(out.replace("\n", " ")))
+    }
 }

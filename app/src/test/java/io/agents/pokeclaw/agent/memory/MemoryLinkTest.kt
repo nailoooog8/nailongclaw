@@ -136,8 +136,8 @@ class MemoryLinkTest {
         val fresh = remember("用户每周跑5次。", relatedIds = listOf(old.entry.id))
 
         assertTrue(
-            "sanity: this pair really does contradict",
-            fresh.conflicts.isNotEmpty()
+            "sanity: this pair really does contradict (old one superseded)",
+            fresh.superseded.isNotEmpty()
         )
         assertTrue(
             "a contradicted pair must stay out of relatedIds",
@@ -177,22 +177,26 @@ class MemoryLinkTest {
     }
 
     @Test
-    fun `deleteByContent also prunes conflicts`() {
-        // Regression: delete(id) repaired the surviving side of a conflict, but
-        // deleteByContent did not, leaving the bank pointing at nothing.
+    fun `deleteByContent also prunes supersedes refs`() {
+        // Regression shape, carried over from the conflict era: delete(id)
+        // repaired the surviving side, but deleteByContent did not, leaving the
+        // bank pointing at nothing. The supersession chain needs the same
+        // guarantee — a live entry whose `supersedes` points at a deleted one
+        // claims history it cannot show.
         val c = remember("用户每周跑3次。")
         val d = remember("用户每周跑5次。")
         assertTrue(
-            "sanity: both sides point at each other",
-            byId(c.entry.id)!!.conflictsWith.contains(d.entry.id) &&
-                byId(d.entry.id)!!.conflictsWith.contains(c.entry.id)
+            "sanity: the newer statement superseded the older one",
+            byId(c.entry.id)!!.isInvalidated &&
+                byId(c.entry.id)!!.supersededBy == d.entry.id &&
+                byId(d.entry.id)!!.supersedes.contains(c.entry.id)
         )
 
         assertEquals(1, MemoryStore.deleteByContent("跑3次"))
         assertEquals(
-            "surviving side must not keep a conflict with a deleted memory",
+            "surviving side must not keep a supersedes ref to a deleted memory",
             emptyList<String>(),
-            byId(d.entry.id)!!.conflictsWith
+            byId(d.entry.id)!!.supersedes
         )
     }
 

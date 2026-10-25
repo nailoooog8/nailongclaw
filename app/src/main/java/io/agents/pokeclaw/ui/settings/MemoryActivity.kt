@@ -131,27 +131,39 @@ class MemoryActivity : BaseActivity() {
         val now = System.currentTimeMillis()
         for (entry in entries) {
             val conflicted = entry.conflictsWith.isNotEmpty()
+            val dead = entry.isInvalidated
             memoryGroup.addMenuItem(
                 leadingIcon = leadingIconFor(entry),
                 title = (if (entry.pinned) "📌 " else "") + (if (conflicted) "⚠ " else "") + entry.content,
-                onClick = { showEditDialog(entry) },
+                onClick = { if (dead) showRestoreDialog(entry) else showEditDialog(entry) },
                 showDivider = true
             ).apply {
-                setTitleColor(cds.textPrimary)
+                // A superseded entry is history, not a live fact: muted both
+                // ways so the list reads "current above, archive below"
+                // without a second screen.
+                setTitleColor(if (dead) cds.textMuted else cds.textPrimary)
                 setTrailingText(
                     buildString {
                         append(entry.kindLabel)
+                        if (dead) append(" · 已作废")
                         if (conflicted) append(" · 矛盾")
                         if (entry.hits > 0) append(" · ${entry.hits}次")
                         // Only the fading tail of the retention curve is worth
                         // showing; tagging every steady entry would be noise.
-                        if (MemoryRetention.isFading(entry, now)) {
+                        // Dead entries skip it — their curve never runs again.
+                        if (!dead && MemoryRetention.isFading(entry, now)) {
                             append(" · ${MemoryRetention.labelOf(entry, now)}")
                         }
                     }
                 )
-                setTrailingTextColor(if (conflicted) cds.danger else cds.textSecondary)
-                setLeadingIconColor(cds.textPrimary)
+                setTrailingTextColor(
+                    when {
+                        dead -> cds.textMuted
+                        conflicted -> cds.danger
+                        else -> cds.textSecondary
+                    }
+                )
+                setLeadingIconColor(if (dead) cds.textMuted else cds.textPrimary)
                 setTrailingIconColor(cds.textMuted)
                 setOnLongClickListener {
                     showDeleteDialog(entry)
@@ -176,19 +188,23 @@ class MemoryActivity : BaseActivity() {
         val now = System.currentTimeMillis()
         val pinned = all.count { it.pinned }
         val conflicted = all.count { it.conflictsWith.isNotEmpty() }
+        val invalidated = all.count { it.isInvalidated }
         val suppressed = MemoryStore.suppressionCount()
         // Reported so the fading marks above read as a working curve rather
         // than entries quietly going missing.
-        val fading = all.count { MemoryRetention.isFading(it, now) }
+        val fading = all.count { !it.isInvalidated && MemoryRetention.isFading(it, now) }
         val state = if (MemoryStore.isEnabled()) "已开启" else "已关闭"
         return "记忆库$state · 共 $total 条（置顶 $pinned 条" +
+            (if (invalidated > 0) " · 作废 $invalidated 条" else "") +
             (if (conflicted > 0) " · 矛盾 $conflicted 条" else "") +
             (if (fading > 0) " · 渐淡 $fading 条" else "") +
             "）· 上限 ${MemoryStore.MAX_ENTRIES} 条\n" +
             "存储于应用外部目录 memories.json，可直接用 adb 推送编辑。\n" +
             "长期没被召回的记忆会慢慢淡出简报，被召回得越多淡得越慢；只淡出，不会自动删除。\n" +
+            "与新记忆矛盾的旧记忆会被自动作废（不再注入，点它可恢复，恢复后接替它的反而作废）；\n" +
+            "置顶记忆不会被自动作废。\n" +
             (if (suppressed > 0) "删除过的 $suppressed 条记忆留有抑制指纹，Agent 不会自动写回相似内容。\n" else "") +
-            "点击编辑，长按删除。"
+            "点击编辑（已作废的点击恢复），长按删除。"
     }
 
     // ── Actions ───────────────────────────────────────────────────────────────
@@ -402,6 +418,44 @@ class MemoryActivity : BaseActivity() {
         )
     }
 
+    /**
+     * The way back from a temporal supersession the user disagrees with.
+     *
+     * Restoring is a ruling that the *old* fact was right, so the entry that
+     * replaced it is invalidated in turn — the dialog says so, because a
+     * "restore" that silently kills another memory would be the same silent
+     * adjudication supersession was designed to avoid.
+     */
+    private fun showRestoreDialog(entry: MemoryEntry) {
+        val replacer = entry.supersededBy
+            .takeIf { it.isNotEmpty() }
+            ?.let { id -> MemoryStore.findById(id)?.content }
+        val swapNote = if (replacer != null) {
+            "\n\n恢复后，接替它的这条会被作废：$replacer"
+        } else ""
+        CdsDialog.show(
+            context = this,
+            title = entry.content,
+            content = CdsDialog.message(
+                this,
+                "这条记忆已被新记忆顶替（作废），不会再注入给 Agent。" +
+                    "点「恢复」把它变回有效；也可以「编辑」改写后保存（同样恢复有效）。$swapNote"
+            ),
+            confirmText = "恢复",
+            cancelText = getString(R.string.common_cancel),
+            neutralText = "编辑",
+            onConfirm = {
+                if (MemoryStore.restoreSuperseded(entry.id)) {
+                    Toast.makeText(this, "已恢复，接替它的记忆已作废", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this, "恢复失败：这条记忆已不在作废状态", Toast.LENGTH_SHORT).show()
+                }
+                renderAll()
+            },
+            onNeutral = { showEditDialog(entry) }
+        )
+    }
+
     private fun showDeleteDialog(entry: MemoryEntry) {
         CdsDialog.show(
             context = this,
@@ -518,9 +572,12 @@ class MemoryActivity : BaseActivity() {
 
                 is MemoryStore.RememberResult.Stored -> when {
                     saved.merged -> "已合并到另一条记忆（共 ${MemoryStore.count()} 条）"
+                    saved.superseded.isNotEmpty() ->
+                        "已保存，并作废 ${saved.superseded.size} 条被顶替的记忆"
                     saved.conflicts.isNotEmpty() ->
-                        "已保存，但与 ${saved.conflicts.size} 条已有记忆矛盾（列表里有 ⚠ 标记）"
-
+                        "已保存，但与 ${saved.conflicts.size} 条置顶记忆矛盾（列表里有 ⚠ 标记）"
+                    existing?.isInvalidated == true && !saved.entry.isInvalidated ->
+                        "已保存并恢复为有效"
                     else -> "已保存，共 ${MemoryStore.count()} 条"
                 }
             }

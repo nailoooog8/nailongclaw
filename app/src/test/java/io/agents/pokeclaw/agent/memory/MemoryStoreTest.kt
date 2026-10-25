@@ -43,6 +43,9 @@ class MemoryStoreTest {
         dir = Files.createTempDirectory("memory-store-test").toFile()
         MemoryStore.storageDirOverride = dir
         MemoryStore.clock = { now }
+        // briefing() gates on the enabled flag, which lives in MMKV and does
+        // not exist in a JVM test.
+        MemoryStore.enabledOverride = true
         MemoryStore.invalidate()
     }
 
@@ -50,6 +53,7 @@ class MemoryStoreTest {
     fun tearDown() {
         MemoryStore.storageDirOverride = null
         MemoryStore.clock = { System.currentTimeMillis() }
+        MemoryStore.enabledOverride = null
         MemoryStore.invalidate()
         dir.deleteRecursively()
     }
@@ -68,6 +72,17 @@ class MemoryStoreTest {
     ): MemoryStore.RememberResult.Stored = stored(
         MemoryStore.remember(content, kind, tags, pinned, fromAgent = fromAgent)
     )
+
+    /** 0→a, 25→z, 26→aa … distinct lowercase ids for eviction fillers. */
+    private fun letterIndex(i: Int): String {
+        var n = i
+        val sb = StringBuilder()
+        while (n >= 0) {
+            sb.insert(0, ('a' + n % 26))
+            n = n / 26 - 1
+        }
+        return sb.toString()
+    }
 
     // ── Suppression must run before the near-duplicate merge ──────────────────
 
@@ -156,10 +171,10 @@ class MemoryStoreTest {
         assertEquals(1, MemoryStore.count())
     }
 
-    // ── conflictsWith is maintained on both sides ─────────────────────────────
+    // ── Temporal supersession (graphiti's validity interval) ─────────────────
 
     @Test
-    fun `a contradiction flags both sides`() {
+    fun `a contradiction supersedes the older fact instead of coexisting with it`() {
         // The swapped value must be something the lexical matcher can see as a
         // slot (a number, version or quoted span). "用户在杭州工作。" ->
         // "用户在上海工作。" does NOT fire: there is no value marker, so it
@@ -168,33 +183,217 @@ class MemoryStoreTest {
         val old = rememberAndStore("用户的手机是Pixel。")
         val neu = stored(MemoryStore.remember("用户的手机是小米。"))
 
-        assertEquals(1, neu.conflicts.size)
-        assertEquals(old.entry.id, neu.conflicts.single().id)
-        // The older side must point back, or the model only learns one
-        // direction of the conflict.
-        assertEquals(listOf(neu.entry.id), MemoryStore.findById(old.entry.id)!!.conflictsWith)
+        // The write reports what it displaced — an unreported invalidation
+        // would be the silent adjudication this design refuses.
+        assertEquals(1, neu.superseded.size)
+        assertEquals(old.entry.id, neu.superseded.single().id)
+        assertTrue(neu.conflicts.isEmpty())
+
+        val victim = MemoryStore.findById(old.entry.id)!!
+        assertTrue("the superseded fact must be invalidated, not deleted", victim.isInvalidated)
+        assertEquals(neu.entry.id, victim.supersededBy)
+        assertEquals(listOf(old.entry.id), MemoryStore.findById(neu.entry.id)!!.supersedes)
+        // A superseded entry's conflict flags die with the claim they
+        // described: ⚠ next to 已作废 would re-open what time already settled.
+        assertEquals(emptyList<String>(), victim.conflictsWith)
     }
 
     @Test
-    fun `deleting one side repairs the survivor's conflict list`() {
-        val old = rememberAndStore("用户的手机是Pixel。")
+    fun `a pinned memory is flagged, never auto-superseded`() {
+        val pinnedOld = rememberAndStore("用户的手机是Pixel。", pinned = true)
         val neu = stored(MemoryStore.remember("用户的手机是小米。"))
+
+        // A pin is the user's explicit override — time may not invalidate it.
+        assertTrue(neu.superseded.isEmpty())
+        assertEquals(1, neu.conflicts.size)
+        val still = MemoryStore.findById(pinnedOld.entry.id)!!
+        assertFalse("pinned entries must stay valid", still.isInvalidated)
+        assertEquals(listOf(neu.entry.id), still.conflictsWith)
+        assertEquals(listOf(pinnedOld.entry.id), neu.entry.conflictsWith)
+    }
+
+    @Test
+    fun `event-kind contradictions keep the honest flag pair instead of superseding`() {
+        // Events accumulate: "5月去东京" and "6月去东京" share a frame but are
+        // two different happenings, not one claim updated. Lexical matching
+        // cannot tell those apart (graphiti would use LLM extraction; we
+        // cannot), so time must not adjudicate them.
+        val may = rememberAndStore("用户5月去了东京旅行。", kind = MemoryKind.EVENT)
+        val june = stored(MemoryStore.remember("用户6月去了东京旅行。", kind = MemoryKind.EVENT))
+
+        assertTrue(june.superseded.isEmpty())
+        assertEquals(listOf(may.entry.id), june.entry.conflictsWith)
+        val mayEntry = MemoryStore.findById(may.entry.id)!!
+        assertFalse("events must stay live", mayEntry.isInvalidated)
+        assertEquals(listOf(june.entry.id), mayEntry.conflictsWith)
+    }
+
+    @Test
+    fun `the briefing injects only currently-valid memories`() {
+        rememberAndStore("用户的手机是Pixel。")
+        rememberAndStore("用户的手机是小米。")
+
+        val brief = MemoryStore.briefing("手机 型号")
+        assertTrue("live fact must be injected", brief.contains("小米"))
+        assertFalse("superseded fact must not sit next to its replacement", brief.contains("Pixel"))
+    }
+
+    @Test
+    fun `recall excludes superseded entries unless history is requested`() {
+        rememberAndStore("用户的手机是Pixel。")
+        rememberAndStore("用户的手机是小米。")
+
+        val live = MemoryStore.recall("手机")
+        assertEquals(1, live.size)
+        assertTrue(live.single().entry.content.contains("小米"))
+
+        val history = MemoryStore.recall("手机", includeHistory = true)
+        assertEquals(2, history.size)
+    }
+
+    @Test
+    fun `recalling history does not reinforce the dead entries`() {
+        val old = rememberAndStore("用户的手机是Pixel。")
+        rememberAndStore("用户的手机是小米。")
+
+        MemoryStore.recall("手机", includeHistory = true)
+
+        val dead = MemoryStore.findById(old.entry.id)!!
+        assertEquals("history must not buy retention for a dead entry", 0, dead.hits)
+    }
+
+    @Test
+    fun `restoreSuperseded swaps the pair instead of reviving both`() {
+        val old = rememberAndStore("用户的手机是Pixel。")
+        val neu = rememberAndStore("用户的手机是小米。")
+
+        assertTrue(MemoryStore.restoreSuperseded(old.entry.id))
+
+        val revived = MemoryStore.findById(old.entry.id)!!
+        val displaced = MemoryStore.findById(neu.entry.id)!!
+        assertFalse("restored entry is valid again", revived.isInvalidated)
+        assertTrue("the entry that replaced it is invalidated in turn", displaced.isInvalidated)
+        assertEquals(old.entry.id, displaced.supersededBy)
+        assertTrue(revived.supersedes.contains(neu.entry.id))
+        // And the live half of the pair is exactly one memory again.
+        assertEquals(1, MemoryStore.all().count { !it.isInvalidated })
+    }
+
+    @Test
+    fun `restoreSuperseded refuses a live or unknown entry`() {
+        val e = rememberAndStore("用户在杭州工作。")
+        assertFalse(MemoryStore.restoreSuperseded(e.entry.id))
+        assertFalse(MemoryStore.restoreSuperseded("no-such-id"))
+    }
+
+    @Test
+    fun `restoring through a chain supersedes the live tail`() {
+        // A→B→C with C live. The old id-based swap only looked at A's direct
+        // superseder B (dead), so reviving A left BOTH A and C live and
+        // unflagged — the state temporal supersession exists to prevent.
+        val a = rememberAndStore("用户的手机是Pixel。")
+        val b = rememberAndStore("用户的手机是小米。")
+        val c = rememberAndStore("用户的手机是华为。")
+
+        assertTrue(MemoryStore.restoreSuperseded(a.entry.id))
+
+        val revived = MemoryStore.findById(a.entry.id)!!
+        val middle = MemoryStore.findById(b.entry.id)!!
+        val tail = MemoryStore.findById(c.entry.id)!!
+        assertFalse("restored head is live", revived.isInvalidated)
+        assertTrue("dead middle stays history", middle.isInvalidated)
+        assertTrue("live tail is superseded by the restored head", tail.isInvalidated)
+        assertEquals(a.entry.id, tail.supersededBy)
+        assertTrue(revived.supersedes.contains(c.entry.id))
+        assertEquals("exactly one live fact remains", 1, MemoryStore.all().count { !it.isInvalidated })
+    }
+
+    @Test
+    fun `re-asserting a superseded fact reactivates it and supersedes its replacement`() {
+        val pixel = rememberAndStore("用户的手机是Pixel。")
+        rememberAndStore("用户的手机是小米。")
+        assertEquals(1, MemoryStore.all().count { !it.isInvalidated })
+
+        // The user says Pixel again. Same content → same id, so this must
+        // reactivate the dead entry rather than duplicate the id, and the live
+        // 小米 must lose its claim in turn.
+        val again = rememberAndStore("用户的手机是Pixel。")
+
+        assertEquals(pixel.entry.id, again.entry.id)
+        assertEquals(1, MemoryStore.all().count { it.id == pixel.entry.id })
+        assertFalse(again.entry.isInvalidated)
+        assertTrue(MemoryStore.findById(again.entry.id)!!.supersedes.isNotEmpty())
+        assertEquals(1, MemoryStore.all().count { !it.isInvalidated })
+    }
+
+    @Test
+    fun `editing a superseded entry restores it to valid`() {
+        val old = rememberAndStore("用户的手机是Pixel。")
+        rememberAndStore("用户的手机是小米。")
+
+        stored(
+            MemoryStore.remember(
+                content = "用户的手机是Pixel 8。",
+                id = old.entry.id
+            )
+        )
+
+        val edited = MemoryStore.findById(old.entry.id)!!
+        assertFalse("a manual edit is the newest statement — it comes back valid", edited.isInvalidated)
+        assertEquals("用户的手机是Pixel 8。", edited.content)
+    }
+
+    @Test
+    fun `eviction drops invalidated entries before live ones and leaves no fingerprint`() {
+        rememberAndStore("用户的手机是Pixel。")
+        val live = rememberAndStore("用户的手机是小米。")
+        rememberAndStore("用户喜欢喝美式。")
+        // Letter-only fillers: templated NUMBERS would share one skeleton and
+        // supersede each other into a chain, and Unicode-indexed characters
+        // collide under lowercasing (both fold filler writes into merges).
+        // Pure a-z indices keep every filler a distinct, unconnected fact.
+        repeat(MemoryStore.MAX_ENTRIES + 20) {
+            rememberAndStore("用户记得第${letterIndex(it)}件不相干的小事。")
+        }
+
+        assertEquals(MemoryStore.MAX_ENTRIES, MemoryStore.count())
+        assertEquals(0, MemoryStore.suppressionCount())
+        // Dead history is the cheapest thing to give up — it can never enter a
+        // briefing again — so it must not crowd out live memories.
+        assertEquals(0, MemoryStore.invalidatedCount())
+        assertNotNull("the live replacement must survive the pressure", MemoryStore.findById(live.entry.id))
+    }
+
+    // ── Supersession chains are pruned on every removal path ─────────────────
+
+    @Test
+    fun `deleting the superseder prunes the victim's link but leaves it restorable`() {
+        val old = rememberAndStore("用户的手机是Pixel。")
+        val neu = rememberAndStore("用户的手机是小米。")
 
         assertTrue(MemoryStore.delete(neu.entry.id))
 
-        // A dangling id would point the model at a memory that no longer
-        // exists, so the surviving side has to be cleaned up.
-        val survivor = MemoryStore.findById(old.entry.id)!!
-        assertEquals(emptyList<String>(), survivor.conflictsWith)
+        val victim = MemoryStore.findById(old.entry.id)!!
+        // Deleting the newer fact is not a ruling that the older one was
+        // right — that is restoreSuperseded's job — but the dangling id must
+        // still go, or the chain points at a memory that no longer exists.
+        assertTrue(victim.isInvalidated)
+        assertEquals("", victim.supersededBy)
+        // …and with the link gone, restoring is still possible.
+        assertTrue(MemoryStore.restoreSuperseded(victim.id))
     }
 
     @Test
-    fun `deleting the older side also repairs the newer one`() {
+    fun `deleting the superseded entry repairs the survivor's chain`() {
         val old = rememberAndStore("用户的手机是Pixel。")
-        val neu = stored(MemoryStore.remember("用户的手机是小米。"))
+        val neu = rememberAndStore("用户的手机是小米。")
 
         assertTrue(MemoryStore.delete(old.entry.id))
-        assertEquals(emptyList<String>(), MemoryStore.findById(neu.entry.id)!!.conflictsWith)
+
+        assertEquals(
+            emptyList<String>(),
+            MemoryStore.findById(neu.entry.id)!!.supersedes
+        )
     }
 
     // ── Eviction deliberately leaves no fingerprint ──────────────────────────

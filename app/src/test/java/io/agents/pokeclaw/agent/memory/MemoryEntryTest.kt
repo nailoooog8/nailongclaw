@@ -4,6 +4,7 @@
 package io.agents.pokeclaw.agent.memory
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -58,7 +59,11 @@ class MemoryEntryTest {
               "updatedAt": 2000,
               "hits": 7,
               "lastUsedAt": 3000,
-              "conflictsWith": ["def456"]
+              "conflictsWith": ["def456"],
+              "validAt": 1500,
+              "invalidAt": 4000,
+              "supersededBy": "def456",
+              "supersedes": ["001122", "334455"]
             }]
             """.trimIndent()
         )
@@ -73,6 +78,26 @@ class MemoryEntryTest {
         assertEquals(7, e.hits)
         assertEquals(3000L, e.lastUsedAt)
         assertEquals(listOf("def456"), e.conflictsWith)
+        assertEquals(1500L, e.validAt)
+        assertEquals(4000L, e.invalidAt)
+        assertEquals("def456", e.supersededBy)
+        assertEquals(listOf("001122", "334455"), e.supersedes)
+        assertTrue(e.isInvalidated)
+        assertEquals(1500L, e.effectiveValidAt)
+    }
+
+    @Test
+    fun `a legacy entry without temporal fields parses as currently valid`() {
+        // memories.json is hand-editable over adb and predates the temporal
+        // fields; every one of those banks must keep injecting as-is.
+        val e = MemoryEntry.parseList("""[{"content":"用户喜欢喝美式。","createdAt":1000}]""").single()
+        assertFalse(e.isInvalidated)
+        assertEquals(0L, e.invalidAt)
+        assertEquals("", e.supersededBy)
+        assertTrue(e.supersedes.isEmpty())
+        // validAt falls back to createdAt — when the fact became true is, at
+        // minimum, when the system learned it.
+        assertEquals(1000L, e.effectiveValidAt)
     }
 
     // ── parseList: per-field degradation ──────────────────────────────────────

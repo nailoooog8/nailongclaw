@@ -48,8 +48,31 @@ data class MemoryEntry(
      * can be updated without inventing anything.
      */
     val relatedIds: List<String> = emptyList(),
+    /**
+     * When the fact became true, which is not always when it was learned.
+     * Defaults to [createdAt] (absent in legacy files) — the two only differ
+     * for a fact restated after being superseded, where the new validity
+     * window starts at the restatement. Graphiti's `valid_at`.
+     */
+    val validAt: Long = 0L,
+    /**
+     * 0 while the fact is still true; set to the moment a later statement
+     * superseded it. Invalidated entries stay on disk (history, not deletion)
+     * but never enter the briefing or default recall. Graphiti's `invalid_at`.
+     */
+    val invalidAt: Long = 0L,
+    /** Id of the live entry that superseded this one; empty while valid. */
+    val supersededBy: String = "",
+    /** Ids of entries this one superseded when it was written. */
+    val supersedes: List<String> = emptyList(),
 ) {
     val kindLabel: String get() = MemoryKind.labelOf(kind)
+
+    /** True once a later statement replaced this fact — superseded, not deleted. */
+    val isInvalidated: Boolean get() = invalidAt > 0L
+
+    /** The moment this fact started being true: [validAt] or [createdAt]. */
+    val effectiveValidAt: Long get() = if (validAt > 0L) validAt else createdAt
 
     companion object {
         private val GSON = Gson()
@@ -90,6 +113,13 @@ data class MemoryEntry(
                 lastUsedAt = o.num("lastUsedAt"),
                 conflictsWith = o.arr("conflictsWith"),
                 relatedIds = o.arr("relatedIds"),
+                // Temporal fields absent from legacy files all mean "valid":
+                // validAt falls back to createdAt via effectiveValidAt, and
+                // an invalidAt of 0 keeps the entry in every default read.
+                validAt = o.num("validAt"),
+                invalidAt = o.num("invalidAt").takeIf { it > 0 } ?: 0L,
+                supersededBy = o.str("supersededBy"),
+                supersedes = o.arr("supersedes"),
             )
         }
 

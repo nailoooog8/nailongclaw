@@ -59,6 +59,19 @@ object MemoryRecallFormat {
         "- [$kindLabel#$id] $content  (命中 $hitsDisplay 次)"
 
     /**
+     * Marker for a superseded entry in an include_history result, appended to
+     * the *content* region of the chip line.
+     *
+     * Deliberately not a suffix after `(命中 N 次)`: the tail of the line is
+     * the chip parser's anchor (see [CHIP]), and anything between the tail and
+     * the next `- [` breaks the lookahead. Inside the content region the
+     * marker is just text — it survives the parser unchanged and the web chip
+     * shows it to the user.
+     */
+    fun historyMark(supersededBy: String): String =
+        if (supersededBy.isEmpty()) "（已作废）" else "（已作废，被 #$supersededBy 接替）"
+
+    /**
      * The tail of a chip: `  (命中 N 次)`, followed by the next `- [` bullet,
      * a truncation ellipsis, or the end of the text. The lookahead is what
      * keeps a `(命中 N 次)` occurrence *inside* a memory's content from ending
