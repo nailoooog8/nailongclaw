@@ -46,21 +46,22 @@ public class GetDeviceInfoTool extends BaseTool {
     @Override
     public String getDescriptionEN() {
         return "Get device system info directly without navigating Settings UI. "
-                + "Categories: battery, wifi, storage, bluetooth, screen, device, time. "
+                + "Categories: battery, wifi, storage, bluetooth, screen, device, time, app_functions. "
                 + "Much faster than opening Settings — use this first for system queries.";
     }
 
     @Override
     public String getDescriptionCN() {
         return "Get device system info directly without navigating Settings UI. "
-                + "Categories: battery, wifi, storage, bluetooth, screen, device, time.";
+                + "Categories: battery, wifi, storage, bluetooth, screen, device, time, app_functions.";
     }
 
     @Override
     public List<ToolParameter> getParameters() {
         return Collections.singletonList(
                 new ToolParameter("category", "string",
-                        "Info category: 'battery', 'wifi', 'storage', 'bluetooth', or 'screen'", true)
+                        "Info category: 'battery', 'wifi', 'storage', 'bluetooth', 'screen', 'time', "
+                                + "or 'app_functions' (Android 16 AppFunctions channel availability)", true)
         );
     }
 
@@ -78,9 +79,11 @@ public class GetDeviceInfoTool extends BaseTool {
                 case "screen": return getScreenInfo(ctx);
                 case "device": return getDeviceDetails();
                 case "time": return getCurrentTime();
+                case "app_functions":
+                    return ToolResult.success(io.agents.pokeclaw.utils.AppFunctionsProbe.probe(ctx));
                 default:
                     return ToolResult.error("Unknown category: " + category
-                            + ". Use: battery, wifi, storage, bluetooth, screen, device, time");
+                            + ". Use: battery, wifi, storage, bluetooth, screen, device, time, app_functions");
             }
         } catch (Exception e) {
             XLog.e(TAG, "Failed to get " + category + " info", e);
