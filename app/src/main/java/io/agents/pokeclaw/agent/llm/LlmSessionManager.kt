@@ -9,6 +9,7 @@ import dev.langchain4j.data.message.UserMessage
 import dev.langchain4j.model.anthropic.AnthropicChatModel
 import dev.langchain4j.model.chat.request.ChatRequest
 import dev.langchain4j.model.openai.OpenAiChatModel
+import io.agents.pokeclaw.agent.EffortLevel
 import io.agents.pokeclaw.agent.langchain.http.OkHttpClientBuilderAdapter
 import io.agents.pokeclaw.utils.XLog
 
@@ -76,7 +77,7 @@ object LlmSessionManager {
         return LlmClientFactory.create(
             config.toAgentConfig(
                 temperature = temperature,
-                maxIterations = 60
+                maxIterations = EffortLevel.maxIterationsOf(EffortLevel.current())
             )
         )
     }

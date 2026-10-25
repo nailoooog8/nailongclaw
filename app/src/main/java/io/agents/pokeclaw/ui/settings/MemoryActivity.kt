@@ -5,14 +5,12 @@ package io.agents.pokeclaw.ui.settings
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
-import android.graphics.Typeface
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.ViewGroup
 import android.widget.CheckBox
 import android.widget.EditText
-import android.widget.LinearLayout
 import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.TextView
@@ -25,9 +23,9 @@ import io.agents.pokeclaw.agent.memory.MemoryRetention
 import io.agents.pokeclaw.agent.memory.MemorySimilarity
 import io.agents.pokeclaw.agent.memory.MemoryStore
 import io.agents.pokeclaw.base.BaseActivity
-import io.agents.pokeclaw.ui.chat.ThemeManager
+import io.agents.pokeclaw.ui.cds.CdsUi
+import io.agents.pokeclaw.widget.CdsDialog
 import io.agents.pokeclaw.widget.CommonToolbar
-import io.agents.pokeclaw.widget.ConfirmDialog
 import io.agents.pokeclaw.widget.MenuGroup
 
 /**
@@ -83,8 +81,7 @@ class MemoryActivity : BaseActivity() {
         actionsGroup.applyCds(cds)
 
         findViewById<TextView>(R.id.tvFooter).apply {
-            setTextColor(cds.textMuted)
-            setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11f)
+            CdsUi.styleChromeText(this, cds, 11f)
         }
     }
 
@@ -325,42 +322,60 @@ class MemoryActivity : BaseActivity() {
             Toast.makeText(this, "当前没有抑制记录", Toast.LENGTH_SHORT).show()
             return
         }
-        val labels = traces.map { t ->
-            val blocked = if (t.blocked > 0) " · 挡过 ${t.blocked} 次" else ""
-            "${t.text.take(40)}\n[${MemoryKind.labelOf(t.kind)}]${blocked}"
-        }.toTypedArray()
 
-        android.app.AlertDialog.Builder(this)
-            .setTitle("遗忘抑制（${traces.size}）\n这些内容已被删除，Agent 不会自动写回相似内容。")
-            .setItems(labels) { _, which -> showSuppressionItemDialog(traces[which]) }
-            .setNeutralButton("全部清除") { _, _ -> showClearSuppressionDialog() }
-            .setNegativeButton(getString(R.string.common_cancel), null)
-            .show()
+        val layout = CdsDialog.column(this)
+        layout.addView(
+            CdsDialog.message(this, "这些内容已被删除，Agent 不会自动写回相似内容。")
+        )
+        traces.forEach { t ->
+            val blocked = if (t.blocked > 0) "挡过 ${t.blocked} 次" else null
+            layout.addView(
+                CdsDialog.optionRow(
+                    context = this,
+                    label = t.text.take(40),
+                    tag = listOfNotNull(MemoryKind.labelOf(t.kind), blocked).joinToString(" · "),
+                ) { showSuppressionItemDialog(t) }
+            )
+        }
+
+        CdsDialog.show(
+            context = this,
+            title = "遗忘抑制（${traces.size}）",
+            content = layout,
+            confirmText = null,
+            cancelText = getString(R.string.common_cancel),
+            neutralText = "全部清除",
+            onNeutral = { showClearSuppressionDialog() },
+        )
     }
 
     private fun showSuppressionItemDialog(trace: MemorySimilarity.Trace) {
         val blocked = if (trace.blocked > 0) "\n已挡下 ${trace.blocked} 次 Agent 写回。" else ""
-        android.app.AlertDialog.Builder(this)
-            .setTitle(trace.text)
-            .setMessage(
+        CdsDialog.show(
+            context = this,
+            title = trace.text,
+            content = CdsDialog.message(
+                this,
                 "分类：${MemoryKind.labelOf(trace.kind)}$blocked\n\n" +
                     "「恢复记忆」把这条放回记忆库并解除抑制；「仅解除抑制」只让 Agent 可以重新学到，" +
                     "记忆库本身不变。"
-            )
-            .setPositiveButton("恢复记忆") { _, _ ->
+            ),
+            confirmText = "恢复记忆",
+            cancelText = getString(R.string.common_cancel),
+            neutralText = "仅解除抑制",
+            onConfirm = {
                 MemoryStore.restoreSuppression(trace.id)
                 Toast.makeText(this, "已恢复这条记忆", Toast.LENGTH_SHORT).show()
                 renderAll()
                 showSuppressionListDialog()
-            }
-            .setNeutralButton("仅解除抑制") { _, _ ->
+            },
+            onNeutral = {
                 MemoryStore.clearSuppression(trace.id)
                 Toast.makeText(this, "已解除这条抑制", Toast.LENGTH_SHORT).show()
                 renderAll()
                 showSuppressionListDialog()
             }
-            .setNegativeButton(getString(R.string.common_cancel), null)
-            .show()
+        )
     }
 
     private fun showClearSuppressionDialog() {
@@ -369,13 +384,17 @@ class MemoryActivity : BaseActivity() {
             Toast.makeText(this, "当前没有抑制记录", Toast.LENGTH_SHORT).show()
             return
         }
-        ConfirmDialog.showWarm(
+        CdsDialog.show(
             context = this,
             title = "清除遗忘抑制？",
-            message = "将清除 $n 条抑制指纹。清除后，Agent 可以重新自动记住你之前删掉的内容。",
-            actionTitle = "清除",
-            cancelTitle = getString(R.string.common_cancel),
-            onAction = {
+            content = CdsDialog.message(
+                this,
+                "将清除 $n 条抑制指纹。清除后，Agent 可以重新自动记住你之前删掉的内容。"
+            ),
+            confirmText = "清除",
+            cancelText = getString(R.string.common_cancel),
+            danger = true,
+            onConfirm = {
                 val cleared = MemoryStore.clearSuppressions()
                 Toast.makeText(this, "已清除 $cleared 条抑制指纹", Toast.LENGTH_SHORT).show()
                 renderAll()
@@ -384,15 +403,19 @@ class MemoryActivity : BaseActivity() {
     }
 
     private fun showDeleteDialog(entry: MemoryEntry) {
-        ConfirmDialog.showWarm(
+        CdsDialog.show(
             context = this,
             title = "删除这条记忆？",
-            message = entry.content +
-                "\n\n删除后会留下抑制指纹，Agent 之后不会自动写回相似内容" +
-                "（可在「遗忘抑制」里清除）。",
-            actionTitle = "删除",
-            cancelTitle = getString(R.string.common_cancel),
-            onAction = {
+            content = CdsDialog.message(
+                this,
+                entry.content +
+                    "\n\n删除后会留下抑制指纹，Agent 之后不会自动写回相似内容" +
+                    "（可在「遗忘抑制」里清除）。"
+            ),
+            confirmText = "删除",
+            cancelText = getString(R.string.common_cancel),
+            danger = true,
+            onConfirm = {
                 MemoryStore.delete(entry.id)
                 Toast.makeText(this, "已删除", Toast.LENGTH_SHORT).show()
                 renderAll()
@@ -401,13 +424,17 @@ class MemoryActivity : BaseActivity() {
     }
 
     private fun showClearDialog() {
-        ConfirmDialog.showWarm(
+        CdsDialog.show(
             context = this,
             title = "清空记忆库？",
-            message = "将删除全部 ${MemoryStore.count()} 条记忆，Agent 会从零开始重新认识你。",
-            actionTitle = "清空",
-            cancelTitle = getString(R.string.common_cancel),
-            onAction = {
+            content = CdsDialog.message(
+                this,
+                "将删除全部 ${MemoryStore.count()} 条记忆，Agent 会从零开始重新认识你。"
+            ),
+            confirmText = "清空",
+            cancelText = getString(R.string.common_cancel),
+            danger = true,
+            onConfirm = {
                 val n = MemoryStore.clear()
                 Toast.makeText(this, "已清空 $n 条", Toast.LENGTH_SHORT).show()
                 renderAll()
@@ -416,42 +443,29 @@ class MemoryActivity : BaseActivity() {
     }
 
     private fun showEditDialog(existing: MemoryEntry?) {
-        // System AlertDialog is light-themed: fixed dark text, not theme colors
-        val fieldColor = 0xFF333333.toInt()
-        val labelColor = 0xFF666666.toInt()
+        // CDS dialog (CdsDialog) — same frame as the page that opened it. The
+        // old version hardcoded #333333 field text because the system dialog
+        // is light-themed; that hack is gone with the frame that needed it.
+        val layout = CdsDialog.column(this)
 
-        val layout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(48, 32, 48, 16)
-        }
-
-        layout.addView(TextView(this).apply {
-            text = "记忆内容（一条一个事实，写成能独立成立的短句）"
-            setTextColor(fieldColor)
-            setTypeface(typeface, Typeface.BOLD)
-        })
-        val contentInput = EditText(this).apply {
-            hint = "例：用户的通勤方式是地铁，单程约 40 分钟"
-            setText(existing?.content ?: "")
-            minLines = 2
-            maxLines = 4
-            setTextColor(fieldColor)
-            setHintTextColor(labelColor)
-        }
+        layout.addView(CdsDialog.label(this, "记忆内容（一条一个事实，写成能独立成立的短句）"))
+        val contentInput = CdsDialog.field(
+            this,
+            hint = "例：用户的通勤方式是地铁，单程约 40 分钟",
+            preset = existing?.content,
+            multiLine = true,
+        )
         layout.addView(contentInput)
 
-        layout.addView(TextView(this).apply {
-            text = "\n分类"
-            setTextColor(fieldColor)
-            setTypeface(typeface, Typeface.BOLD)
-        })
+        layout.addView(CdsDialog.label(this, "分类"))
         val kindGroup = RadioGroup(this).apply { orientation = RadioGroup.HORIZONTAL }
         val kindButtons = HashMap<String, RadioButton>()
         for (kind in MemoryKind.all) {
             val button = RadioButton(this).apply {
                 text = MemoryKind.labelOf(kind)
                 isChecked = (existing?.kind ?: MemoryKind.FACT) == kind
-                setTextColor(fieldColor)
+                setTextColor(cds.textPrimary)
+                typeface = CdsUi.fontSans()
                 textSize = 14f
             }
             kindButtons[kind] = button
@@ -459,72 +473,61 @@ class MemoryActivity : BaseActivity() {
         }
         layout.addView(kindGroup)
 
-        layout.addView(TextView(this).apply {
-            text = "\n标签（逗号分隔，可选）"
-            setTextColor(fieldColor)
-            setTypeface(typeface, Typeface.BOLD)
-        })
-        val tagsInput = EditText(this).apply {
-            hint = "device,permissions"
-            setText(existing?.tags?.joinToString(",") ?: "")
-            setSingleLine(true)
-            setTextColor(fieldColor)
-            setHintTextColor(labelColor)
-        }
+        layout.addView(CdsDialog.label(this, "标签（逗号分隔，可选）"))
+        val tagsInput = CdsDialog.field(this, hint = "device,permissions", preset = existing?.tags?.joinToString(","))
         layout.addView(tagsInput)
 
         val pinnedCheck = CheckBox(this).apply {
             text = "置顶（每次都注入，不参与衰减）"
             isChecked = existing?.pinned ?: false
-            setTextColor(fieldColor)
+            setTextColor(cds.textPrimary)
+            typeface = CdsUi.fontSans()
         }
         layout.addView(pinnedCheck)
 
-        val dialog = android.app.AlertDialog.Builder(this)
-            .setTitle(if (existing == null) "添加记忆" else "编辑记忆")
-            .setView(layout)
+        CdsDialog.show(
+            context = this,
+            title = if (existing == null) "添加记忆" else "编辑记忆",
+            content = layout,
+            confirmText = "保存",
+            cancelText = "取消",
+            dismissOnConfirm = false,
+            onConfirm = { handle ->
             // Validate on click, not in the builder callback: the builder
             // callback runs after the dialog is dismissed, so rejecting empty
             // content there discarded everything the user had typed.
-            .setPositiveButton("保存", null)
-            .setNegativeButton("取消", null)
-            .create()
-
-        dialog.setOnShowListener {
-            dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val content = contentInput.text.toString().trim()
-                if (content.isEmpty()) {
-                    Toast.makeText(this, "内容不能为空", Toast.LENGTH_SHORT).show()
-                    return@setOnClickListener
-                }
-                val kind = kindButtons.entries.firstOrNull { it.value.isChecked }?.key
-                    ?: MemoryKind.FACT
-                val tags = tagsInput.text.toString()
-                    .split(",").map { it.trim() }.filter { it.isNotEmpty() }
-                val saved = MemoryStore.remember(
-                    content = content,
-                    kind = kind,
-                    tags = tags,
-                    pinned = pinnedCheck.isChecked,
-                    id = existing?.id
-                )
-                val message = when (saved) {
-                    is MemoryStore.RememberResult.Suppressed ->
-                        "与被删除过的记忆太像，已作为手动添加保存"
-
-                    is MemoryStore.RememberResult.Stored -> when {
-                        saved.merged -> "已合并到另一条记忆（共 ${MemoryStore.count()} 条）"
-                        saved.conflicts.isNotEmpty() ->
-                            "已保存，但与 ${saved.conflicts.size} 条已有记忆矛盾（列表里有 ⚠ 标记）"
-
-                        else -> "已保存，共 ${MemoryStore.count()} 条"
-                    }
-                }
-                Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
-                renderAll()
-                dialog.dismiss()
+            val content = contentInput.text.toString().trim()
+            if (content.isEmpty()) {
+                Toast.makeText(this, "内容不能为空", Toast.LENGTH_SHORT).show()
+                return@show
             }
+            val kind = kindButtons.entries.firstOrNull { it.value.isChecked }?.key
+                ?: MemoryKind.FACT
+            val tags = tagsInput.text.toString()
+                .split(",").map { it.trim() }.filter { it.isNotEmpty() }
+            val saved = MemoryStore.remember(
+                content = content,
+                kind = kind,
+                tags = tags,
+                pinned = pinnedCheck.isChecked,
+                id = existing?.id
+            )
+            val message = when (saved) {
+                is MemoryStore.RememberResult.Suppressed ->
+                    "与被删除过的记忆太像，已作为手动添加保存"
+
+                is MemoryStore.RememberResult.Stored -> when {
+                    saved.merged -> "已合并到另一条记忆（共 ${MemoryStore.count()} 条）"
+                    saved.conflicts.isNotEmpty() ->
+                        "已保存，但与 ${saved.conflicts.size} 条已有记忆矛盾（列表里有 ⚠ 标记）"
+
+                    else -> "已保存，共 ${MemoryStore.count()} 条"
+                }
+            }
+            Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+            renderAll()
+            handle.dismiss()
         }
-        dialog.show()
+    )
     }
 }

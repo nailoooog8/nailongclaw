@@ -88,8 +88,8 @@
     <string name="wechat_media_voice">voice</string>
     <string name="wechat_media_unknown">media</string>
     <string name="channel_config_saved">Configuration saved</string>
-    <string name="channel_config_lan_hint">💡 Enable \"LAN Config\" in Settings to configure via browser</string>
-    <string name="channel_config_lan_hint_running">💡 Open %s in your browser to configure</string>
+    <string name="channel_config_lan_hint">Enable \"LAN Config\" in Settings to configure via browser</string>
+    <string name="channel_config_lan_hint_running">Open %s in your browser to configure</string>
     <string name="channel_config_lan_copied">Address copied</string>
 
     <!-- LLM Config -->
@@ -401,4 +401,36 @@
     <string name="theme_label_ember_light">Ember light</string>
     <string name="theme_label_abyss_dark">Abyss dark</string>
     <string name="theme_label_abyss_light">Abyss light</string>
+
+    <!-- Settings hub section rows (the hub links to the section pages). -->
+    <string name="settings_section_model">Model &amp; Task</string>
+    <string name="settings_section_monitor">Monitoring &amp; Permissions</string>
+    <string name="settings_section_skills">Skills</string>
+    <string name="settings_section_memory">Memory bank</string>
+
+    <!-- Merged theme page: mode × base × accent, three orthogonal axes.
+         Keys mirror mockup/claude-ui/cds.css [data-mode] / [data-base] /
+         [data-theme] and are storage keys — never translate the keys. -->
+    <string name="theme_mode_section">Light / dark</string>
+    <string name="theme_option_light">Light</string>
+    <string name="theme_option_dark">Dark</string>
+    <string name="theme_mode_hint">Applies app-wide immediately. The chat surface follows the same choice.</string>
+    <string name="theme_base_section">Base color (page background)</string>
+    <string name="theme_base_clay">Clay</string>
+    <string name="theme_base_porcelain">Porcelain</string>
+    <string name="theme_base_sand">Sand</string>
+    <string name="theme_base_caramel">Caramel</string>
+    <string name="theme_base_taupe">Taupe</string>
+    <string name="theme_base_rose">Rose</string>
+    <string name="theme_base_mint">Mint</string>
+    <string name="theme_accent_section">Accent color</string>
+    <string name="theme_accent_clay">Clay orange</string>
+    <string name="theme_accent_clay_bright">Clay orange · high contrast</string>
+    <string name="theme_accent_sage">Sage green</string>
+    <string name="theme_accent_indigo">Indigo</string>
+    <string name="theme_accent_ochre">Ochre red</string>
+    <string name="theme_accent_wisteria">Wisteria</string>
+    <string name="theme_accent_teal">Deep teal</string>
+    <string name="theme_in_use">In use</string>
+    <string name="theme_page_foot">All three axes are independent: light/dark, base color, accent color. The chat surface and the native pages follow the same choices — pick here or from the sidebar 主题 popover, both land in the same place.</string>
 </resources>

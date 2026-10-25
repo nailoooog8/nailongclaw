@@ -52,12 +52,16 @@ class LoadingDialog private constructor(context: Context) : Dialog(context, R.st
         super.onCreate(savedInstanceState)
         setContentView(R.layout.dialog_loading)
 
+        val p = io.agents.pokeclaw.ui.cds.CdsUi.palette(context)
+
         setCancelable(isDismissible)
         setCanceledOnTouchOutside(isDismissible)
 
+        // Same CDS frame as QRCodeDialog / CdsDialog: the window is the panel,
+        // the layout's own ember card background is dropped under it.
         window?.apply {
             setGravity(Gravity.CENTER)
-            setBackgroundDrawableResource(android.R.color.transparent)
+            setBackgroundDrawable(io.agents.pokeclaw.ui.cds.CdsUi.panel(context, p))
             setLayout(
                 WindowManager.LayoutParams.WRAP_CONTENT,
                 WindowManager.LayoutParams.WRAP_CONTENT
@@ -65,8 +69,16 @@ class LoadingDialog private constructor(context: Context) : Dialog(context, R.st
             // Keep background from dimming to keep the loading dialog lightweight
             setDimAmount(0.3f)
         }
+        (findViewById<android.widget.FrameLayout>(android.R.id.content))?.getChildAt(0)?.background = null
+
+        findViewById<android.widget.ProgressBar>(R.id.progressBar)?.apply {
+            indeterminateTintList = android.content.res.ColorStateList.valueOf(p.accent)
+        }
 
         val tvMessage = findViewById<TextView>(R.id.tvMessage)
+        tvMessage.typeface = io.agents.pokeclaw.ui.cds.CdsUi.fontSans()
+        tvMessage.setTextColor(p.textSecondary)
+        tvMessage.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12.5f)
         if (!message.isNullOrEmpty()) {
             tvMessage.text = message
             tvMessage.visibility = View.VISIBLE

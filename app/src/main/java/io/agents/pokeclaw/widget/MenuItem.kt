@@ -4,6 +4,10 @@
 package io.agents.pokeclaw.widget
 
 import android.content.Context
+import android.content.res.ColorStateList
+import android.graphics.Typeface
+import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.RippleDrawable
 import android.util.AttributeSet
 import android.util.TypedValue
 import android.view.LayoutInflater
@@ -15,6 +19,7 @@ import android.widget.TextView
 import androidx.annotation.DrawableRes
 import androidx.core.view.isVisible
 import io.agents.pokeclaw.R
+import io.agents.pokeclaw.ui.cds.CdsUi
 
 /**
  * Menu item component - clickable row with leading icon, title, and trailing text/arrow
@@ -32,10 +37,14 @@ class MenuItem @JvmOverloads constructor(
     private val ivTrailing: ImageView
     private val divider: View
 
+    /** The clickable row container (first child of the merged layout). */
+    private val rowContent: LinearLayout
+
     init {
         orientation = VERTICAL
         LayoutInflater.from(context).inflate(R.layout.widget_menu_item, this, true)
 
+        rowContent = getChildAt(0) as LinearLayout
         ivLeading = findViewById(R.id.ivLeading)
         tvTitle = findViewById(R.id.tvTitle)
         viewRedDot = findViewById(R.id.viewRedDot)
@@ -52,6 +61,84 @@ class MenuItem @JvmOverloads constructor(
      */
     fun setLeadingIcon(@DrawableRes iconRes: Int) {
         ivLeading.setImageResource(iconRes)
+    }
+
+    /**
+     * Set the leading icon to an arbitrary drawable — the theme page's base /
+     * accent swatches are generated GradientDrawables, not resources. Clears
+     * the color filter so a swatch's own colors survive (setLeadingIconColor
+     * would otherwise repaint it).
+     */
+    fun setLeadingIconDrawable(drawable: android.graphics.drawable.Drawable?) {
+        ivLeading.colorFilter = null
+        ivLeading.setImageDrawable(drawable)
+    }
+
+    /**
+     * Set the leading icon box size (dp). Swatches want a wider, shorter box
+     * than the 24dp icon default so the three-step base ladder reads as a
+     * strip rather than a square.
+     */
+    fun setLeadingIconSize(widthDp: Int, heightDp: Int) {
+        val lp = ivLeading.layoutParams
+        lp.width = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP, widthDp.toFloat(), resources.displayMetrics
+        ).toInt()
+        lp.height = TypedValue.applyDimension(
+            TypedValue.COMPLEX_UNIT_DIP, heightDp.toFloat(), resources.displayMetrics
+        ).toInt()
+        ivLeading.layoutParams = lp
+    }
+
+    /**
+     * Set the title typeface — the CDS typography pass uses this to give row
+     * titles the serif content face while chrome stays sans.
+     */
+    fun setTitleTypeface(typeface: android.graphics.Typeface) {
+        tvTitle.typeface = typeface
+    }
+
+    /**
+     * Set the trailing text typeface — CDS keeps meta (statuses, counts, hex
+     * values) in the sans chrome face so it never competes with the serif
+     * title for attention.
+     */
+    fun setTrailingTextTypeface(typeface: android.graphics.Typeface) {
+        tvTrailing.typeface = typeface
+    }
+
+    /** Title size in sp — the CDS pass sets the reference's 13.5sp row label. */
+    fun setTitleTextSizeSp(sizeSp: Float) {
+        tvTitle.setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeSp)
+    }
+
+    /** Trailing size in sp — the CDS pass sets the reference's 12sp meta. */
+    fun setTrailingTextSizeSp(sizeSp: Float) {
+        tvTrailing.setTextSize(TypedValue.COMPLEX_UNIT_SP, sizeSp)
+    }
+
+    /**
+     * Row vertical padding in dp — the CDS pass tightens the stock 16dp to the
+     * reference settings-row density (11px ≈ 11dp here).
+     */
+    fun setRowPaddingVerticalDp(dp: Float) {
+        val px = CdsUi.dp(context, dp).toInt()
+        rowContent.setPadding(rowContent.paddingLeft, px, rowContent.paddingRight, px)
+    }
+
+    /**
+     * CDS press feedback: a 5%-ink ripple over the row instead of the theme's
+     * brand-colored `selectableItemBackground`. The stock ripple inherits
+     * colorControlHighlight from the Material theme, which on the CDS pages
+     * is a second, louder color than anything in the palette.
+     */
+    fun setCdsPress(p: CdsUi.Palette) {
+        val ripple = RippleDrawable(
+            ColorStateList.valueOf(p.ghostHover),
+            null,
+            ColorDrawable(p.fillSecondary)
+        )
+        rowContent.background = ripple
     }
 
     /**

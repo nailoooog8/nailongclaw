@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel
 import io.agents.pokeclaw.ClawApplication.Companion.appViewModelInstance
 import io.agents.pokeclaw.TaskEvent
 import io.agents.pokeclaw.agent.AgentConfig
+import io.agents.pokeclaw.agent.EffortLevel
 import io.agents.pokeclaw.agent.llm.ModelConfigRepository
 import io.agents.pokeclaw.channel.Channel
 import io.agents.pokeclaw.channel.ChannelManager
@@ -98,7 +99,8 @@ class AppViewModel : ViewModel() {
     fun getAgentConfig(): AgentConfig =
         ModelConfigRepository.snapshot().toAgentConfig(
             temperature = 0.1,
-            maxIterations = 60
+            // The composer's effort gear picks the agent loop's round budget.
+            maxIterations = EffortLevel.maxIterationsOf(EffortLevel.current())
         )
 
     fun updateAgentConfig(): Boolean = taskOrchestrator.updateAgentConfig()

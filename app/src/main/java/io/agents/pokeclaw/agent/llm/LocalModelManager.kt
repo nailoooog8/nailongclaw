@@ -213,13 +213,18 @@ object LocalModelManager {
         )
     }
 
+    /**
+     * Display state for the model page's cards. Chinese on purpose: these
+     * strings render on the CDS settings page (the only consumer), where
+     * "● Ready" next to "● 就绪" read as two products.
+     */
     fun resolveActiveModelState(context: Context, localConfig: LocalModelConfig): ActiveModelState {
         val modelPath = localConfig.modelPath
         if (modelPath.isBlank()) {
             return ActiveModelState(
-                displayName = "No model selected",
-                metaText = "Download a model below",
-                statusText = "● Not configured",
+                displayName = "未选择模型",
+                metaText = "在下方下载模型",
+                statusText = "● 未配置",
                 statusKind = StatusKind.NEUTRAL,
             )
         }
@@ -229,11 +234,11 @@ object LocalModelManager {
             val availability = availabilityForModel(context, matchedModel, localConfig)
             return ActiveModelState(
                 displayName = matchedModel.displayName,
-                metaText = "${matchedModel.fileName} · On-device",
+                metaText = "${matchedModel.fileName} · 本机",
                 statusText = when (availability.source) {
-                    AvailabilitySource.MANAGED_DOWNLOAD -> "● Ready"
-                    AvailabilitySource.LINKED_FILE -> "● Ready"
-                    AvailabilitySource.MISSING -> "● Missing file"
+                    AvailabilitySource.MANAGED_DOWNLOAD -> "● 就绪"
+                    AvailabilitySource.LINKED_FILE -> "● 就绪"
+                    AvailabilitySource.MISSING -> "● 文件缺失"
                 },
                 statusKind = if (availability.isAvailable) StatusKind.READY else StatusKind.WARNING,
             )
@@ -241,8 +246,8 @@ object LocalModelManager {
 
         return ActiveModelState(
             displayName = localConfig.displayName.ifBlank { File(modelPath).nameWithoutExtension },
-            metaText = "On-device",
-            statusText = if (File(modelPath).exists()) "● Ready" else "● Missing file",
+            metaText = "本机",
+            statusText = if (File(modelPath).exists()) "● 就绪" else "● 文件缺失",
             statusKind = if (File(modelPath).exists()) StatusKind.READY else StatusKind.WARNING,
         )
     }

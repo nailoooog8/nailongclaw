@@ -31,17 +31,75 @@
     catch (e) { console.warn('[cds] localStorage.getItem(' + key + ') failed:', e); return null; }
   }
 
+  /* 桥：有 Kotlin 桥时（真机），KVUtils 是主题与任务设置的唯一事实源；
+     纯浏览器打开时没有桥，localStorage 兜底（设计稿预览照常工作）。
+     写路径两边都写：桥让原生页与 composer  pill 立即一致，localStorage
+     让无桥预览和 QA 探针仍有据可查。 */
+  function bridge() {
+    return (typeof PokeClawChat !== 'undefined' && PokeClawChat) ? PokeClawChat : null;
+  }
+
+  function persistPrefs() {
+    var b = bridge();
+    if (!b || !b.writeThemePrefs) return;
+    try {
+      b.writeThemePrefs(JSON.stringify({
+        mode: root.getAttribute('data-mode'),
+        base: root.getAttribute('data-base'),
+        accent: root.getAttribute('data-theme')
+      }));
+    } catch (e) { console.warn('[cds] writeThemePrefs failed:', e); }
+  }
+
+  /* 读偏好：桥优先（原生主题页 / 设置页改过的话这里读得到），
+     localStorage 回退，最后才轮到系统深浅色。 */
+  function readPrefs() {
+    var b = bridge();
+    if (b && b.readThemePrefs) {
+      try {
+        var raw = b.readThemePrefs();
+        if (raw) {
+          var p = JSON.parse(raw);
+          if (p && (p.mode || p.base || p.accent)) return p;
+        }
+      } catch (e) { console.warn('[cds] readThemePrefs failed:', e); }
+    }
+    return {
+      mode: read(THEME_KEY) ||
+        (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'),
+      base: read(BASE_KEY) || 'clay',
+      accent: read(ACCENT_KEY) || 'clay'
+    };
+  }
+
+  function syncModeSeg(mode) {
+    var seg = document.getElementById('themeModeSeg');
+    if (!seg) return;
+    seg.querySelectorAll('.seg-opt').forEach(function (opt) {
+      opt.setAttribute('aria-checked', String(opt.dataset.modeKey === mode));
+    });
+  }
+
   function applyTheme(mode) {
     root.setAttribute('data-mode', mode);
     store(THEME_KEY, mode);
     var btn = document.getElementById('themeToggle');
     if (btn) btn.setAttribute('aria-label', mode === 'dark' ? '切换到浅色' : '切换到深色');
+    syncModeSeg(mode);
+    persistPrefs();
   }
 
   function initTheme() {
-    var saved = read(THEME_KEY);
-    if (saved) { applyTheme(saved); return; }
-    applyTheme(window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    applyTheme(readPrefs().mode || 'light');
+  }
+
+  /* 原生页（主题页 / 设置页）改过偏好后，由 Kotlin 在 onResume 调用，
+     把页面拉到与 KVUtils 一致。只动变了的维度，避免无谓重排。 */
+  function applyPrefs(prefs) {
+    if (!prefs) return;
+    if (prefs.mode && prefs.mode !== root.getAttribute('data-mode')) applyTheme(prefs.mode);
+    if (prefs.base && prefs.base !== root.getAttribute('data-base')) applyBase(prefs.base);
+    if (prefs.accent && prefs.accent !== root.getAttribute('data-theme')) applyAccent(prefs.accent);
   }
 
   /* ------------------------------------------------- 配色方案（强调色）
@@ -57,6 +115,7 @@
       row.setAttribute('aria-checked', String(row.dataset.themeKey === key));
     });
     syncThemeLabel();
+    persistPrefs();
   }
 
   /* ------------------------------------------------- 底色方案
@@ -70,6 +129,7 @@
       row.setAttribute('aria-checked', String(row.dataset.baseKey === key));
     });
     syncThemeLabel();
+    persistPrefs();
   }
 
   /* ------------------------------------------------- 存量值校验
@@ -123,12 +183,12 @@
   }
 
   function initAccent() {
-    var saved = read(ACCENT_KEY);
+    var saved = readPrefs().accent;
     applyAccent(validAccent(saved) ? saved : 'clay');
   }
 
   function initBase() {
-    var saved = read(BASE_KEY);
+    var saved = readPrefs().base;
     applyBase(validBase(saved) ? saved : 'clay');
   }
 
@@ -181,13 +241,6 @@
     // 标题改成中性文案：写死「给妈妈订高铁票」会让真实使用显得像被冒充。
     var title = document.querySelector('.topbar-title');
     if (title) title.textContent = '新任务';
-    // 抽屉记忆库行的「· 128 条」是设计稿的示例计数，真实模式下是谎报。
-    var memBtn = document.getElementById('memoryBtn');
-    if (memBtn) {
-      Array.prototype.forEach.call(memBtn.childNodes, function (n) {
-        if (n.nodeType === 3 && n.nodeValue.indexOf('记忆库') !== -1) n.nodeValue = '记忆库';
-      });
-    }
     // 静态示例 turn（工具卡 / MCP 卡 / 记忆 chips）只属于纯浏览器里的设计稿。
     // 三类示例现在都有真实数据源（工具卡 H23、MCP 卡 H27、chips 2026-10-24），
     // 真实界面里再摆一段虚构的「给妈妈订高铁票」对话就不是示例而是冒充了。
@@ -375,30 +428,200 @@
 
   rovingFocus(document.querySelector('.sessions'), '.session');
   rovingFocus(document.querySelector('.composer-bar'), '.pill');
-  var popWrap = document.querySelector('.pop-wrap');
-  var pop = popWrap.querySelector('.pop');
-  var popTrigger = popWrap.querySelector('.pill');
 
-  popTrigger.addEventListener('click', function (e) {
-    e.stopPropagation();
-    pop.setAttribute('data-open', pop.getAttribute('data-open') === 'true' ? 'false' : 'true');
-  });
+  /* ---------------------------------------------------- popover 互斥管理器
+     四个 popover（模型 / 努力档位 / 敏感操作 / 主题）共用一套开关逻辑：
+     同一时刻只开一个，点外部或 Esc 全关。原来是各写一遍且第二个
+     （主题）出现后两边还会互相打架。 */
+  var popovers = [];
+
+  /* 弹出方向实测：默认向上弹（bottom: calc(100% + 6px)）。触发器上方
+     放不下面板高度时翻转向下（data-flip="down"，见 cds.css）。
+     手机抽屉里主题行被 live 模式顶到靠近顶部——会话列表整段是死控件、
+     已隐藏，脚部因此贴在品牌头下面——向上弹 520px 高出视口一截，
+     「深浅 / 底色」整段裁在屏幕外。CSS 无从得知上方还剩多少空间，
+     所以开合时量一次，resize 再量一次。
+     水平同样量一次：右缘出视口（pill 靠近屏幕右边）时贴回包含块右缘，
+     否则 item 的 tag 会被裁掉，文档还会白白获得横向滚动。 */
+  function placePopover(entry) {
+    var pop = entry.pop;
+    pop.removeAttribute('data-flip');
+    pop.style.left = '';
+    pop.style.right = '';
+    var roomAbove = entry.btn.getBoundingClientRect().top;
+    if (roomAbove < pop.offsetHeight + 8) {
+      pop.setAttribute('data-flip', 'down');
+    }
+    if (pop.getBoundingClientRect().right > window.innerWidth - 8) {
+      pop.style.left = 'auto';
+      pop.style.right = '0';
+    }
+  }
+
+  function registerPopover(wrapId, popId, btnId) {
+    var wrap = document.getElementById(wrapId);
+    var pop = document.getElementById(popId);
+    var btn = document.getElementById(btnId);
+    if (!wrap || !pop || !btn) return null;
+    var entry = { wrap: wrap, pop: pop, btn: btn };
+    popovers.push(entry);
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var willOpen = pop.getAttribute('data-open') !== 'true';
+      closeAllPopovers();
+      if (willOpen) {
+        pop.setAttribute('data-open', 'true');
+        btn.setAttribute('aria-expanded', 'true');
+        // 先display:block再量高度；量完才决定翻不翻转。
+        placePopover(entry);
+      }
+    });
+    return entry;
+  }
+
+  function closeAllPopovers() {
+    popovers.forEach(function (entry) {
+      entry.pop.setAttribute('data-open', 'false');
+      entry.btn.setAttribute('aria-expanded', 'false');
+    });
+  }
+
   document.addEventListener('click', function (e) {
-    if (!popWrap.contains(e.target)) pop.setAttribute('data-open', 'false');
+    var inside = popovers.some(function (entry) {
+      return entry.wrap.contains(e.target);
+    });
+    if (!inside) closeAllPopovers();
   });
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') pop.setAttribute('data-open', 'false');
+    if (e.key === 'Escape') closeAllPopovers();
   });
 
-  pop.addEventListener('click', function (e) {
-    var item = e.target.closest('.pop-item');
-    if (!item) return;
-    pop.querySelectorAll('.pop-item').forEach(function (b) {
-      b.setAttribute('aria-checked', String(b === item));
-      b.style.background = b === item ? 'var(--cds-fill-ghost-selected)' : '';
+  // 开着的面板在视口变化时重新定向（分屏 / 转屏 / 键盘顶出 dock）。
+  window.addEventListener('resize', function () {
+    popovers.forEach(function (entry) {
+      if (entry.pop.getAttribute('data-open') === 'true') placePopover(entry);
     });
-    popTrigger.querySelector('.pill-label').textContent = item.dataset.label;
   });
+
+  // 模型切换器
+  var modelPopEntry = registerPopover('modelWrap', 'modelPop', 'modelBtn');
+  // 模型行点击：换模型 + 更新 pill 标签（原逻辑，迁到管理器里）
+  var modelPop = modelPopEntry ? modelPopEntry.pop : null;
+  var modelBtn = modelPopEntry ? modelPopEntry.btn : null;
+  if (modelPop && modelBtn) {
+    modelPop.addEventListener('click', function (e) {
+      var item = e.target.closest('.pop-item');
+      if (!item) return;
+      modelPop.querySelectorAll('.pop-item').forEach(function (b) {
+        b.setAttribute('aria-checked', String(b === item));
+        b.style.background = b === item ? 'var(--cds-fill-ghost-selected)' : '';
+      });
+      var label = modelBtn.querySelector('.pill-label');
+      if (label) label.textContent = item.dataset.label;
+      closeAllPopovers();
+    });
+  }
+
+  // 主题面板（侧边栏）：底色 × 强调色 × 深浅，一个面板三个维度
+  registerPopover('themePopWrap', 'themePop', 'themePickerBtn');
+  var themePop = document.getElementById('themePop');
+  if (themePop) {
+    themePop.addEventListener('click', function (e) {
+      var row = e.target.closest('.swatch-row');
+      if (row) { applyAccent(row.dataset.themeKey); return; }
+      var base = e.target.closest('.base-row');
+      if (base) applyBase(base.dataset.baseKey);
+    });
+    var modeSeg = document.getElementById('themeModeSeg');
+    if (modeSeg) {
+      modeSeg.addEventListener('click', function (e) {
+        var opt = e.target.closest('.seg-opt');
+        if (!opt) return;
+        applyTheme(opt.dataset.modeKey);
+      });
+    }
+  }
+
+  /* --------------------------------------------- 努力档位 / 敏感操作两个档位
+     原来是无 onClick 的死 pill（「高努力」「允许操作」）。现在各是一个
+     换档器：写 localStorage 兜底，并经桥写 KVUtils —— AgentConfig 的
+     maxIterations 与 MCP 确认门都读那份 KVUtils，档位因此是真实行为。 */
+  var EFFORT_KEY = 'cds-mockup-effort';
+  var EFFORT_LABELS = { low: '低', medium: '中', high: '高', max: '最大' };
+
+  function applyEffort(key) {
+    if (!EFFORT_LABELS[key]) key = 'high';
+    store(EFFORT_KEY, key);
+    var pop = document.getElementById('effortPop');
+    if (pop) {
+      pop.querySelectorAll('.pop-item').forEach(function (item) {
+        item.setAttribute('aria-checked', String(item.dataset.effortKey === key));
+      });
+    }
+    var label = document.getElementById('effortLabel');
+    if (label) label.textContent = EFFORT_LABELS[key];
+    var b = bridge();
+    if (b && b.setEffort) {
+      try { b.setEffort(key); }
+      catch (e) { console.warn('[cds] setEffort failed:', e); }
+    }
+  }
+
+  var POLICY_KEY = 'cds-mockup-policy';
+  var POLICY_LABELS = { ask: '询问', auto: '自动' };
+
+  function applyPolicy(key) {
+    if (!POLICY_LABELS[key]) key = 'ask';
+    store(POLICY_KEY, key);
+    var pop = document.getElementById('policyPop');
+    if (pop) {
+      pop.querySelectorAll('.pop-item').forEach(function (item) {
+        item.setAttribute('aria-checked', String(item.dataset.policyKey === key));
+      });
+    }
+    var label = document.getElementById('policyLabel');
+    if (label) label.textContent = POLICY_LABELS[key];
+    var b = bridge();
+    if (b && b.setAutoAllow) {
+      try { b.setAutoAllow(key === 'auto'); }
+      catch (e) { console.warn('[cds] setAutoAllow failed:', e); }
+    }
+  }
+
+  function initTaskGears() {
+    var b = bridge();
+    var effort = null;
+    var policy = null;
+    if (b && b.readTaskPrefs) {
+      try {
+        var p = JSON.parse(b.readTaskPrefs() || '{}');
+        effort = p.effort;
+        policy = p.autoAllow ? 'auto' : 'ask';
+      } catch (e) { console.warn('[cds] readTaskPrefs failed:', e); }
+    }
+    applyEffort(effort || read(EFFORT_KEY) || 'high');
+    applyPolicy(policy || read(POLICY_KEY) || 'ask');
+  }
+
+  var effortEntry = registerPopover('effortWrap', 'effortPop', 'effortBtn');
+  if (effortEntry) {
+    effortEntry.pop.addEventListener('click', function (e) {
+      var item = e.target.closest('.pop-item');
+      if (!item) return;
+      applyEffort(item.dataset.effortKey);
+      closeAllPopovers();
+    });
+  }
+
+  var policyEntry = registerPopover('policyWrap', 'policyPop', 'policyBtn');
+  if (policyEntry) {
+    policyEntry.pop.addEventListener('click', function (e) {
+      var item = e.target.closest('.pop-item');
+      if (!item) return;
+      applyPolicy(item.dataset.policyKey);
+      closeAllPopovers();
+    });
+  }
 
   /* ------------------------------------------------------------ 消息渲染 */
   function turn(cls, inner) {
@@ -601,35 +824,9 @@
     }, 900);
   }
 
-  /* --------------------------------------------- 配色方案 popover 交互 */
-  var accentWrap = document.querySelector('.theme-pop-wrap');
-  var accentPop = document.getElementById('themePop');
-  var accentBtn = document.getElementById('themePickerBtn');
-
-  if (accentBtn && accentPop) {
-    accentBtn.addEventListener('click', function (e) {
-      e.stopPropagation();
-      var open = accentPop.getAttribute('data-open') === 'true';
-      accentPop.setAttribute('data-open', String(!open));
-      accentBtn.setAttribute('aria-expanded', String(!open));
-    });
-    // 与模型切换 popover 互斥：两个同时开会叠在一起
-    document.addEventListener('click', function (e) {
-      if (!accentWrap.contains(e.target)) {
-        accentPop.setAttribute('data-open', 'false');
-        accentBtn.setAttribute('aria-expanded', 'false');
-      }
-      if (popWrap.contains(e.target) === false && !e.target.closest('.pop-wrap')) {
-        pop.setAttribute('data-open', 'false');
-      }
-    });
-    accentPop.addEventListener('click', function (e) {
-      var row = e.target.closest('.swatch-row');
-      if (row) { applyAccent(row.dataset.themeKey); return; }
-      var base = e.target.closest('.base-row');
-      if (base) applyBase(base.dataset.baseKey);
-    });
-  }
+  /* --------------------------------------------- 配色方案 popover 交互
+     已并入上方的 popover 互斥管理器（registerPopover('themePopWrap', …)），
+     这里不再重复挂监听。 */
 
   /* --------------------------------------------- 会话抽屉（≤760px）
      手机宽度侧栏是覆盖抽屉（见 cds.css 断点段）：汉堡开，遮罩 / Esc 关。
@@ -705,33 +902,14 @@
   });
 
   /* --------------------------------------------- 侧栏脚部行
-     抽屉里的「设置」打开页内设置面板（不再直达原生）——
-     面板里才有分区的原生编辑页入口。
-     「记忆库」「技能管理」是外移的直达行：真实模式下经桥进对应原生页，
-     设计稿里静默不动。 */
+     抽屉里的「设置」打开页内设置面板 —— 面板按分区列出各原生编辑页入口。
+     主题（深浅 × 底色 × 强调色）是侧边栏的常驻 quick access，与设置面板
+     「外观 · 主题」行打开的是同一个原生主题页。 */
   var settingsBtn = document.getElementById('settingsBtn');
   if (settingsBtn) {
     settingsBtn.addEventListener('click', function () {
       closeNav();
       openSettingsView();
-    });
-  }
-  var memoryBtn = document.getElementById('memoryBtn');
-  if (memoryBtn) {
-    memoryBtn.addEventListener('click', function () {
-      closeNav();
-      if (window.PokeClawChat && window.PokeClawChat.openSettingsPage) {
-        window.PokeClawChat.openSettingsPage('memory');
-      }
-    });
-  }
-  var skillsBtn = document.getElementById('skillsBtn');
-  if (skillsBtn) {
-    skillsBtn.addEventListener('click', function () {
-      closeNav();
-      if (window.PokeClawChat && window.PokeClawChat.openSettingsPage) {
-        window.PokeClawChat.openSettingsPage('skills');
-      }
     });
   }
 
@@ -796,12 +974,16 @@
       applied: {
         mode: root.getAttribute('data-mode'),
         accent: root.getAttribute('data-theme'),
-        base: root.getAttribute('data-base')
+        base: root.getAttribute('data-base'),
+        effort: read(EFFORT_KEY),
+        policy: read(POLICY_KEY)
       },
       stored: {
         theme: read(THEME_KEY),
         accent: read(ACCENT_KEY),
         base: read(BASE_KEY),
+        effort: read(EFFORT_KEY),
+        policy: read(POLICY_KEY),
         len: Object.keys(all).length
       },
       roundTrip: rt
@@ -850,12 +1032,10 @@
   initTheme();
   initAccent();
   initBase();
+  initTaskGears();
   // 必须在主题初始化之后、且在首次读桥之前。addJavascriptInterface 在页面
   // 加载前就注入了，所以这里读到的一定是最终状态。
   if (hasNativeBridge()) enterLiveMode();
-  document.getElementById('themeToggle').addEventListener('click', function () {
-    applyTheme(root.getAttribute('data-mode') === 'dark' ? 'light' : 'dark');
-  });
   syncAutoGrow();
   requestAnimationFrame(function () { toBottom(false); });
 
@@ -887,12 +1067,18 @@
     },
     setAccent: applyAccent,
     setBase: applyBase,
+    applyTheme: applyTheme,
+    applyPrefs: applyPrefs,
+    setEffort: applyEffort,
+    setAutoAllow: function (auto) { applyPolicy(auto ? 'auto' : 'ask'); },
     qa: qaReport,
     state: function () {
       return { pinned: pinned, showJump: showJump, backoff: backoff,
                mode: root.getAttribute('data-mode'),
                accent: root.getAttribute('data-theme'),
-               base: root.getAttribute('data-base') };
+               base: root.getAttribute('data-base'),
+               effort: read(EFFORT_KEY),
+               policy: read(POLICY_KEY) };
     }
   };
 })();

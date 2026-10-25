@@ -78,6 +78,14 @@ class McpConfirmationGate {
         ALLOW_ONCE,
         ALLOW_ALWAYS,
 
+        /**
+         * Allowed without asking because the user turned on 自动允许 in
+         * 模型与任务 settings. Distinct from [ALLOW_ALWAYS]: that one is a
+         * per-tool yes given on a card, this one is a blanket policy applied
+         * before any card is drawn.
+         */
+        AUTO_ALLOWED,
+
         /** The user tapped 本次拒绝. */
         DENY_BY_USER,
 
@@ -182,6 +190,7 @@ class McpConfirmationGate {
             Outcome.ALLOW_REMEMBERED,
             Outcome.ALLOW_ONCE,
             Outcome.ALLOW_ALWAYS,
+            Outcome.AUTO_ALLOWED,
             -> true
 
             else -> false
@@ -209,6 +218,7 @@ class McpConfirmationGate {
                 Outcome.ALLOW_ONCE -> "✓ 已允许一次：$label"
                 Outcome.ALLOW_ALWAYS -> "✓ 已始终允许：$label（本次运行内不再询问）"
                 Outcome.ALLOW_REMEMBERED -> "✓ 已始终允许：$label"
+                Outcome.AUTO_ALLOWED -> "✓ 已自动允许：$label（设置 · 敏感操作 = 自动允许）"
                 Outcome.DENY_BY_USER -> "✗ 已拒绝：$label，工具未执行"
                 Outcome.DENY_TIMED_OUT -> "✗ 超时未确认：$label，工具未执行"
                 Outcome.DENY_CANCELLED -> "✗ 确认被取消：$label，工具未执行"

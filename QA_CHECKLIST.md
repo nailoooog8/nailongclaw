@@ -1185,8 +1185,52 @@ When in doubt, rerun the smaller bundle first, then expand only if something dri
     - 再看**宽度**：文字节点的 x 范围若顶到屏幕边缘，说明撑破了（本次 113→1136，屏幕 1260，没顶）。
     - 这套判据的用处是：**它不需要人眼，也不依赖 OCR**，而 OCR 在这台设备的小字号 CJK 上已经坑过一次（H24 的 `设备截图` 悬案）。
 
-## CI. Emulator Smoke Harness
+### 设置分区化 + 两个档位键活化 + 主题三轴合并（2026-10-24 晚，用户反馈七连）
 
+> 本轮起点全是用户点名的问题：①「高努力」「允许操作」两个 pill 是死行 ②点任何交互键过渡期间出现蓝色方框 ③侧边栏主题、深浅色独立行、「全部设置」里的主题行三处重复且能力不一 ④MCP/技能/记忆点进去只换了颜色字体没换 ⑤添加 MCP 弹框没改 ⑥以前的主题能调整体背景色 ⑦「全部设置」再套一层设置很啰嗦。参考实现仍为 Caho1/open-claude-ui（令牌与 SegmentedControl 形态）。
+>
+> ✅ **总验（2026-10-24 22:0x，设备 `10AG4J1THX00524` / V2502DA（API 36），release 50 `PokeClaw_v0.8.3_20261024_215954.apk`）**：用户本人在机上逐项看过并确认「可以」。机主与自动化交替点选期间 logcat 可见窗口内 **九个 section 全部分发成功**（`openSettingsPage(model/channels/monitor/tools/mcp/theme/about/memory/skills)` 逐个出现，未知 section 会被记日志丢弃——没有出现），`dumpsys activity exit-info` 无新崩溃记录。截图取证：主 surface（pill 单行）、抽屉（仅剩主题+设置）、主题 popover（强调色板）、设置面板（四区无「全部设置」）、监听与权限页（四监听+四权限+脚注）。
+
+- [x] **H32. 设置面板按分区直达，没有「全部设置」这一层 [PASS]**: 侧边栏「设置」→ 面板为四区（配置：模型与任务/渠道接入/监听；功能：工具/MCP 服务器/技能/记忆库；外观：主题；系统：关于），无「全部设置」行 → 每行点进对应原生分区页 → BACK 回面板仍在。截图确认四区九行 + 脚注「深浅、底色与强调色在侧边栏『主题』里」；九个 section 的桥分发全部在 logcat 窗口内出现。
+- [x] **H33. 「高努力」死行变努力档位换档器 [PASS]**: pill 显示当前档（「努力·高」），popover 四档（低/中/高/最大 = 15/30/60/150 轮，`EffortLevel`）→ 选择经 `PokeClawChat.setEffort` 写 `KVUtils.KEY_EFFORT_LEVEL`，页面重载时 `readTaskPrefs` 桥读回 → 真实生效：`EffortLevel.current().maxIterations` 进入 `AppViewModel.getAgentConfig()` 与 `LlmSessionManager.createCloudClient()` 两个构造点（原来两处都写死 60）。
+- [x] **H34. 「允许操作」死行变敏感操作策略 [PASS]**: 真机截图 pill 为「允许操作·自动」——用户经 popover 切到「自动允许」后**跨进程重建仍在**（KVUtils 持久化 + 桥读回闭环成立）。行为链：`KVUtils.isAutoAllowOperations` → `ClawApplication` 里接线的 `McpConfirmationCoordinator.autoAllowProvider` → `awaitDecision` 在任何状态判断前返回 `Outcome.AUTO_ALLOWED`（后台/无界面/忙碌都不破坏该策略）；选「每次询问」恢复 fail-closed 确认卡。
+- [x] **H35. 主题三轴合并且跨表面一致 [PASS]**: 侧边栏「主题」popover 顶部为「深浅」分段控件（浅色/深色），其下底色 7 款 + 强调色 7 款；**独立「深浅色」行已删**；原生「主题」页同为三区（深浅 segmented + 底色 + 强调色，`activity_theme.xml` 重写）。KVUtils `THEME_MODE/THEME_BASE/THEME_ACCENT` 为唯一事实源：cds.js 启动时 `readThemePrefs` 桥优先、localStorage 回退；任何写入双写桥 + localStorage；原生页改设置后 `ClaudeUiPreviewActivity.onResume → syncPrefsToPage` 推送（指纹比对，只在真变过时推）。
+- [x] **H36. WebView 里点任何交互键都不再出现蓝色方框 [PASS]**: `cds.css` 两件套——`* { -webkit-tap-highlight-color: transparent }`（Android WebView 默认蓝色 tap 高亮，桌面 Chromium 看不到所以一直漏到真机）+ 全局 `:focus { outline: none }`（Chromium 默认焦点环；键盘可达性由 rovingFocus 保留，`.search:focus` 的 box-shadow 是唯一显式焦点样式）。全部截图无蓝色矩形残留。
+- [x] **H37. 渠道接入页（新页面）[PASS]**: 三区——可接入的软件（Discord/Telegram/微信/QQ/抖音，行尾已连接/未配置）、入口（配对 PIN/局域网配置/外部自动化）、即将推出（WhatsApp/Web 控制台诚实标注）。未配置行 → ChannelConfigActivity；微信保留二维码/手动二选一；已配置行 → 解绑确认 → 行尾回「未配置」。logcat 确认分发正常打开。
+- [x] **H38. 监听与权限页（新页面）[PASS — 截图全量]**: 「监听」区四行（无障碍服务·屏幕监听 / 通知使用权·通知监听 / 常驻后台 / 自动回复监控）+ 「权限」区四行（通知弹出 / 悬浮窗 / 电池白名单 / 存储），状态来自 `AppCapabilityCoordinator.snapshot`，每秒刷新；常驻后台开关即时生效；脚注说明两个监听各自的用途。整页截图确认排版与状态文案。
+- [x] **H39. 工具页是真实列表 [PASS]**: 三组来自运行时注册表（内置 / MCP 远程 / 技能），与 `ToolRegistry.getAllTools()` / `SkillRegistry.getAll()` 一致；只读——死行「管理工具」及其「12 个工具即将上线」Toast 由此删除。logcat 确认打开无异常。
+- [x] **H40. MCP/技能/记忆页字体字号 + 对话框 CDS 化 [PASS]**: `MenuGroup.applyCds` 的 palette 通道现在同时装排版（`MenuGroup.kt`）：衬线标题 13.5sp（`Typeface.create("serif")` ≈ Noto Serif，镜像 `--font-anthropic-serif`）、无衬线 meta 12sp、行高 11dp、20dp 图标、5% ink ripple（替换主题 brand 色 `selectableItemBackground`）。`CdsDialog`（widget）替换三个页面的系统 AlertDialog：surface-2 面板 + 发丝线 + 衬线标题 + accent 确认键；「系统浅色框 + 固定 #333333 文字」的 hack 连同它存在的理由一起删除。
+- [x] **H41. 实验稿入口行已删除 [PASS]**: 原生关于区不再有「Claude UI 聊天」行（该表面即主界面，SplashActivity 路由过去）；报告问题/分享调试/GitHub/赞助迁到新「关于」分区页（AboutActivity）。截图与 hub 代码确认无残留入口。
+- [x] **H42. composer pill 不错行 [PASS]**: `.pill { flex:none; white-space:nowrap }` + `·` 两侧去空格。真机截图：「本地模型」「努力· 高」「允许操作· 自动」三个 pill 均单行（修前「努力·高」「本地模型」各折成两行）。
+  - ⚠️ **真机日志通道当日不稳定**：`adb logcat -s ClaudeUiPreview` 在 21:2x 有输出、22:0x 起只剩 adbd 噪声（与「Device Notes」里第三方 logcat 间歇可见一致）。本轮的分发验证靠的是可见窗口内的完整级联 + 截图 + exit-info，不依赖单条日志。
+  - ⚠️ **快速连点同一行仍会叠两个原生页实例**（H30 已记，标准 launchMode 不去重）。低危，记 BACKLOG。
+
+### 弹窗交互 UI 收口 + 主题三轴贯通原生侧（2026-10-25，用户反馈三轮）
+
+> 本轮起点全是用户点名的问题：①侧边栏主题面板显示不全 ②「模型选择」点进去的 UI 没改 ③各种弹出来的交互 UI 没改（任务预算 / 自定义本地模型 / 全局提示词 / 接入软件 / 配对）④渠道配置页（QQ/微信）点进去 UI 没改 ⑤改主配色后设置里的页面不跟着变色 ⑥点「允许操作」有字被遮挡 ⑦主界面还能左右滑动。参考实现仍为 Caho1/open-claude-ui（模态框形态：面板 + 遮罩 + 强调色确认键）。
+>
+> ✅ **总验（2026-10-25，设备 `10AG4J1THX00524` / V2502DA（API 36），release 54 `PokeClaw_v0.8.3_20261025_093055.apk`）**：机主本人在机上逐项看过并确认「可以 / 已验收」。全部判据取自无障碍树 bounds 与 Node 像素解码（不认图、不 OCR）。
+
+- [x] **H43. 侧边栏主题面板完整在屏 [PASS]**: 点「主题 · 米黄 陶土橙」→ 面板 16 行全部可测：深浅分段（浅色/深色）+ 底色 7 款（米黄→薄荷，y 756→1446）+ 强调色 7 款（陶土橙→深青，y 1547→2236）。修前：面板向上弹 520px 顶出视口，a11y 树里前 12 行全是贴 y=123 的零高度节点（被裁），只有最底 4 行强调色露得出来。
+  - **修法**：cds.js `placePopover()` 开合时实测——触发器上方放不下面板高度就翻转向下（`.pop[data-flip="down"]`，`bottom:auto; top:calc(100%+6px)`），resize 时重量。手机 live 模式把会话列表整段隐藏、主题行被顶到靠近顶部（y≈355），向上弹必裁；翻转向下后自上而下展开，抽屉全高度容得下。
+  - **点选闭环**：点「藕荷」→ 行内主题名即时变「藕荷 陶土橙」（KVUtils 双写桥 + localStorage），切回「米黄」后原生页画布 `#f9f2ec` 精确命中。
+- [x] **H44. 主题三轴贯通原生设置页（用户报的「选鼠尾绿出来陶土橙」）[PASS]**: `CdsUi.palette()` 原来返回两张写死的 clay 表，从不读 KVUtils——侧边栏换强调色，WebView 绿了，原生设置页全体留陶土橙。现在按调用解析：`THEME_MODE`（存什么用什么，未存回退系统 night mode）× `THEME_BASE`（7 款底色浅/深三阶 + 各自的暖黑 ink 与边框 alpha，逐值镜像 cds.css）× `THEME_ACCENT`（7 套强调色，与深浅正交；暗色 subtle 用 accent 15% 混色，镜像 cds.css:305）。默认值（clay/clay/系统）与原硬编码逐位相同，零回归。
+  - **真机判据**：侧边栏切「鼠尾草绿」+ 底色已在薄荷 → 进模型选择页 → 全屏搜像素：**陶土橙 #d97757 0 个**、鼠尾草绿 #6f9068 94 个（✓ 已启用状态、下载 pill）、画布 `#eff4f0`（薄荷 surface-1）✓。`SettingsActivity` 另加主题指纹防陈旧（主题页在它下面改轴不重建它，onResume 指纹变了才 recreate）。
+  - **ThemeActivity 自己**：两个渲染函数改取实时调色板（选中环/「使用中」立即跟随）；换底色因涉及整条表面阶梯直接 recreate。
+- [x] **H45. composer popover 不再被裁、主界面不再左右滑动（用户报的两个 bug）[PASS]**: 点「允许操作」→ 弹框容器 a11y bounds `[346,2266][1013,2542]`，item 的 tag（默认/跳过确认卡）完整在框内（右缘 995 < 1013）。修前：弹框被拉到 590px 宽（pill 包含块只有 343px），右缘顶出屏幕（item 节点 `[686,…][1260,…]` 被裁在屏边，「默认」只剩半个），**文档因此获得横向滚动**——主界面真能左右滑动。
+  - **修法**：`.pop { width: max-content; max-width: calc(100vw - 32px) }` 显式收拢 + 视口兜底；`placePopover()` 加水平钳制（右缘出视口贴回包含块右缘）。
+  - **横滑判据**：弹框开着重划右侧（300,1500→1100,1500）→ 汉堡 bounds 前后均 `[98,153][192,251]`，零位移。
+- [x] **H46. 模型选择页全量 CDS 化 [PASS]**: `LlmConfigActivity` + `activity_llm_config.xml` 重写。修前只换了色（H31），排版/按钮/文案还是 ember：CardView 卡片带 elevation、动作是裸文字（使用 / ↓ 下载 / 🗑 emoji）、段落标题全是英文、状态色借聊天侧 colorSuccess/Warning。现在：三张卡 = `--cds-panel`（surface-2 + 发丝线 + 10px 圆角 + 零投影）、名称衬线 14/15sp、meta 无衬线 11.5/12sp、动作是 ghost pill（描边胶囊 + 5% ink 按压）、单选点改绘制圆（不再靠 ◉/○ 字形）、状态色走 CDS（ready=accent、error=danger；CDS 没有琥珀，内存不足保留 ⚠ 字形走 muted）、段落标题与字段标签中文化。真机：画布 `#f9f2ec`、卡片 `#fcf8f4`、「✓ 已启用」「↓ 下载」「保存并启用」在位。
+  - **顺带修掉两处英文状态串**（都只有这一个消费方）：`TaskBudget.describeCurrentBudget()`「50.0K / no $ cap」→「50.0K / 成本不限」；`LocalModelManager.resolveActiveModelState()`「● Ready / On-device」→「● 就绪 / 本机」。
+- [x] **H47. 渠道配置页 CDS 化 + 修掉一个真 bug [PASS]**: `ChannelConfigActivity` + 布局重写（输入井改显式 id 的 LinearLayout，代码绘 `--cds-input`）。**修前的真 bug**：两个输入井靠 `etInput.parent.parent` 猜 CardView，而两个井的嵌套深度不一样——第一个井从来没被画上 CDS 色，纯白 `#ffffff` 和 surface-3 `#fcf8f4` 并排亮着（像素扫描实拍）。机主点进微信/QQ 配置页发现「UI 没改」即始于此。修后两井均 `#fcf8f4`、保存钮陶土橙、标签/提示 chrome 排版、LAN 提示去 💡 emoji（三语言）。**机主本人验收通过**。
+- [x] **H48. 弹出来的交互 UI 全部收口到 CdsDialog [PASS]**: `CdsDialog` 扩四件——`danger`（确认键走 `--cds-fill-danger`，解绑/删除/清空用）、`neutralText`+`onNeutral`（第三按钮，MCP 确认的「始终允许」、记忆抑制的「仅解除抑制」）、`message()`（衬线正文段）、`optionRow()`（单选行：accent 圆点 + ghost 选中底，预算档位与抑制列表用）；取消按钮接 `onCancel`（MCP 的「本次拒绝」是作答，静默关闭会让泊住的 agent 线程空等超时）；有输入框时 `SOFT_INPUT_STATE_VISIBLE` 自动弹键盘（对齐旧 InputDialog 体验）。
+  - **迁移清单**（全部真机走过）：任务预算（7 单选行 + 金额字段；选 50K 保存 → 行尾即时变「50.0K / 成本不限」）、全局提示词（多行 2000 字）、自定义本地模型 URL（校验不过保留对话框不丢输入）、微信模式二选一、解绑确认（danger）、外部自动化启用、配对 PIN（6 位数字校验；非法值不落盘——重试后 PIN 仍 762494）、记忆删除（danger，取消后两条 H28 记忆均在）、遗忘抑制列表与单项（三按钮）、MCP 服务器/技能删除确认、MCP 工具确认卡（三按钮）、关于页问题报告（二选一）。
+  - **QR 配对链路**：`QRCodeDialog`/`LoadingDialog` 换 CDS 框体（窗口即面板、衬线标题、无衬线副标题、accent 关闭钮、状态浮层 surface-2）。真机走通 扫码登录：LoadingDialog → QRCodeDialog（标题/副标题/关闭 + 二维码在位）。
+  - **旧组件删除**：`AlertDialog` / `InputDialog` / `ConfirmDialog` 三个 widget 连同 `dialog_alert/input/confirm` 布局与三个孤儿 drawable 全部 `git rm`——调用点清零后留着就是给下一个人留地雷。
+  - ⚠️ **MCP 确认卡只走了代码路径**：三按钮 CdsDialog 与其他已验弹窗同构件，但真机触发需要一次真实 MCP 工具任务（H27 的回显服务器套路），本轮未排。登记录为「代码同级、待任务触发复看」。
+  - ⚠️ **PIN 弹窗的「校验不过不关窗」难经点击验证**：键盘顶升会让对话框位移，点到窗外即标准 dismiss。非法值不落盘已证（PIN 保持 762494）；不关窗分支按代码结构成立（只有合法分支调 `handle.dismiss()`）。
+
+## CI. Emulator Smoke Harness
 The runner itself is code. When it reports red for a reason that has nothing to do with
 the app, it burns triage time and trains everyone to ignore the matrix — which is worse
 than having no CI at all. These cases test **the harness**, not the product.

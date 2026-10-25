@@ -88,8 +88,8 @@
     <string name="wechat_media_voice">语音</string>
     <string name="wechat_media_unknown">媒体</string>
     <string name="channel_config_saved">配置已保存</string>
-    <string name="channel_config_lan_hint">💡 在设置页开启「局域网配置」，即可通过电脑浏览器配置</string>
-    <string name="channel_config_lan_hint_running">💡 电脑浏览器打开 %s 即可配置</string>
+    <string name="channel_config_lan_hint">在设置页开启「局域网配置」，即可通过电脑浏览器配置</string>
+    <string name="channel_config_lan_hint_running">电脑浏览器打开 %s 即可配置</string>
     <string name="channel_config_lan_copied">已复制地址</string>
 
     <!-- LLM 配置 -->
@@ -398,4 +398,36 @@
     <string name="theme_label_ember_light">余烬·浅色</string>
     <string name="theme_label_abyss_dark">深海·深色</string>
     <string name="theme_label_abyss_light">深海·浅色</string>
+
+    <!-- 设置枢纽的分区行（点进去是对应的分区页）。 -->
+    <string name="settings_section_model">模型与任务</string>
+    <string name="settings_section_monitor">监听与权限</string>
+    <string name="settings_section_skills">技能</string>
+    <string name="settings_section_memory">记忆库</string>
+
+    <!-- 合并后的主题页：深浅 × 底色 × 强调色，三个正交维度。
+         key 与 mockup/claude-ui/cds.css 的 [data-mode] / [data-base] /
+         [data-theme] 一一对应，是存储键，不翻译。 -->
+    <string name="theme_mode_section">深浅</string>
+    <string name="theme_option_light">浅色</string>
+    <string name="theme_option_dark">深色</string>
+    <string name="theme_mode_hint">立即全应用生效，聊天表面跟随同一选择。</string>
+    <string name="theme_base_section">底色（整体背景色）</string>
+    <string name="theme_base_clay">米黄</string>
+    <string name="theme_base_porcelain">奶白</string>
+    <string name="theme_base_sand">沙</string>
+    <string name="theme_base_caramel">焦糖</string>
+    <string name="theme_base_taupe">灰褐</string>
+    <string name="theme_base_rose">藕荷</string>
+    <string name="theme_base_mint">薄荷</string>
+    <string name="theme_accent_section">强调色</string>
+    <string name="theme_accent_clay">陶土橙</string>
+    <string name="theme_accent_clay_bright">陶土橙 · 高对比</string>
+    <string name="theme_accent_sage">鼠尾草绿</string>
+    <string name="theme_accent_indigo">靛蓝</string>
+    <string name="theme_accent_ochre">赭石红</string>
+    <string name="theme_accent_wisteria">紫藤</string>
+    <string name="theme_accent_teal">深青</string>
+    <string name="theme_in_use">使用中</string>
+    <string name="theme_page_foot">三个维度互不干扰：深浅、底色、强调色各自独立。聊天表面与原生页面跟随同一选择 —— 在本页或侧边栏「主题」面板里改，落的都是同一处。</string>
 </resources>

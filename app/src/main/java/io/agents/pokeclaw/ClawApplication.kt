@@ -48,6 +48,13 @@ class ClawApplication : BaseApp() {
         io.agents.pokeclaw.service.KeepAliveJobService.schedule(this)
         // MCP: load remote tool configs and register remote tools (async, network)
         io.agents.pokeclaw.agent.mcp.McpConnectionManager.loadAndRegister(this)
+        // The composer's 允许操作 gear: when the user picks 自动允许, MCP tool
+        // calls run without the per-call confirmation card. Wired here because
+        // KVUtils must be initialized first; the default (provider unset) is
+        // the fail-closed ask-every-time policy.
+        io.agents.pokeclaw.agent.mcp.McpConfirmationCoordinator.autoAllowProvider = {
+            KVUtils.isAutoAllowOperations()
+        }
         XLog.e(TAG, "ClawApplication initialized, tools registered: ${ToolRegistry.getInstance().getAllTools().size}")
 
         // Write network logs to file (set to true when debugging)

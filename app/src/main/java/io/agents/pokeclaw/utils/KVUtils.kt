@@ -260,6 +260,26 @@ object KVUtils {
     fun isExternalAutomationEnabled(): Boolean = getBoolean(KEY_EXTERNAL_AUTOMATION_ENABLED, false)
     fun setExternalAutomationEnabled(enabled: Boolean) = putBoolean(KEY_EXTERNAL_AUTOMATION_ENABLED, enabled)
 
+    // ==================== Task prefs — effort gear + operation policy ====================
+    // Single source of truth for the composer's two gears on the Claude UI
+    // surface. The WebView page reads/writes these through the PokeClawChat
+    // bridge (cds.js keeps a localStorage copy only as the pure-browser
+    // fallback), so the pill and 模型与任务 page can never disagree.
+    private const val KEY_EFFORT_LEVEL = "KEY_EFFORT_LEVEL"
+    private const val KEY_AUTO_ALLOW_OPERATIONS = "KEY_AUTO_ALLOW_OPERATIONS"
+
+    /** Stored key is the enum name (LOW/MEDIUM/HIGH/MAX); unknown values fall back to HIGH. */
+    fun getEffortLevel(): String = getString(KEY_EFFORT_LEVEL, "HIGH")
+    fun setEffortLevel(level: String): Boolean = putString(KEY_EFFORT_LEVEL, level.uppercase())
+
+    /**
+     * When true, MCP tool calls skip the per-call confirmation card and run
+     * immediately. Default false — the fail-closed behaviour that shipped
+     * first: a third-party tool the model decided to call still stops and asks.
+     */
+    fun isAutoAllowOperations(): Boolean = getBoolean(KEY_AUTO_ALLOW_OPERATIONS, false)
+    fun setAutoAllowOperations(enabled: Boolean) = putBoolean(KEY_AUTO_ALLOW_OPERATIONS, enabled)
+
     private const val KEY_PENDING_ACCESSIBILITY_RETURN = "KEY_PENDING_ACCESSIBILITY_RETURN"
     private const val KEY_PENDING_ACCESSIBILITY_RETURN_AT = "KEY_PENDING_ACCESSIBILITY_RETURN_AT"
     private const val KEY_PENDING_NOTIFICATION_ACCESS_RETURN = "KEY_PENDING_NOTIFICATION_ACCESS_RETURN"

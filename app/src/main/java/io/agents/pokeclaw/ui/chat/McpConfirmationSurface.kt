@@ -3,7 +3,6 @@
 
 package io.agents.pokeclaw.ui.chat
 
-import android.app.AlertDialog
 import android.os.Handler
 import android.os.Looper
 import androidx.activity.ComponentActivity
@@ -41,7 +40,7 @@ class McpConfirmationSurface(
 
     private val main = Handler(Looper.getMainLooper())
 
-    private var dialog: AlertDialog? = null
+    private var dialog: io.agents.pokeclaw.widget.CdsDialog.Handle? = null
 
     override fun showConfirmation(request: McpConfirmationRequest) {
         // The coordinator calls this from the agent thread; a dialog may only
@@ -50,15 +49,26 @@ class McpConfirmationSurface(
             if (activity.isFinishing) return@post
             dismissDialog()
             onNote(McpConfirmationGate.pendingNote(request))
-            dialog = AlertDialog.Builder(activity)
-                .setTitle("MCP 工具需要确认")
-                .setMessage(buildMessage(request))
-                // Cancelling answers "no" — see the class comment.
-                .setOnCancelListener { answer(McpConfirmationGate.Decision.DENY) }
-                .setPositiveButton("允许一次") { _, _ -> answer(McpConfirmationGate.Decision.ALLOW_ONCE) }
-                .setNeutralButton("始终允许") { _, _ -> answer(McpConfirmationGate.Decision.ALLOW_ALWAYS) }
-                .setNegativeButton("本次拒绝") { _, _ -> answer(McpConfirmationGate.Decision.DENY) }
-                .show()
+            // CDS frame: the same panel/serif/accent treatment the settings
+            // editors got, so a confirmation that parks the agent thread
+            // doesn't drop the user into a stock system dialog.
+            dialog = io.agents.pokeclaw.widget.CdsDialog.show(
+                context = activity,
+                title = "MCP 工具需要确认",
+                content = io.agents.pokeclaw.widget.CdsDialog.message(
+                    activity,
+                    buildMessage(request)
+                ),
+                confirmText = "允许一次",
+                cancelText = "本次拒绝",
+                neutralText = "始终允许",
+                onConfirm = { answer(McpConfirmationGate.Decision.ALLOW_ONCE) },
+                onNeutral = { answer(McpConfirmationGate.Decision.ALLOW_ALWAYS) },
+                // Cancelling answers "no" — see the class comment. The cancel
+                // button and BACK/outside-touch both land here (CdsDialog
+                // routes the button through onCancel on purpose).
+                onCancel = { answer(McpConfirmationGate.Decision.DENY) },
+            )
         }
     }
 
@@ -84,9 +94,6 @@ class McpConfirmationSurface(
     private fun dismissDialog() {
         val current = dialog ?: return
         dialog = null
-        // Null the dismiss message so the framework's own teardown cannot
-        // re-enter and null the field twice.
-        current.setDismissMessage(null)
         current.dismiss()
     }
 

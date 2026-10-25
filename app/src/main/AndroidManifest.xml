@@ -71,6 +71,26 @@
             android:exported="false"
             android:screenOrientation="portrait" />
         <activity
+            android:name=".ui.settings.ModelSettingsActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        <activity
+            android:name=".ui.settings.ChannelsActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        <activity
+            android:name=".ui.settings.MonitorActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        <activity
+            android:name=".ui.settings.ToolsActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        <activity
+            android:name=".ui.settings.AboutActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+        <activity
             android:name=".ui.settings.McpServersActivity"
             android:exported="false"
             android:screenOrientation="portrait"

@@ -12,119 +12,73 @@
 
     <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:paddingHorizontal="16dp"
-        android:paddingTop="12dp"
-        android:clipToPadding="false">
+        android:layout_height="match_parent">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:paddingVertical="8dp">
 
-            <!-- Dark themes section -->
+            <!-- 深浅：与底色、强调色三者正交，合并进同一页 -->
             <TextView
-                android:layout_width="wrap_content"
+                android:id="@+id/tvModeLabel"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:paddingBottom="10dp"
-                android:text="Dark Themes"
-                android:textColor="@color/colorTextSecondary"
-                android:textSize="13dp"
+                android:paddingLeft="8dp"
+                android:paddingTop="12dp"
+                android:text="@string/theme_mode_section"
+                android:textSize="11sp"
                 android:textStyle="bold" />
 
             <LinearLayout
+                android:id="@+id/modeCard"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center">
+                android:layout_marginHorizontal="8dp"
+                android:layout_marginTop="4dp"
+                android:orientation="vertical"
+                android:padding="12dp">
 
-                <include layout="@layout/item_theme_preview"
-                    android:id="@+id/themeEmberDark"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_margin="4dp" />
+                <io.agents.pokeclaw.widget.CdsSegmented
+                    android:id="@+id/modeSegmented"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
 
-                <include layout="@layout/item_theme_preview"
-                    android:id="@+id/themeAbyssDark"
-                    android:layout_width="0dp"
+                <TextView
+                    android:id="@+id/tvModeHint"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_margin="4dp" />
-
-                <include layout="@layout/item_theme_preview"
-                    android:id="@+id/themeMossDark"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_margin="4dp" />
-
-                <include layout="@layout/item_theme_preview"
-                    android:id="@+id/themeOnyxDark"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_margin="4dp" />
+                    android:paddingTop="8dp"
+                    android:textSize="11sp" />
             </LinearLayout>
 
-            <!-- Light themes section -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:paddingTop="20dp"
-                android:paddingBottom="10dp"
-                android:text="Light Themes"
-                android:textColor="@color/colorTextSecondary"
-                android:textSize="13dp"
-                android:textStyle="bold" />
-
-            <LinearLayout
+            <!-- 底色：整体背景色，七个暖调方案 -->
+            <io.agents.pokeclaw.widget.MenuGroup
+                android:id="@+id/baseGroup"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center">
+                android:layout_marginTop="8dp" />
 
-                <include layout="@layout/item_theme_preview"
-                    android:id="@+id/themeEmberLight"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_margin="4dp" />
+            <!-- 强调色：与底色、深浅正交 -->
+            <io.agents.pokeclaw.widget.MenuGroup
+                android:id="@+id/accentGroup"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
 
-                <include layout="@layout/item_theme_preview"
-                    android:id="@+id/themeAbyssLight"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_margin="4dp" />
-
-                <include layout="@layout/item_theme_preview"
-                    android:id="@+id/themeMossLight"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_margin="4dp" />
-
-                <include layout="@layout/item_theme_preview"
-                    android:id="@+id/themeOnyxLight"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_margin="4dp" />
-            </LinearLayout>
-
-            <!-- Current selection -->
             <TextView
-                android:id="@+id/tvCurrentTheme"
+                android:id="@+id/tvFooter"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:gravity="center"
-                android:paddingTop="24dp"
-                android:paddingBottom="24dp"
-                android:text="Current: Abyss Dark"
-                android:textColor="@color/colorTextSecondary"
-                android:textSize="14dp" />
+                android:padding="16dp"
+                android:textSize="11sp" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="24dp" />
 
         </LinearLayout>
+
     </ScrollView>
+
 </LinearLayout>

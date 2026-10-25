@@ -88,8 +88,8 @@
     <string name="wechat_media_voice">音声</string>
     <string name="wechat_media_unknown">メディア</string>
     <string name="channel_config_saved">設定を保存しました</string>
-    <string name="channel_config_lan_hint">💡 設定ページで「LAN設定」を有効にすると、ブラウザから設定できます</string>
-    <string name="channel_config_lan_hint_running">💡 ブラウザで %s を開いて設定してください</string>
+    <string name="channel_config_lan_hint">設定ページで「LAN設定」を有効にすると、ブラウザから設定できます</string>
+    <string name="channel_config_lan_hint_running">ブラウザで %s を開いて設定してください</string>
     <string name="channel_config_lan_copied">アドレスをコピーしました</string>
 
     <!-- LLM設定 -->
@@ -398,4 +398,36 @@
     <string name="theme_label_ember_light">エンバー ライト</string>
     <string name="theme_label_abyss_dark">アビス ダーク</string>
     <string name="theme_label_abyss_light">アビス ライト</string>
+
+    <!-- 設定ハブのセクション行（各セクション頁へ遷移する）。 -->
+    <string name="settings_section_model">モデルとタスク</string>
+    <string name="settings_section_monitor">監視と権限</string>
+    <string name="settings_section_skills">スキル</string>
+    <string name="settings_section_memory">メモリバンク</string>
+
+    <!-- 統合テーマページ：深浅 × 底色 × 強調色の直交する3軸。
+         key は mockup/claude-ui/cds.css の [data-mode] / [data-base] /
+         [data-theme] と対応する保存キーなので翻訳しない。 -->
+    <string name="theme_mode_section">深浅</string>
+    <string name="theme_option_light">ライト</string>
+    <string name="theme_option_dark">ダーク</string>
+    <string name="theme_mode_hint">アプリ全体に即時適用されます。チャット画面も同じ選択に従います。</string>
+    <string name="theme_base_section">底色（ページ背景色）</string>
+    <string name="theme_base_clay">イエロークレイ</string>
+    <string name="theme_base_porcelain">ポーセリン</string>
+    <string name="theme_base_sand">サンド</string>
+    <string name="theme_base_caramel">キャラメル</string>
+    <string name="theme_base_taupe">トープ</string>
+    <string name="theme_base_rose">ローズ</string>
+    <string name="theme_base_mint">ミント</string>
+    <string name="theme_accent_section">強調色</string>
+    <string name="theme_accent_clay">クレイオレンジ</string>
+    <string name="theme_accent_clay_bright">クレイオレンジ · 高コントラスト</string>
+    <string name="theme_accent_sage">セージグリーン</string>
+    <string name="theme_accent_indigo">インディゴ</string>
+    <string name="theme_accent_ochre">オーカーレッド</string>
+    <string name="theme_accent_wisteria">藤色</string>
+    <string name="theme_accent_teal">ディープティール</string>
+    <string name="theme_in_use">使用中</string>
+    <string name="theme_page_foot">3軸は互いに独立しています：深浅・底色・強調色。チャット画面もネイティブページも同じ選択に従います。このページでもサイドバーの「テーマ」パネルでも、変更は同じ場所に保存されます。</string>
 </resources>

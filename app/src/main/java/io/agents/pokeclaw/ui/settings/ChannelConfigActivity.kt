@@ -82,29 +82,34 @@ class ChannelConfigActivity : BaseActivity() {
         etInput2 = findViewById(R.id.etInput2)
         val ivToggle = findViewById<ImageView>(R.id.ivTogglePassword)
 
-        // CDS text + input treatment over the XML defaults (the two CardView
-        // input wells become surface-3 fields; EditTexts keep bg @null inside).
-        tvTip.setTextColor(cds.textMuted)
-        tvLabel1.setTextColor(cds.textPrimary)
-        tvLabel2.setTextColor(cds.textPrimary)
-        findViewById<TextView>(R.id.tvLanConfigHint)?.setTextColor(cds.textMuted)
-        findViewById<ImageView>(R.id.ivCopyAddress)?.setColorFilter(cds.textMuted)
+        // CDS treatment: the two input wells are the composer field
+        // (surface-3 + hairline + 8px corners), painted by id — the old code
+        // found the CardView through parent.parent and only the second well
+        // had that nesting depth, so the first one rendered ember white
+        // next to a CDS cream one. Labels and hints are chrome type (sans,
+        // muted), the tip reads as body copy.
+        listOf(R.id.inputCard1, R.id.inputCard2).forEach { id ->
+            findViewById<View>(id)?.background =
+                io.agents.pokeclaw.ui.cds.CdsUi.input(this, cds)
+        }
+        io.agents.pokeclaw.ui.cds.CdsUi.styleChromeText(tvTip, cds, 12f)
+        io.agents.pokeclaw.ui.cds.CdsUi.styleChromeText(tvLabel1, cds, 12f)
+        io.agents.pokeclaw.ui.cds.CdsUi.styleChromeText(tvLabel2, cds, 12f)
+        findViewById<TextView>(R.id.tvLanConfigHint)?.let {
+            io.agents.pokeclaw.ui.cds.CdsUi.styleChromeText(it, cds, 11.5f)
+        }
         listOf(etInput1, etInput2).forEach {
             it.setTextColor(cds.textPrimary)
             it.setHintTextColor(cds.textMuted)
+            it.typeface = io.agents.pokeclaw.ui.cds.CdsUi.fontSans()
         }
-        (etInput1.parent.parent as? androidx.cardview.widget.CardView)?.apply {
-            setCardBackgroundColor(cds.surface3)
-            cardElevation = 0f
-        }
-        (etInput2.parent.parent as? androidx.cardview.widget.CardView)?.apply {
-            setCardBackgroundColor(cds.surface3)
-            cardElevation = 0f
-        }
+        findViewById<ImageView>(R.id.ivCopyAddress)?.setColorFilter(cds.textMuted)
         ivToggle.setColorFilter(cds.textMuted)
         findViewById<KButton>(R.id.btnSave).apply {
             setBgColor(cds.accent)
             setTextColor(cds.onAccent)
+            typeface = io.agents.pokeclaw.ui.cds.CdsUi.fontSans()
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
         }
 
         when (channelType) {
@@ -112,7 +117,7 @@ class ChannelConfigActivity : BaseActivity() {
                 tvTip.text = getString(R.string.channel_config_discord_tip)
                 tvLabel1.text = "Bot Token"
                 tvLabel2.visibility = View.GONE
-                (etInput2.parent.parent as View).visibility = View.GONE
+                findViewById<View>(R.id.inputCard2)?.visibility = View.GONE
                 etInput1.hint = getString(R.string.channel_config_discord_hint1)
                 etInput1.setText(KVUtils.getDiscordBotToken())
             }
@@ -120,7 +125,7 @@ class ChannelConfigActivity : BaseActivity() {
                 tvTip.text = getString(R.string.channel_config_telegram_tip)
                 tvLabel1.text = "Bot Token"
                 tvLabel2.visibility = View.GONE
-                (etInput2.parent.parent as View).visibility = View.GONE
+                findViewById<View>(R.id.inputCard2)?.visibility = View.GONE
                 etInput1.hint = getString(R.string.channel_config_telegram_hint1)
                 etInput1.setText(KVUtils.getTelegramBotToken())
             }
@@ -131,7 +136,7 @@ class ChannelConfigActivity : BaseActivity() {
                 etInput1.setText(KVUtils.getWechatApiBaseUrl())
                 tvLabel2.visibility = View.VISIBLE
                 tvLabel2.text = "Bot Token"
-                (etInput2.parent.parent as View).visibility = View.VISIBLE
+                findViewById<View>(R.id.inputCard2)?.visibility = View.VISIBLE
                 etInput2.hint = getString(R.string.channel_config_wechat_token_hint)
                 etInput2.setText(KVUtils.getWechatBotToken())
             }
@@ -142,7 +147,7 @@ class ChannelConfigActivity : BaseActivity() {
                 etInput1.setText(KVUtils.getQqWsUrl())
                 tvLabel2.visibility = View.VISIBLE
                 tvLabel2.text = getString(R.string.channel_config_qq_token_label)
-                (etInput2.parent.parent as View).visibility = View.VISIBLE
+                findViewById<View>(R.id.inputCard2)?.visibility = View.VISIBLE
                 etInput2.hint = getString(R.string.channel_config_qq_token_hint)
                 etInput2.setText(KVUtils.getQqBotToken())
             }
@@ -153,7 +158,7 @@ class ChannelConfigActivity : BaseActivity() {
                 etInput1.setText(KVUtils.getDouyinWebhookUrl())
                 tvLabel2.visibility = View.VISIBLE
                 tvLabel2.text = getString(R.string.channel_config_douyin_token_label)
-                (etInput2.parent.parent as View).visibility = View.VISIBLE
+                findViewById<View>(R.id.inputCard2)?.visibility = View.VISIBLE
                 etInput2.hint = getString(R.string.channel_config_douyin_token_hint)
                 etInput2.setText(KVUtils.getDouyinToken())
             }

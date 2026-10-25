@@ -210,12 +210,43 @@
   --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, "Noto Sans Mono CJK SC", monospace;
 }
 
-/* 高分屏发丝线补偿 */
+/* 高分屏发发线补偿 */
 @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 2dppx), (resolution >= 2x) {
   :root { --cds-ring-hairline: 0.5px; }
 }
 @media (-webkit-min-device-pixel-ratio: 3), (min-resolution: 3dppx), (resolution >= 3x) {
   :root { --cds-ring-hairline: calc(1px / 3); }
+}
+
+/* --------------------------------------------------------------------------
+   WebView 触控与焦点修正（真机必留）
+   --------------------------------------------------------------------------
+   两个问题只在 Android WebView 里出现，桌面 Chromium 完全看不到：
+
+   1. 点任何可点元素，过渡期间会闪一个**蓝色方框**。那是 WebView 默认的
+      -webkit-tap-highlight-color（蓝色半透明），不是我们的 focus 样式。
+      这里全局置透明 —— 按压反馈由 :active 的 background/scale 负责，
+      每个控件都已经有。
+   2. 按钮被点击后会持焦，Chromium 默认焦点环（蓝色 outline）会一直挂在
+      上次点过的控件上。触屏设备上这是纯噪音，所以 outline 全部去掉；
+      键盘可达性由 rovingFocus（方向键）保留，Tab 流不受影响。
+      .search:focus 的 box-shadow 是唯一的显式焦点样式，保留。 */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+button:focus,
+.row-btn:focus,
+.pill:focus,
+.icon-btn:focus,
+.session:focus,
+.settings-row:focus,
+.pop-item:focus,
+.base-row:focus,
+.swatch-row:focus,
+.send:focus,
+.new-task:focus,
+.jump:focus {
+  outline: none;
 }
 
 /* --------------------------------------------------------------------------
@@ -875,7 +906,13 @@ body {
 .pop-wrap { position: relative; }
 .pop {
   position: absolute; bottom: calc(100% + 8px); left: 0;
+  /* 显式收拢 + 视口兜底。真机上 .pop 曾被拉到 590px 宽（pill 包含块只有
+     343px），右缘顶出屏幕：item 的 tag（「默认」/「跳过确认卡」）被裁，
+     文档还因此获得横向滚动——主界面能左右滑动。width: max-content 让收缩
+     行为确定，max-width 保证任何情况下都不出视口。 */
+  width: max-content;
   min-width: 216px;
+  max-width: calc(100vw - 32px);
   border-radius: var(--cds-panel-radius);
   background: var(--cds-surface-popover);
   box-shadow: var(--cds-shadow-popover);
@@ -904,8 +941,68 @@ body {
   color: var(--cds-text-secondary);
   font: inherit; font-size: 12.5px; cursor: pointer;
   transition: background-color 150ms var(--cds-ease-swift), color 150ms ease;
+  /* flex:none + nowrap：pill 是内容宽的胶囊。缺了这两条，窄屏幕上 flex
+     子项被压到内容宽以下，「努力 · 高」「本地模型」直接折行，一个字掉到
+     第二行 —— 真机上见的错行就在这里。 */
+  flex: none;
+  white-space: nowrap;
 }
+.pill .pill-label { white-space: nowrap; }
 .pill:hover { background: var(--cds-fill-ghost-hover); color: var(--cds-text-primary); }
+
+/* ==========================================================================
+   分段控件（SegmentedControl）
+   --------------------------------------------------------------------------
+   抄参考项目的圆角胶囊：轨道是 alpha 填充，选中块是 surface-2 浮层，
+   文字 600 加重。用于主题面板的深浅轴、输入区的努力档位与敏感操作策略 ——
+   凡是「几个互斥选项」都不再用死 pill 或无框文字。
+   ========================================================================== */
+.seg {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--cds-segmented-track);
+}
+.seg-opt {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 30px;
+  padding: 5px 10px;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12.5px;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--cds-text-secondary);
+  transition: background-color 150ms var(--cds-ease-swift), color 150ms ease;
+  white-space: nowrap;
+}
+.seg-opt:hover { color: var(--cds-text-primary); }
+.seg-opt[aria-checked="true"] {
+  background: var(--cds-segmented-thumb);
+  color: var(--cds-text-primary);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+[data-mode="dark"] .seg-opt[aria-checked="true"] {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+/* popover 里的选中项：左侧一个强调色小点，避免只靠背景色区分 */
+.pop-item[aria-checked="true"] { background: var(--cds-fill-ghost-selected); font-weight: 550; }
+.pop-item[aria-checked="true"]::before {
+  content: "";
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--cds-clay);
+  flex: none;
+}
 
 /* ==========================================================================
    跳至最新 + 限流退避条
@@ -958,8 +1055,24 @@ body {
    ========================================================================== */
 .theme-pop-wrap { position: relative; }
 
-/* 配色面板在侧边栏底部，需向上弹出（与输入区的模型切换器方向一致） */
-.theme-pop { left: auto; right: 0; bottom: calc(100% + 6px); }
+/* 配色面板在侧边栏底部，需向上弹出（与输入区的模型切换器方向一致）。
+   三个维度（深浅 / 底色 / 强调色）合在一个面板里，比侧栏行宽一些；
+   加 max-height + 滚动，矮屏幕上不会顶出视口。 */
+.theme-pop {
+  left: auto; right: 0; bottom: calc(100% + 6px);
+  width: 248px;
+  max-height: min(72vh, 520px);
+  overflow-y: auto;
+}
+
+/* 向上空间不够时翻转向下弹出（data-flip 由 cds.js 的 placePopover 实测设置）。
+   手机抽屉里主题行被 live 模式顶到靠近顶部（会话列表整段隐藏），向上弹
+   520px 必然高出视口——真机上「深浅 / 底色 / 前三个强调色」整段被裁在屏幕
+   外，只有最底四个强调色露得出来。翻转后自上而下展开，抽屉全高度容得下。 */
+.pop[data-flip="down"] {
+  bottom: auto;
+  top: calc(100% + 6px);
+}
 
 /* 底色色块：左深右浅三段，一眼看出这是「底色」而非「强调色」 */
 .base-row {
@@ -1122,30 +1235,25 @@ body {
 
 /* ============================================================ 真实模式收敛
    接上真实任务流之后，设计稿里这些元素**没有数据也没有行为**：会话列表、
-   搜索框、重命名与「更多」按钮、记忆库与技能管理入口、新建任务按钮。
-   留着它们等于承诺一个点不动的功能，所以藏掉。
+   搜索框、重命名与「更多」按钮、新建任务按钮。留着它们等于承诺一个点不动
+   的功能，所以藏掉。
 
    由 <html data-live="true"> 驱动 —— cds.js 在检测到 Kotlin 桥时设置该属性。
    纯浏览器打开设计稿时属性不存在，整套侧边栏照常显示，评审时看到的仍是
-   完整设计。用 CSS 而不是删元素，正是为了保住「一份 HTML 两种用途」。 */
-/* .sidebar-foot 里的记忆库 / 技能管理是死入口，但主题设置与「设置」行
-   是活的，所以用直接子选择器整体藏掉，再用 #themePickerBtn / #settingsBtn
-   单独顶回来。#themeToggle（深浅色）同理。 */
+   完整设计。用 CSS 而不是删元素，正是为了保住「一份 HTML 两种用途」。
+
+   侧边栏脚部只剩两个活入口：#themePickerBtn（主题，含深浅/底色/强调色
+   三个维度）与 #settingsBtn（设置面板）。旧的「深浅色」独立行和记忆库 /
+   技能管理快捷行已合并进这两个入口，相应规则一并移除。 */
 [data-live="true"] .sessions,
 [data-live="true"] .search,
 [data-live="true"] .new-task,
-[data-live="true"] #themeToggle,
 [data-live="true"] .sidebar-foot > .row-btn {
   display: none;
 }
 
 [data-live="true"] #themePickerBtn { display: flex; }
 [data-live="true"] #settingsBtn { display: flex; }
-/* 抽屉脚部的记忆库 / 技能管理行在真实模式下是活的：经
-   PokeClawChat.openSettingsPage 直达对应原生编辑页（设置内容外移，
-   不必进设置面板）。标签里的「· 128 条」示例计数由 enterLiveMode 抹掉。 */
-[data-live="true"] #memoryBtn,
-[data-live="true"] #skillsBtn { display: flex; }
 [data-live="true"] .sidebar-head { border-bottom: none; }
 
 /* 顶栏图标按钮（重命名 / 更多）在真实模式下没有任何行为，

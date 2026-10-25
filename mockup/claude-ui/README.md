@@ -65,6 +65,42 @@
 > `.settings-topbar` 化的返回栏。深浅跟随系统 night mode（与 live 模式同信号）。
 > 面板的「渠道接入」行同时修为直达完整设置页——`ChannelConfigActivity` 需要
 > per-channel extra，裸开会立即 finish（47 上的死行）。
+>
+> **同日晚间第四轮：设置分区化 + composer 两个档位键活化 + 主题三轴合并
+> （QA H32–H42，用户反馈七连）**。
+> - **面板四区九行直达分区页，「全部设置」层删除**：配置（模型与任务 / 渠道接入 /
+>   监听）、功能（工具 / MCP / 技能 / 记忆库）、外观（主题）、系统（关于）。
+>   原生 `SettingsActivity` 从七组平铺重写成纯导航枢纽；新分区页
+>   `ModelSettingsActivity` / `ChannelsActivity` / `MonitorActivity` /
+>   `ToolsActivity` / `AboutActivity`。侧边栏脚部的「记忆库」「技能管理」快捷行
+>   移入面板「功能」区——同一功能不在侧栏和设置里各挂一个入口。
+> - **「高努力」「允许操作」两个死 pill 变真档位**：努力档位换档器
+>   （低/中/高/最大 = 15/30/60/150 轮，`EffortLevel` → `AgentConfig.maxIterations`）
+>   与敏感操作策略（每次询问 / 自动允许 → `McpConfirmationCoordinator`）。
+>   KVUtils 是唯一事实源：`PokeClawChat.readTaskPrefs / setEffort / setAutoAllow`
+>   桥读写，localStorage 降级为无桥预览缓存。
+> - **主题三处入口合并为一套三轴**：侧边栏独立「深浅色」行删除，主题 popover 顶部
+>   加「深浅」分段控件（参考项目 `SegmentedControl` 形态，原生侧同形态的
+>   `widget/CdsSegmented.kt` 供主题页与模型与任务页共用）；原生主题页重写为
+>   深浅 × 底色 × 强调色。`readThemePrefs / writeThemePrefs` 桥 + onResume
+>   指纹比对推送（`syncPrefsToPage`）保证两边一致。
+> - **WebView 蓝框**：`* { -webkit-tap-highlight-color: transparent }` +
+>   全局 `:focus { outline: none }`（桌面 Chromium 看不到，一直漏到真机）。
+> - **popover 管理器**：模型 / 努力 / 策略 / 主题四个 popover 共用一套互斥开关
+>   （`registerPopover`），点外部或 Esc 全关——原来是各写一遍还会互相打架。
+>
+> **2026-10-25 第五轮：popover 定位实测 + 交互弹窗口径（QA H43–H48）**。
+> - **主题面板完整在屏**：`placePopover()` 在每次开合时实测——触发器上方放不下
+>   面板高度就翻转向下（`.pop[data-flip="down"]`），右缘出视口就贴回包含块右缘，
+>   resize 时重量。修前手机 live 模式（会话列表整段隐藏、主题行被顶到靠近顶部）
+>   向上弹 520px，前 12 行裁在屏幕外；composer 三个 popover 同管理器受益。
+> - **`.pop` 显式收拢**：`width: max-content` + `max-width: calc(100vw - 32px)`。
+>   真机上 auto 宽曾被拉到 590px（包含块只有 343px），item 的 tag 被裁、文档还
+>   获得横向滚动；根因未查明（桌面 Chromium 无此行为），兜底已验。
+> - **本页自身的弹窗口径**：设置弹层（`#settingsView`）仍是纯呈现——配置行为只在
+>   原生一处；原生侧全部编辑/确认弹窗（任务预算 / 提示词 / 渠道 / 配对 / QR 等）
+>   已收口到 `widget/CdsDialog.kt`（面板 + 衬线标题 + accent/danger 确认键 +
+>   单选行），删除的 `AlertDialog` / `InputDialog` / `ConfirmDialog` 不再有调用方。
 
 ## 来源
 
@@ -141,4 +177,5 @@ __cds.state()            // { pinned, showJump, backoff }
 ## 本地预览
 
 直接用浏览器打开 `index.html`（无需构建、无需服务器）。
-深浅色跟随系统，也可用左下角按钮切换。
+深浅色在侧边栏「主题」面板顶部切换（底色 / 强调色同面板）；纯浏览器预览下
+主题与两个档位存 localStorage，有 Kotlin 桥时（真机）以 MMKV 为唯一事实源。

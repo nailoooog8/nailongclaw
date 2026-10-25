@@ -3,10 +3,7 @@
 
 package io.agents.pokeclaw.ui.settings
 
-import android.graphics.Typeface
 import android.os.Bundle
-import android.widget.EditText
-import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import io.agents.pokeclaw.R
@@ -14,7 +11,8 @@ import io.agents.pokeclaw.agent.skill.SkillRegistry
 import io.agents.pokeclaw.agent.skill.ToolCallRecorder
 import io.agents.pokeclaw.agent.skill.UserSkillLoader
 import io.agents.pokeclaw.base.BaseActivity
-import io.agents.pokeclaw.widget.ConfirmDialog
+import io.agents.pokeclaw.ui.cds.CdsUi
+import io.agents.pokeclaw.widget.CdsDialog
 import io.agents.pokeclaw.widget.CommonToolbar
 import io.agents.pokeclaw.widget.MenuGroup
 import java.io.File
@@ -133,19 +131,22 @@ class UserSkillsActivity : BaseActivity() {
             text = "技能配方存于应用外部目录 /skills/（*.yaml），与 adb 推送方式兼容，重启后自动加载。\n" +
                 "点击配方可查看/编辑 YAML，长按删除。\n" +
                 "配方引用的工具须在工具注册表中（mcp_* 远程工具允许后注册）。"
-            setTextColor(cds.textMuted)
-            setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11f)
+            CdsUi.styleChromeText(this, cds, 11f)
         }
     }
 
     private fun showDeleteDialog(file: File, title: String) {
-        ConfirmDialog.showWarm(
+        CdsDialog.show(
             context = this,
             title = "删除技能？",
-            message = "将删除 \"${file.name}\"（$title），下次启动不再加载。",
-            actionTitle = "删除",
-            cancelTitle = getString(R.string.common_cancel),
-            onAction = {
+            content = CdsDialog.message(
+                this,
+                "将删除 \"${file.name}\"（$title），下次启动不再加载。"
+            ),
+            confirmText = "删除",
+            cancelText = getString(R.string.common_cancel),
+            danger = true,
+            onConfirm = {
                 val ok = UserSkillLoader.delete(this, file)
                 if (!ok) Toast.makeText(this, "删除失败", Toast.LENGTH_SHORT).show()
                 reload()
@@ -155,80 +156,53 @@ class UserSkillsActivity : BaseActivity() {
 
     /** Create-from-capture: ask for id/name, then open the YAML editor prefilled. */
     private fun showCreateFromCaptureDialog(capture: ToolCallRecorder.Capture) {
-        val fieldColor = 0xFF333333.toInt()
-        val labelColor = 0xFF666666.toInt()
-
-        fun field(hint: String, preset: String): EditText {
-            return EditText(this).apply {
-                this.hint = hint
-                setText(preset)
-                setSingleLine(true)
-                setTextColor(fieldColor)
-                setHintTextColor(labelColor)
-            }
-        }
-
-        val layout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(48, 32, 48, 16)
-        }
-
-        fun label(text: String) {
-            layout.addView(TextView(this).apply {
-                this.text = text
-                setTextColor(fieldColor)
-                setTypeface(typeface, Typeface.BOLD)
-            })
-        }
+        // CDS dialog (CdsDialog): same frame as the page that opened it.
+        val layout = CdsDialog.column(this)
 
         val suggestedId = "captured_" + (System.currentTimeMillis() / 1000)
-        label("技能 ID（文件名，英文/数字/下划线）")
-        val idInput = field("my_skill", suggestedId)
+        layout.addView(CdsDialog.label(this, "技能 ID（文件名，英文/数字/下划线）"))
+        val idInput = CdsDialog.field(this, hint = "my_skill", preset = suggestedId)
         layout.addView(idInput)
 
-        label("\n技能名称")
-        val nameInput = field("我的技能", capture.task.take(20))
+        layout.addView(CdsDialog.label(this, "技能名称"))
+        val nameInput = CdsDialog.field(this, hint = "我的技能", preset = capture.task.take(20))
         layout.addView(nameInput)
 
-        label("\n描述（可留空）")
-        val descInput = field("", "")
+        layout.addView(CdsDialog.label(this, "描述（可留空）"))
+        val descInput = CdsDialog.field(this, hint = "", preset = "")
         layout.addView(descInput)
 
-        val dialog = android.app.AlertDialog.Builder(this)
-            .setTitle("从上次任务创建技能")
-            .setMessage("已捕获 ${capture.calls.size} 次工具调用（任务：${capture.task.take(60)}）")
-            .setView(layout)
-            // Validate on click, not in the builder callback: the builder
-            // callback runs after dismissal, so a rejected ID threw away the
-            // name and description the user had already typed.
-            .setPositiveButton("生成配方", null)
-            .setNegativeButton("取消", null)
-            .create()
-
-        dialog.setOnShowListener {
-            dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val id = idInput.text.toString().trim()
-                val name = nameInput.text.toString().trim()
-                if (id.isEmpty() || !id.matches(Regex("[a-zA-Z0-9_]+"))) {
-                    Toast.makeText(this, "ID 只能含英文/数字/下划线", Toast.LENGTH_SHORT).show()
-                    return@setOnClickListener
-                }
-                if (name.isEmpty()) {
-                    Toast.makeText(this, "名称不能为空", Toast.LENGTH_SHORT).show()
-                    return@setOnClickListener
-                }
-                val yaml = UserSkillLoader.captureToYaml(
-                    capture, id, name, descInput.text.toString().trim()
-                )
-                if (yaml.isEmpty()) {
-                    Toast.makeText(this, "捕获中没有可用的动作步骤（只截屏/finish 的任务无法成技能）", Toast.LENGTH_LONG).show()
-                    return@setOnClickListener
-                }
-                dialog.dismiss()
-                showEditor(id, yaml, isNew = true)
+        CdsDialog.show(
+            context = this,
+            title = "从上次任务创建技能",
+            content = layout,
+            confirmText = "生成配方",
+            cancelText = "取消",
+            dismissOnConfirm = false,
+            onConfirm = { handle ->
+            // Validate on click: a rejected ID in the builder callback fired
+            // after dismissal and discarded the name and description already typed.
+            val id = idInput.text.toString().trim()
+            val name = nameInput.text.toString().trim()
+            if (id.isEmpty() || !id.matches(Regex("[a-zA-Z0-9_]+"))) {
+                Toast.makeText(this, "ID 只能含英文/数字/下划线", Toast.LENGTH_SHORT).show()
+                return@show
             }
+            if (name.isEmpty()) {
+                Toast.makeText(this, "名称不能为空", Toast.LENGTH_SHORT).show()
+                return@show
+            }
+            val yaml = UserSkillLoader.captureToYaml(
+                capture, id, name, descInput.text.toString().trim()
+            )
+            if (yaml.isEmpty()) {
+                Toast.makeText(this, "捕获中没有可用的动作步骤（只截屏/finish 的任务无法成技能）", Toast.LENGTH_LONG).show()
+                return@show
+            }
+            handle.dismiss()
+            showEditor(id, yaml, isNew = true)
         }
-        dialog.show()
+    )
     }
 
     /** YAML editor: new file (null) / existing file / prefilled capture text. */
@@ -248,91 +222,68 @@ class UserSkillsActivity : BaseActivity() {
         isNew: Boolean,
         editingFile: File? = null
     ) {
-        val fieldColor = 0xFF333333.toInt()
-        val labelColor = 0xFF666666.toInt()
+        val layout = CdsDialog.column(this)
 
-        val layout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(48, 32, 48, 16)
-        }
-
-        layout.addView(TextView(this).apply {
-            text = "技能 ID"
-            setTextColor(fieldColor)
-            setTypeface(typeface, Typeface.BOLD)
-        })
-        val idInput = EditText(this).apply {
-            setText(presetId)
-            setSingleLine(true)
-            setTextColor(fieldColor)
-            setHintTextColor(labelColor)
+        layout.addView(CdsDialog.label(this, "技能 ID"))
+        val idInput = CdsDialog.field(this, hint = "", preset = presetId).apply {
             // Editing an existing file: id fixed to the filename
             isEnabled = isNew || editingFile == null
         }
         layout.addView(idInput)
 
-        layout.addView(TextView(this).apply {
-            text = "YAML 配方"
-            setTextColor(fieldColor)
-            setTypeface(typeface, Typeface.BOLD)
-        })
-        val yamlInput = EditText(this).apply {
-            setText(presetYaml)
-            setSingleLine(false)
+        layout.addView(CdsDialog.label(this, "YAML 配方"))
+        val yamlInput = CdsDialog.field(this, hint = "", preset = presetYaml, multiLine = true).apply {
             minLines = 8
             maxLines = 20
-            setTextColor(fieldColor)
-            setTypeface(Typeface.MONOSPACE)
+            typeface = CdsUi.fontMono()
             textSize = 12f
         }
         layout.addView(yamlInput)
 
-        val dialog = android.app.AlertDialog.Builder(this)
-            .setTitle(if (isNew) "保存技能配方" else "编辑配方")
-            .setView(layout)
+        CdsDialog.show(
+            context = this,
+            title = if (isNew) "保存技能配方" else "编辑配方",
+            content = layout,
+            confirmText = "保存",
+            cancelText = "取消",
+            dismissOnConfirm = false,
+            onConfirm = { handle ->
             // Validate on click: a YAML error in the builder callback fired
             // after dismissal and discarded the whole recipe the user typed.
-            .setPositiveButton("保存", null)
-            .setNegativeButton("取消", null)
-            .create()
-
-        dialog.setOnShowListener {
-            dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val id = idInput.text.toString().trim()
-                val yaml = yamlInput.text.toString()
-                if (id.isEmpty() || !id.matches(Regex("[a-zA-Z0-9_]+"))) {
-                    Toast.makeText(this, "ID 只能含英文/数字/下划线", Toast.LENGTH_SHORT).show()
-                    return@setOnClickListener
-                }
-                val parsed = try {
-                    UserSkillLoader.parse(yaml)
-                } catch (e: Exception) {
-                    null
-                }
-                if (parsed == null) {
-                    Toast.makeText(this, "YAML 解析失败或引用未知工具，未保存", Toast.LENGTH_LONG).show()
-                    return@setOnClickListener
-                }
-                if (parsed.id != id) {
-                    Toast.makeText(this, "YAML 里的 id（${parsed.id}）须与上方 ID 一致", Toast.LENGTH_LONG).show()
-                    return@setOnClickListener
-                }
-                // Renaming an existing file: remove the old one
-                if (editingFile != null && editingFile.name != "$id.yaml") {
-                    editingFile.delete()
-                }
-                val saved = UserSkillLoader.save(this, id, yaml)
-                if (saved == null) {
-                    Toast.makeText(this, "写入失败", Toast.LENGTH_SHORT).show()
-                    return@setOnClickListener
-                }
-                SkillRegistry.register(parsed)
-                Toast.makeText(this, "已保存并启用：${parsed.name}（${parsed.steps.size} 步）", Toast.LENGTH_SHORT).show()
-                dialog.dismiss()
-                reload()
+            val id = idInput.text.toString().trim()
+            val yaml = yamlInput.text.toString()
+            if (id.isEmpty() || !id.matches(Regex("[a-zA-Z0-9_]+"))) {
+                Toast.makeText(this, "ID 只能含英文/数字/下划线", Toast.LENGTH_SHORT).show()
+                return@show
             }
+            val parsed = try {
+                UserSkillLoader.parse(yaml)
+            } catch (e: Exception) {
+                null
+            }
+            if (parsed == null) {
+                Toast.makeText(this, "YAML 解析失败或引用未知工具，未保存", Toast.LENGTH_LONG).show()
+                return@show
+            }
+            if (parsed.id != id) {
+                Toast.makeText(this, "YAML 里的 id（${parsed.id}）须与上方 ID 一致", Toast.LENGTH_LONG).show()
+                return@show
+            }
+            // Renaming an existing file: remove the old one
+            if (editingFile != null && editingFile.name != "$id.yaml") {
+                editingFile.delete()
+            }
+            val saved = UserSkillLoader.save(this, id, yaml)
+            if (saved == null) {
+                Toast.makeText(this, "写入失败", Toast.LENGTH_SHORT).show()
+                return@show
+            }
+            SkillRegistry.register(parsed)
+            Toast.makeText(this, "已保存并启用：${parsed.name}（${parsed.steps.size} 步）", Toast.LENGTH_SHORT).show()
+            handle.dismiss()
+            reload()
         }
-        dialog.show()
+    )
     }
 
     private companion object {

@@ -90,6 +90,18 @@ object McpConfirmationCoordinator {
     @Volatile
     private var surface: Surface? = null
 
+    /**
+     * Whether the user turned on 自动允许 (模型与任务 settings). When true,
+     * [awaitDecision] never parks the agent thread and never shows a card —
+     * every MCP call runs immediately.
+     *
+     * A provider rather than a direct KVUtils read, for the same reason
+     * [io.agents.pokeclaw.tool.ToolRegistry.sourceChannelProvider] is one:
+     * this object stays constructible without an app instance, and the default
+     * is the fail-closed one (ask).
+     */
+    var autoAllowProvider: () -> Boolean = { false }
+
     private val lock = Any()
 
     @Volatile
@@ -128,6 +140,13 @@ object McpConfirmationCoordinator {
         request: McpConfirmationRequest,
         timeoutMs: Long = DEFAULT_CONFIRM_TIMEOUT_MS,
     ): McpConfirmationGate.Verdict {
+        // 自动允许：用户显式关掉了逐次确认。在任何状态判断之前生效 ——
+        // 后台、无界面、忙碌都不该让一个「不再询问」的策略突然变成拒绝。
+        if (autoAllowProvider()) {
+            XLog.e(TAG, "[mcpConfirm] auto-allow on: '${request.toolName}' runs without asking")
+            return verdictFor(McpConfirmationGate.Outcome.AUTO_ALLOWED, request, timeoutMs)
+        }
+
         val current = surface
         val outcome = try {
             gate.request(

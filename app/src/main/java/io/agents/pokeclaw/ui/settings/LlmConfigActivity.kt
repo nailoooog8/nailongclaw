@@ -5,36 +5,45 @@ package io.agents.pokeclaw.ui.settings
 
 import android.graphics.Rect
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.StateListDrawable
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ProgressBar
-import android.widget.RadioButton
-import android.widget.RadioGroup
-import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
-import androidx.cardview.widget.CardView
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import io.agents.pokeclaw.ClawApplication
 import io.agents.pokeclaw.R
-import io.agents.pokeclaw.agent.CloudModel
 import io.agents.pokeclaw.agent.CloudProvider
-import io.agents.pokeclaw.agent.ModelPricing
 import io.agents.pokeclaw.agent.llm.ActiveModelMode
 import io.agents.pokeclaw.agent.llm.LocalModelManager
 import io.agents.pokeclaw.agent.llm.ModelConfigRepository
 import io.agents.pokeclaw.base.BaseActivity
+import io.agents.pokeclaw.ui.cds.CdsUi
 import io.agents.pokeclaw.utils.KVUtils
 import io.agents.pokeclaw.widget.CommonToolbar
 import io.agents.pokeclaw.widget.KButton
 import java.util.concurrent.Executors
 import kotlin.math.max
 
+/**
+ * 模型选择 — the sheet's 模型与任务 landing spot.
+ *
+ * The page used to be colored like CDS (H31) but still typeset and wired in
+ * the ember language: CardView cards with stock shadows, plain-text action
+ * "buttons" (使用 / ↓ 下载 / a 🗑 emoji), English section headers next to the
+ * Chinese pages around it, and success/warning colors borrowed from the chat
+ * theme. This pass finishes the migration the way [MenuGroup.applyCds] did for
+ * the row pages: every surface is a `--cds-panel`, names are serif content
+ * text, meta is sans chrome text, actions are ghost pills, and statuses use
+ * the CDS palette (accent = ready, danger = error — the CDS has no amber, so
+ * the RAM warning stays muted and the ⚠ glyph carries the meaning).
+ */
 class LlmConfigActivity : BaseActivity() {
 
     private val executor = Executors.newSingleThreadExecutor()
@@ -42,20 +51,21 @@ class LlmConfigActivity : BaseActivity() {
     private var selectedProvider: CloudProvider = CloudProvider.OPENAI
     private var selectedModelId: String = ""
 
+    private val cds by lazy { CdsUi.palette(this) }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_llm_config)
 
         // CDS tokens: this page is the sheet's 模型与预算 row. The chat
         // ThemeManager (ember) stays with the chat surfaces only.
-        val cds = io.agents.pokeclaw.ui.cds.CdsUi.palette(this)
         window.decorView.setBackgroundColor(cds.surface1)
         val contentFrame = findViewById<android.view.ViewGroup>(android.R.id.content)
         contentFrame?.setBackgroundColor(cds.surface1)
         (contentFrame?.getChildAt(0) as? View)?.setBackgroundColor(cds.surface1)
 
         val toolbar = findViewById<CommonToolbar>(R.id.toolbar)
-        io.agents.pokeclaw.ui.cds.CdsUi.styleToolbar(this, toolbar, cds, "模型")
+        CdsUi.styleToolbar(this, toolbar, cds, "模型")
         toolbar.showBackButton(true) { finish() }
 
         // Include user's custom local model URL (#36) at the tail of the rendered list.
@@ -74,35 +84,51 @@ class LlmConfigActivity : BaseActivity() {
         val deviceSupport = LocalModelManager.deviceSupport(this)
         val catalog = LocalModelManager.catalog(this).associateBy { it.model.id }
 
-        // Active-model card text
-        activeModelName.setTextColor(cds.textPrimary)
-        activeModelMeta.setTextColor(cds.textMuted)
-        defaultLocalName.setTextColor(cds.textPrimary)
-        defaultLocalMeta.setTextColor(cds.textMuted)
-        defaultCloudName.setTextColor(cds.textPrimary)
-        defaultCloudMeta.setTextColor(cds.textMuted)
+        // ---- Panels: the three cards become --cds-panel (surface-2 + hairline
+        // + 10px radius, zero elevation — the flat sheet look). ----
+        listOf(R.id.activeCard, R.id.defaultsCard, R.id.cloudCard).forEach { id ->
+            findViewById<View>(id)?.background = cardBackground(cds.surface2)
+        }
+        findViewById<View>(R.id.dividerDefaults)?.setBackgroundColor(cds.border)
+        findViewById<TextView>(R.id.avatarActive)?.background = GradientDrawable().apply {
+            setColor(cds.surface3)
+            cornerRadius = dp(10f)
+            setStroke(dp(1), cds.border)
+        }
 
-        // Restyle every CardView + section header in the XML layout
+        // ---- Typography: section headers are the direct-child id-less
+        // TextViews of the scroll content; field labels carry ids now (the
+        // old size-based heuristic recolored emoji on some builds). ----
         val scrollContent = findViewById<LinearLayout>(R.id.layoutModelList)?.parent as? LinearLayout
-        if (scrollContent != null) {
-            // Nested caption/field labels ("Default local model", "API Key", …)
-            // are id-less TextViews at label sizes — recolor for dark mode but
-            // keep their metrics (the big emoji avatars are larger, so spared).
-            // Runs BEFORE the header pass so the direct-child group labels win.
-            styleNestedLabels(scrollContent, cds)
-            for (i in 0 until scrollContent.childCount) {
-                val child = scrollContent.getChildAt(i)
+        scrollContent?.let { root ->
+            for (i in 0 until root.childCount) {
+                val child = root.getChildAt(i)
                 if (child is TextView && child.id == View.NO_ID) {
-                    // Section headers ("Active Model", "Available Models", "Cloud LLM")
-                    io.agents.pokeclaw.ui.cds.CdsUi.styleGroupLabel(child, cds)
-                }
-                if (child is CardView) {
-                    child.setCardBackgroundColor(cds.surface2)
-                    child.cardElevation = 0f
+                    CdsUi.styleGroupLabel(child, cds)
                 }
             }
         }
-        findViewById<TextView>(R.id.tvCustomHint)?.setTextColor(cds.textMuted)
+        listOf(
+            R.id.labelDefaultLocal, R.id.labelDefaultCloud,
+            R.id.labelApiKey, R.id.labelBaseUrl, R.id.labelModelName,
+        ).forEach { id ->
+            findViewById<TextView>(id)?.let { CdsUi.styleChromeText(it, cds, 12f) }
+        }
+
+        // Active-model card text — serif names, sans meta.
+        CdsUi.styleContentText(activeModelName, cds, 15f, bold = true)
+        CdsUi.styleChromeText(activeModelMeta, cds, 12f)
+        activeModelStatus.typeface = CdsUi.fontSans()
+        activeModelStatus.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12f)
+        CdsUi.styleContentText(defaultLocalName, cds, 14f, bold = true)
+        CdsUi.styleChromeText(defaultLocalMeta, cds, 12f)
+        defaultLocalStatus.typeface = CdsUi.fontSans()
+        defaultLocalStatus.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12f)
+        CdsUi.styleContentText(defaultCloudName, cds, 14f, bold = true)
+        CdsUi.styleChromeText(defaultCloudMeta, cds, 12f)
+        defaultCloudStatus.typeface = CdsUi.fontSans()
+        defaultCloudStatus.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12f)
+        findViewById<TextView>(R.id.tvCustomHint)?.let { CdsUi.styleChromeText(it, cds, 11f) }
 
         // Active model — show what is ACTUALLY active based on provider
         if (resolvedConfig.activeMode == ActiveModelMode.LOCAL) {
@@ -110,13 +136,7 @@ class LlmConfigActivity : BaseActivity() {
             activeModelName.text = activeState.displayName
             activeModelMeta.text = activeState.metaText
             activeModelStatus.text = activeState.statusText
-            activeModelStatus.setTextColor(
-                when (activeState.statusKind) {
-                    LocalModelManager.StatusKind.READY -> getColor(R.color.colorSuccessPrimary)
-                    LocalModelManager.StatusKind.WARNING -> getColor(R.color.colorWarningPrimary)
-                    LocalModelManager.StatusKind.NEUTRAL -> cds.textMuted
-                }
-            )
+            activeModelStatus.setTextColor(statusColor(activeState.statusKind))
         } else {
             val cloudModel = resolvedConfig.activeCloud.modelName
             if (cloudModel.isNotEmpty()) {
@@ -124,7 +144,7 @@ class LlmConfigActivity : BaseActivity() {
                 val providerName = resolvedConfig.activeCloud.provider.displayName
                 activeModelMeta.text = "$providerName · 云端"
                 activeModelStatus.text = "● 已连接"
-                activeModelStatus.setTextColor(getColor(R.color.colorSuccessPrimary))
+                activeModelStatus.setTextColor(cds.accent)
             } else {
                 activeModelName.text = "未选择模型"
                 activeModelMeta.text = "在下方配置云端模型"
@@ -137,19 +157,13 @@ class LlmConfigActivity : BaseActivity() {
         defaultLocalName.text = defaultLocalState.displayName
         defaultLocalMeta.text = defaultLocalState.metaText
         defaultLocalStatus.text = defaultLocalState.statusText
-        defaultLocalStatus.setTextColor(
-            when (defaultLocalState.statusKind) {
-                LocalModelManager.StatusKind.READY -> getColor(R.color.colorSuccessPrimary)
-                LocalModelManager.StatusKind.WARNING -> getColor(R.color.colorWarningPrimary)
-                LocalModelManager.StatusKind.NEUTRAL -> cds.textMuted
-            }
-        )
+        defaultLocalStatus.setTextColor(statusColor(defaultLocalState.statusKind))
 
         if (resolvedConfig.defaultCloud.isConfigured) {
             defaultCloudName.text = resolvedConfig.defaultCloud.modelName
             defaultCloudMeta.text = "${resolvedConfig.defaultCloud.provider.displayName} · 云端"
             defaultCloudStatus.text = "● 就绪"
-            defaultCloudStatus.setTextColor(getColor(R.color.colorSuccessPrimary))
+            defaultCloudStatus.setTextColor(cds.accent)
         } else {
             defaultCloudName.text = "未设置默认云端模型"
             defaultCloudMeta.text = "在下方配置云端模型"
@@ -176,20 +190,15 @@ class LlmConfigActivity : BaseActivity() {
                 LocalModelManager.AvailabilitySource.MISSING -> null
             }
 
-            val card = CardView(this).apply {
+            val card = LinearLayout(this).apply {
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 ).apply { bottomMargin = dp(6) }
-                radius = dp(10).toFloat()
-                cardElevation = 0f
-                setCardBackgroundColor(cds.surface2)
-            }
-
-            val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
-                setPadding(dp(16), dp(14), dp(16), dp(14))
+                background = cardBackground(cds.surface2)
+                setPadding(dp(16), dp(12), dp(16), dp(12))
             }
 
             // Model info
@@ -198,147 +207,132 @@ class LlmConfigActivity : BaseActivity() {
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             }
 
-            val nameTV = TextView(this).apply {
+            info.addView(TextView(this).apply {
                 text = model.displayName
-                textSize = 14f
-                setTextColor(cds.textPrimary)
-                if (isActive) setTypeface(typeface, android.graphics.Typeface.BOLD)
+                CdsUi.styleContentText(this, cds, 14f, bold = isActive)
+            })
+
+            info.addView(TextView(this).apply {
+                val baseText = "${model.sizeBytes / 1_000_000} MB · 需 ${model.minRamGb}GB+ 内存"
+                text = if (supportedOnDevice) baseText else "$baseText · 本机 ${deviceSupport.deviceRamGb}GB"
+                CdsUi.styleChromeText(this, cds, 11.5f)
+                if (!supportedOnDevice) setTextColor(cds.textMuted)
+            })
+
+            card.addView(info)
+
+            // Actions — ghost pills instead of bare text and a 🗑 emoji.
+            val actions = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
             }
-            info.addView(nameTV)
 
-            val descTV = TextView(this).apply {
-                val baseText = "${model.sizeBytes / 1_000_000} MB · ${model.minRamGb}GB+ RAM"
-                text = if (supportedOnDevice) baseText else "$baseText · This phone reports ${deviceSupport.deviceRamGb}GB"
-                textSize = 12f
-                setTextColor(if (supportedOnDevice) cds.textMuted else getColor(R.color.colorWarningPrimary))
-            }
-            info.addView(descTV)
-
-            row.addView(info)
-
-            // Action button
             if (downloaded) {
                 if (isActive) {
-                    val check = TextView(this).apply {
-                        text = if (supportedOnDevice) "✓ Active" else "⚠ Active"
-                        textSize = 12f
-                        setTextColor(if (supportedOnDevice) getColor(R.color.colorSuccessPrimary) else getColor(R.color.colorWarningPrimary))
-                    }
-                    row.addView(check)
+                    actions.addView(TextView(this).apply {
+                        text = if (supportedOnDevice) "✓ 已启用" else "⚠ 已启用"
+                        typeface = CdsUi.fontSans()
+                        setTextColor(if (supportedOnDevice) cds.accent else cds.textMuted)
+                        setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12f)
+                        setPadding(dp(4), dp(6), dp(4), dp(6))
+                    })
                 } else {
                     if (isDefaultLocal) {
-                        row.addView(TextView(this).apply {
-                            text = "✓ 默认"
-                            textSize = 12f
-                            setTextColor(getColor(R.color.colorSuccessPrimary))
-                            setPadding(dp(12), dp(6), dp(12), dp(6))
+                        actions.addView(TextView(this).apply {
+                            text = "默认"
+                            typeface = CdsUi.fontSans()
+                            setTextColor(cds.textMuted)
+                            setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11.5f)
+                            setPadding(dp(4), dp(6), dp(8), dp(6))
                         })
                     }
                     if (supportedOnDevice) {
-                        val useBtn = TextView(this).apply {
-                            text = "使用"
-                            textSize = 13f
-                            setTextColor(cds.accent)
-                            setPadding(dp(12), dp(6), dp(12), dp(6))
-                            setOnClickListener {
-                                val path = resolvedLocalPath
-                                if (path != null) {
-                                    // Save as default local model (independent of cloud config)
-                                    // Only switch active provider if currently on local tab
-                                    val shouldActivateLocal = ModelConfigRepository.isLocalActive() || !KVUtils.hasDefaultCloudModel()
-                                    ModelConfigRepository.saveLocalDefault(path, model.id, shouldActivateLocal)
-                                    ClawApplication.appViewModelInstance.updateAgentConfig()
-                                    ClawApplication.appViewModelInstance.initAgent()
-                                    Toast.makeText(this@LlmConfigActivity, "设为默认本地模型：${model.displayName}", Toast.LENGTH_SHORT).show()
-                                    recreate()
-                                } else {
-                                    Toast.makeText(this@LlmConfigActivity, "模型文件不存在", Toast.LENGTH_SHORT).show()
-                                }
+                        actions.addView(ghostPill("使用", cds.accent) {
+                            val path = resolvedLocalPath
+                            if (path != null) {
+                                // Save as default local model (independent of cloud config)
+                                // Only switch active provider if currently on local tab
+                                val shouldActivateLocal = ModelConfigRepository.isLocalActive() || !KVUtils.hasDefaultCloudModel()
+                                ModelConfigRepository.saveLocalDefault(path, model.id, shouldActivateLocal)
+                                ClawApplication.appViewModelInstance.updateAgentConfig()
+                                ClawApplication.appViewModelInstance.initAgent()
+                                Toast.makeText(this@LlmConfigActivity, "设为默认本地模型：${model.displayName}", Toast.LENGTH_SHORT).show()
+                                recreate()
+                            } else {
+                                Toast.makeText(this@LlmConfigActivity, "模型文件不存在", Toast.LENGTH_SHORT).show()
                             }
-                        }
-                        row.addView(useBtn)
+                        })
                     } else {
-                        row.addView(TextView(this).apply {
-                            text = "需要 ${model.minRamGb}GB+ 内存"
-                            textSize = 12f
-                            setTextColor(getColor(R.color.colorWarningPrimary))
-                            setPadding(dp(12), dp(6), dp(12), dp(6))
+                        actions.addView(TextView(this).apply {
+                            text = "需 ${model.minRamGb}GB+ 内存"
+                            typeface = CdsUi.fontSans()
+                            setTextColor(cds.textMuted)
+                            setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11.5f)
+                            setPadding(dp(4), dp(6), dp(4), dp(6))
                         })
                     }
 
                     if (availability.source == LocalModelManager.AvailabilitySource.MANAGED_DOWNLOAD) {
-                        val delBtn = TextView(this).apply {
-                            text = "🗑"
-                            textSize = 16f
-                            setPadding(dp(8), dp(4), dp(4), dp(4))
-                            alpha = 0.4f
-                            setOnClickListener {
-                                LocalModelManager.deleteModel(this@LlmConfigActivity, model)
-                                Toast.makeText(this@LlmConfigActivity, "已删除 ${model.displayName}", Toast.LENGTH_SHORT).show()
-                                recreate()
-                            }
-                        }
-                        row.addView(delBtn)
+                        actions.addView(ghostPill("删除", cds.textMuted) {
+                            LocalModelManager.deleteModel(this@LlmConfigActivity, model)
+                            Toast.makeText(this@LlmConfigActivity, "已删除 ${model.displayName}", Toast.LENGTH_SHORT).show()
+                            recreate()
+                        })
                     }
                 }
             } else {
                 if (supportedOnDevice) {
-                    val dlBtn = TextView(this).apply {
-                        text = "↓ 下载"
-                        textSize = 13f
-                        setTextColor(cds.accent)
-                        setPadding(dp(12), dp(6), dp(12), dp(6))
-                        setOnClickListener {
-                            if (isDownloading) {
-                                Toast.makeText(this@LlmConfigActivity, "已在下载中", Toast.LENGTH_SHORT).show()
-                                return@setOnClickListener
-                            }
-                            isDownloading = true
-                            text = "下载中…"
-                            isEnabled = false
+                    val dlBtn = ghostPill("↓ 下载", cds.accent) {
+                        if (isDownloading) {
+                            Toast.makeText(this@LlmConfigActivity, "已在下载中", Toast.LENGTH_SHORT).show()
+                            return@ghostPill
+                        }
+                        isDownloading = true
+                        text = "下载中…"
+                        isEnabled = false
 
-                            executor.submit {
-                                LocalModelManager.downloadModel(this@LlmConfigActivity, model, object : LocalModelManager.DownloadCallback {
-                                    override fun onProgress(bytesDownloaded: Long, totalBytes: Long, bytesPerSecond: Long) {
-                                        val pct = if (totalBytes > 0) (bytesDownloaded * 100 / totalBytes).toInt() else 0
-                                        runOnUiThread { text = "$pct%" }
+                        executor.submit {
+                            LocalModelManager.downloadModel(this@LlmConfigActivity, model, object : LocalModelManager.DownloadCallback {
+                                override fun onProgress(bytesDownloaded: Long, totalBytes: Long, bytesPerSecond: Long) {
+                                    val pct = if (totalBytes > 0) (bytesDownloaded * 100 / totalBytes).toInt() else 0
+                                    runOnUiThread { text = "$pct%" }
+                                }
+                                override fun onComplete(modelPath: String) {
+                                    runOnUiThread {
+                                        ModelConfigRepository.saveLocalDefault(
+                                            modelPath = modelPath,
+                                            modelId = model.id,
+                                            activateNow = false
+                                        )
+                                        isDownloading = false
+                                        Toast.makeText(this@LlmConfigActivity, "已下载", Toast.LENGTH_SHORT).show()
+                                        recreate()
                                     }
-                                    override fun onComplete(modelPath: String) {
-                                        runOnUiThread {
-                                            ModelConfigRepository.saveLocalDefault(
-                                                modelPath = modelPath,
-                                                modelId = model.id,
-                                                activateNow = false
-                                            )
-                                            isDownloading = false
-                                            Toast.makeText(this@LlmConfigActivity, "已下载", Toast.LENGTH_SHORT).show()
-                                            recreate()
-                                        }
+                                }
+                                override fun onError(error: String) {
+                                    runOnUiThread {
+                                        isDownloading = false
+                                        text = "↓ 下载"
+                                        isEnabled = true
+                                        Toast.makeText(this@LlmConfigActivity, error, Toast.LENGTH_LONG).show()
                                     }
-                                    override fun onError(error: String) {
-                                        runOnUiThread {
-                                            isDownloading = false
-                                            text = "↓ 下载"
-                                            isEnabled = true
-                                            Toast.makeText(this@LlmConfigActivity, error, Toast.LENGTH_LONG).show()
-                                        }
-                                    }
-                                })
-                            }
+                                }
+                            })
                         }
                     }
-                    row.addView(dlBtn)
+                    actions.addView(dlBtn)
                 } else {
-                    row.addView(TextView(this).apply {
-                        text = "需要 ${model.minRamGb}GB+ 内存"
-                        textSize = 12f
-                        setTextColor(getColor(R.color.colorWarningPrimary))
-                        setPadding(dp(12), dp(6), dp(12), dp(6))
+                    actions.addView(TextView(this).apply {
+                        text = "需 ${model.minRamGb}GB+ 内存"
+                        typeface = CdsUi.fontSans()
+                        setTextColor(cds.textMuted)
+                        setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11.5f)
+                        setPadding(dp(4), dp(6), dp(4), dp(6))
                     })
                 }
             }
 
-            card.addView(row)
+            card.addView(actions)
             modelList.addView(card)
         }
 
@@ -349,16 +343,57 @@ class LlmConfigActivity : BaseActivity() {
         setupCloudLlm(cds)
     }
 
-    /** Recolors id-less label TextViews (≤14sp) anywhere under `root`. */
-    private fun styleNestedLabels(root: android.view.ViewGroup, cds: io.agents.pokeclaw.ui.cds.CdsUi.Palette) {
-        for (i in 0 until root.childCount) {
-            val child = root.getChildAt(i)
-            if (child is TextView && child.id == View.NO_ID && child.textSize <= dp(14)) {
-                child.setTextColor(cds.textSecondary)
-            }
-            if (child is android.view.ViewGroup) styleNestedLabels(child, cds)
+    /** `--cds-panel`: surface fill, 1px hairline, 10px radius, no elevation. */
+    private fun cardBackground(fill: Int): GradientDrawable =
+        GradientDrawable().apply {
+            setColor(fill)
+            cornerRadius = dp(10f)
+            setStroke(dp(1), cds.border)
         }
-    }
+
+    /**
+     * Status ink from the CDS palette: accent for ready (`--cds-fill-brand`),
+     * muted for neutral, danger for error. The palette has no amber — the RAM
+     * warning keeps the ⚠ glyph and reads as muted instead of borrowing the
+     * chat theme's warning color.
+     */
+    private fun statusColor(kind: LocalModelManager.StatusKind): Int =
+        when (kind) {
+            LocalModelManager.StatusKind.READY -> cds.accent
+            LocalModelManager.StatusKind.WARNING -> cds.textMuted
+            LocalModelManager.StatusKind.NEUTRAL -> cds.textMuted
+        }
+
+    /**
+     * The mockup's `.pill`: content-width capsule, hairline border, sans
+     * 12.5sp label, 5%-ink press. Row actions on the model cards use it so
+     * 使用 / 下载 / 删除 read as buttons instead of bare text.
+     */
+    private fun ghostPill(text: String, color: Int, onClick: (TextView.() -> Unit)? = null): TextView =
+        TextView(this).apply {
+            this.text = text
+            typeface = CdsUi.fontSans()
+            setTextColor(color)
+            setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12.5f)
+            setPadding(dp(12), dp(6), dp(12), dp(6))
+            isClickable = true
+            isFocusable = true
+            val normal = GradientDrawable().apply {
+                cornerRadius = dp(16f)
+                setStroke(dp(1), cds.border)
+                setColor(0x00000000)
+            }
+            val pressed = GradientDrawable().apply {
+                cornerRadius = dp(16f)
+                setStroke(dp(1), cds.border)
+                setColor(cds.ghostHover)
+            }
+            background = StateListDrawable().apply {
+                addState(intArrayOf(android.R.attr.state_pressed), pressed)
+                addState(intArrayOf(), normal)
+            }
+            setOnClickListener { onClick?.invoke(this) }
+        }
 
     private fun updateStorageInfo() {
         val models = LocalModelManager.AVAILABLE_MODELS + listOfNotNull(LocalModelManager.customModel())
@@ -379,7 +414,7 @@ class LlmConfigActivity : BaseActivity() {
         findViewById<TextView>(R.id.tvStorageDetail).text = "已用 ${mbUsed} MB / 配额 ${allocated} MB"
     }
 
-    private fun setupCloudLlm(cds: io.agents.pokeclaw.ui.cds.CdsUi.Palette) {
+    private fun setupCloudLlm(cds: CdsUi.Palette) {
         val tabLayout = findViewById<LinearLayout>(R.id.layoutProviderTabs)
         val modelListLayout = findViewById<LinearLayout>(R.id.layoutCloudModels)
         val layoutBaseUrl = findViewById<View>(R.id.layoutBaseUrl)
@@ -391,7 +426,7 @@ class LlmConfigActivity : BaseActivity() {
         val btnTest = findViewById<TextView>(R.id.btnTestConnection)
         val btnSave = findViewById<KButton>(R.id.btnSaveCloud)
         val btnClear = findViewById<TextView>(R.id.btnClearApiKey)
-        val scrollView = findViewById<ScrollView>(R.id.scrollContent)
+        val scrollView = findViewById<android.widget.ScrollView>(R.id.scrollContent)
         val configSnapshot = ModelConfigRepository.snapshot()
         val cloudSeed = configSnapshot.defaultCloud.let {
             if (it.modelName.isNotEmpty() || it.apiKey.isNotEmpty() || it.baseUrl.isNotEmpty()) it else configSnapshot.activeCloud
@@ -401,14 +436,36 @@ class LlmConfigActivity : BaseActivity() {
 
         // CDS input treatment on the credential fields
         listOf(etApiKey, etBaseUrl, etModelName).forEach {
-            io.agents.pokeclaw.ui.cds.CdsUi.styleEditText(it, cds)
+            CdsUi.styleEditText(it, cds)
         }
-        tvStatus?.setTextColor(cds.textMuted)
-        btnTest?.setTextColor(cds.accent)
-        btnClear?.setTextColor(cds.textMuted)
+        tvStatus?.typeface = CdsUi.fontSans()
+        tvStatus?.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12f)
+        btnClear.typeface = CdsUi.fontSans()
+        btnClear.setTextColor(cds.danger)
         btnSave?.apply {
             setBgColor(cds.accent)
             setTextColor(cds.onAccent)
+            typeface = CdsUi.fontSans()
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+        }
+
+        // Test connection — ghost pill at button height.
+        btnTest.typeface = CdsUi.fontSans()
+        btnTest.setTextColor(cds.accent)
+        btnTest.gravity = Gravity.CENTER
+        val testNormal = GradientDrawable().apply {
+            cornerRadius = dp(16f)
+            setStroke(dp(1), cds.border)
+            setColor(0x00000000)
+        }
+        val testPressed = GradientDrawable().apply {
+            cornerRadius = dp(16f)
+            setStroke(dp(1), cds.border)
+            setColor(cds.ghostHover)
+        }
+        btnTest.background = StateListDrawable().apply {
+            addState(intArrayOf(android.R.attr.state_pressed), testPressed)
+            addState(intArrayOf(), testNormal)
         }
 
         // Clear API key button
@@ -424,11 +481,19 @@ class LlmConfigActivity : BaseActivity() {
         selectedModelId = cloudSeed.modelName
         etApiKey.setText(cloudSeed.apiKey)
 
+        // The tab strip is the CDS segmented track (alpha ink); the selected
+        // tab is a surface-2 thumb — same tokens as CdsSegmented.
+        tabLayout.background = GradientDrawable().apply {
+            cornerRadius = dp(20f)
+            setColor(cds.ghostHover)
+        }
+
         // Build provider tabs
         val tabViews = mutableMapOf<CloudProvider, TextView>()
         CloudProvider.entries.forEach { provider ->
             val tab = TextView(this).apply {
                 text = provider.displayName
+                typeface = CdsUi.fontSans()
                 textSize = 13f
                 setPadding(dp(14), dp(6), dp(14), dp(6))
                 gravity = Gravity.CENTER
@@ -445,12 +510,11 @@ class LlmConfigActivity : BaseActivity() {
         fun updateTabStyles() {
             tabViews.forEach { (provider, tab) ->
                 if (provider == selectedProvider) {
-                    // Selected tab = CDS fill-secondary ghost pill with primary text
                     tab.setTextColor(cds.textPrimary)
                     tab.setTypeface(tab.typeface, android.graphics.Typeface.BOLD)
                     tab.background = GradientDrawable().apply {
-                        cornerRadius = dp(16).toFloat()
-                        setColor(cds.fillSecondary)
+                        cornerRadius = dp(16f)
+                        setColor(cds.surface2)
                     }
                 } else {
                     tab.setTextColor(cds.textMuted)
@@ -475,36 +539,39 @@ class LlmConfigActivity : BaseActivity() {
 
             selectedProvider.models.forEach { model ->
                 val isSelected = model.id == selectedModelId
-                val card = CardView(this).apply {
+                val card = LinearLayout(this).apply {
                     layoutParams = LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT
                     ).apply { bottomMargin = dp(6) }
-                    radius = dp(10).toFloat()
-                    cardElevation = 0f
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
                     // Selected card carries the accent-subtle wash (the CDS
                     // selected-state tint), unselected ones stay surface-2.
-                    setCardBackgroundColor(if (isSelected) cds.accentSubtle else cds.surface2)
+                    background = cardBackground(if (isSelected) cds.accentSubtle else cds.surface2)
+                    setPadding(dp(14), dp(12), dp(14), dp(12))
                     setOnClickListener {
                         selectedModelId = model.id
                         renderModels()
                     }
                 }
 
-                val row = LinearLayout(this).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    gravity = Gravity.CENTER_VERTICAL
-                    setPadding(dp(14), dp(12), dp(14), dp(12))
-                }
-
-                // Radio dot
-                val dot = TextView(this).apply {
-                    text = if (isSelected) "◉" else "○"
-                    textSize = 16f
-                    setTextColor(if (isSelected) cds.accent else cds.textMuted)
-                    setPadding(0, 0, dp(10), 0)
-                }
-                row.addView(dot)
+                // Radio dot — drawn, not a ◉/○ glyph (font-dependent).
+                card.addView(android.view.View(this).apply {
+                    val d = dp(14)
+                    layoutParams = LinearLayout.LayoutParams(d, d).apply {
+                        marginEnd = dp(10)
+                    }
+                    background = GradientDrawable().apply {
+                        shape = GradientDrawable.OVAL
+                        if (isSelected) {
+                            setColor(cds.accent)
+                        } else {
+                            setStroke(dp(1), cds.borderStrong)
+                            setColor(0x00000000)
+                        }
+                    }
+                })
 
                 // Model info
                 val info = LinearLayout(this).apply {
@@ -517,9 +584,7 @@ class LlmConfigActivity : BaseActivity() {
                 }
                 nameRow.addView(TextView(this).apply {
                     text = model.displayName
-                    textSize = 14f
-                    setTextColor(cds.textPrimary)
-                    if (isSelected) setTypeface(typeface, android.graphics.Typeface.BOLD)
+                    CdsUi.styleContentText(this, cds, 14f, bold = isSelected)
                 })
                 // Recommended badge
                 if (model.recommended) {
@@ -532,13 +597,11 @@ class LlmConfigActivity : BaseActivity() {
 
                 // Price + tier
                 info.addView(TextView(this).apply {
-                    text = "${model.tier.stars} ${model.tier.label} · \$${model.inputPricePerM} / \$${model.outputPricePerM} / 每百万 tokens"
-                    textSize = 11f
-                    setTextColor(cds.textMuted)
+                    text = "${model.tier.stars} ${model.tier.label} · \$${model.inputPricePerM} / \$${model.outputPricePerM} / 每百万 token"
+                    CdsUi.styleChromeText(this, cds, 11f)
                 })
-                row.addView(info)
+                card.addView(info)
 
-                card.addView(row)
                 modelListLayout.addView(card)
             }
         }
@@ -585,12 +648,12 @@ class LlmConfigActivity : BaseActivity() {
                     if (modelId.isEmpty()) throw RuntimeException("未选择模型")
                     runOnUiThread {
                         tvStatus.text = "✓ 可以保存"
-                        tvStatus.setTextColor(getColor(R.color.colorSuccessPrimary))
+                        tvStatus.setTextColor(cds.accent)
                     }
                 } catch (e: Exception) {
                     runOnUiThread {
                         tvStatus.text = "✗ ${e.message}"
-                        tvStatus.setTextColor(getColor(R.color.colorErrorPrimary))
+                        tvStatus.setTextColor(cds.danger)
                     }
                 }
             }
@@ -636,7 +699,7 @@ class LlmConfigActivity : BaseActivity() {
      * `adjustResize` alone is not reliable here because the ScrollView content
      * still needs extra bottom inset + explicit scroll after the keyboard opens.
      */
-    private fun installKeyboardAwareScrolling(scrollView: ScrollView, fields: List<EditText>) {
+    private fun installKeyboardAwareScrolling(scrollView: android.widget.ScrollView, fields: List<EditText>) {
         val baseBottomPadding = scrollView.paddingBottom
 
         val focusListener = View.OnFocusChangeListener { view, hasFocus ->
@@ -662,7 +725,7 @@ class LlmConfigActivity : BaseActivity() {
         ViewCompat.requestApplyInsets(scrollView)
     }
 
-    private fun scrollFieldIntoView(scrollView: ScrollView, field: View) {
+    private fun scrollFieldIntoView(scrollView: android.widget.ScrollView, field: View) {
         val rect = Rect()
         field.getDrawingRect(rect)
         scrollView.offsetDescendantRectToMyCoords(field, rect)
@@ -677,10 +740,12 @@ class LlmConfigActivity : BaseActivity() {
             }
             rect.bottom > visibleBottom -> {
                 val targetScroll = scrollView.scrollY + (rect.bottom - visibleBottom) + margin
-                scrollView.smoothScrollTo(0, targetScroll.coerceAtLeast(0))
+                scrollView.smoothScrollTo(0, targetScroll)
             }
         }
     }
 
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
+
+    private fun dp(v: Float): Float = v * resources.displayMetrics.density
 }

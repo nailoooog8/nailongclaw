@@ -127,17 +127,23 @@ class TaskBudget(
 
         fun getMaxCost(): Double = getConfiguredMaxCost() ?: UNLIMITED_COST_USD
 
+        /**
+         * One-line summary for the settings row and the post-save toast.
+         * Chinese to match the page it renders on — the row used to read
+         * "50.0K / no $ cap" next to Chinese labels, which is the kind of
+         * mixed-language leftover this surface is meant to be free of.
+         */
         fun describeCurrentBudget(): String {
             val tokenLimit = getConfiguredMaxTokens()
             val costLimit = getConfiguredMaxCost()
             return when {
-                tokenLimit == null && costLimit == null -> "Unlimited"
+                tokenLimit == null && costLimit == null -> "不设上限"
                 tokenLimit != null && costLimit != null ->
                     "${ModelPricing.formatTokens(tokenLimit)} / ${String.format("$%.2f", costLimit)}"
                 tokenLimit != null ->
-                    "${ModelPricing.formatTokens(tokenLimit)} / no $ cap"
+                    "${ModelPricing.formatTokens(tokenLimit)} / 成本不限"
                 else ->
-                    "Unlimited / ${String.format("$%.2f", costLimit)}"
+                    "token 不限 / ${String.format("$%.2f", costLimit)}"
             }
         }
 

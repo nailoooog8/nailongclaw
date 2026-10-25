@@ -3,10 +3,8 @@
 
 package io.agents.pokeclaw.ui.settings
 
-import android.graphics.Typeface
 import android.os.Bundle
 import android.widget.CheckBox
-import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -18,7 +16,8 @@ import io.agents.pokeclaw.agent.mcp.McpAuthType
 import io.agents.pokeclaw.agent.mcp.McpConnectionManager
 import io.agents.pokeclaw.agent.mcp.McpServerConfig
 import io.agents.pokeclaw.base.BaseActivity
-import io.agents.pokeclaw.widget.ConfirmDialog
+import io.agents.pokeclaw.ui.cds.CdsUi
+import io.agents.pokeclaw.widget.CdsDialog
 import io.agents.pokeclaw.widget.CommonToolbar
 import io.agents.pokeclaw.widget.MenuGroup
 import kotlinx.coroutines.launch
@@ -60,8 +59,7 @@ class McpServersActivity : BaseActivity() {
             text = "配置存储于 mcp_servers.json（应用外部目录），与 adb 推送方式兼容。\n" +
                 "鉴权 Header 值以 enc:v1: 开头的密文保存，请在应用内填写。\n" +
                 "点击服务器编辑，长按删除。"
-            setTextColor(cds.textMuted)
-            setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11f)
+            CdsUi.styleChromeText(this, cds, 11f)
         }
 
         lifecycleScope.launch {
@@ -138,13 +136,17 @@ class McpServersActivity : BaseActivity() {
     }
 
     private fun showDeleteDialog(config: McpServerConfig) {
-        ConfirmDialog.showWarm(
+        CdsDialog.show(
             context = this,
             title = "删除 MCP 服务器？",
-            message = "将移除 \"${config.name}\" 的配置，并从工具注册表中注销其全部远程工具。",
-            actionTitle = "删除",
-            cancelTitle = getString(R.string.common_cancel),
-            onAction = {
+            content = CdsDialog.message(
+                this,
+                "将移除 \"${config.name}\" 的配置，并从工具注册表中注销其全部远程工具。"
+            ),
+            confirmText = "删除",
+            cancelText = getString(R.string.common_cancel),
+            danger = true,
+            onConfirm = {
                 val updated = configs.filterNot { it.name == config.name }
                 McpConnectionManager.saveConfigs(this, updated)
                 McpConnectionManager.removeServer(this, config)
@@ -155,46 +157,25 @@ class McpServersActivity : BaseActivity() {
     }
 
     private fun showEditDialog(existing: McpServerConfig?) {
-        // System AlertDialog is light-themed: use fixed dark text, not theme colors
-        val fieldColor = 0xFF333333.toInt()
-        val labelColor = 0xFF666666.toInt()
-
-        fun field(hint: String, preset: String?, singleLine: Boolean = true, password: Boolean = false): EditText {
-            return EditText(this).apply {
-                this.hint = hint
-                setText(preset ?: "")
-                setSingleLine(singleLine)
-                setTextColor(fieldColor)
-                setHintTextColor(labelColor)
-                if (password) {
-                    inputType = android.text.InputType.TYPE_CLASS_TEXT or
-                        android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
-                }
-            }
-        }
-
-        val layout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(48, 32, 48, 16)
-        }
+        // CDS dialog (CdsDialog) instead of a bare system AlertDialog: the
+        // frame rides the same tokens as the page that opened it. The old
+        // version hardcoded #333333 field text because the system dialog is
+        // light-themed — that hack is gone with the frame that needed it.
+        val layout = CdsDialog.column(this)
 
         fun label(text: String) {
-            layout.addView(TextView(this).apply {
-                this.text = text
-                setTextColor(fieldColor)
-                setTypeface(typeface, Typeface.BOLD)
-            })
+            layout.addView(CdsDialog.label(this, text))
         }
 
         label("名称（用于工具前缀 mcp_{名称}_…）")
-        val nameInput = field("my-server", existing?.name)
+        val nameInput = CdsDialog.field(this, "my-server", existing?.name)
         layout.addView(nameInput)
 
-        label("\nStreamable HTTP 端点")
-        val urlInput = field("https://example.com/mcp", existing?.url)
+        label("Streamable HTTP 端点")
+        val urlInput = CdsDialog.field(this, "https://example.com/mcp", existing?.url)
         layout.addView(urlInput)
 
-        label("\n鉴权方式")
+        label("鉴权方式")
         val authTypes = listOf(
             "无鉴权 (None)" to McpAuthType.NONE,
             "Bearer Token (推荐)" to McpAuthType.BEARER,
@@ -214,29 +195,21 @@ class McpServersActivity : BaseActivity() {
 
         val headerNameContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(0, 16, 0, 0)
+            setPadding(0, CdsUi.dp(context, 12), 0, 0)
         }
-        val headerNameLabel = TextView(this).apply {
-            text = "Header 名"
-            setTextColor(fieldColor)
-            setTypeface(typeface, Typeface.BOLD)
-        }
-        val headerNameInput = field("X-API-Key", existing?.headerName)
+        val headerNameLabel = CdsDialog.label(this, "Header 名")
+        val headerNameInput = CdsDialog.field(this, "X-API-Key", existing?.headerName)
         headerNameContainer.addView(headerNameLabel)
         headerNameContainer.addView(headerNameInput)
         layout.addView(headerNameContainer)
 
         val headerValueContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(0, 16, 0, 0)
+            setPadding(0, CdsUi.dp(context, 12), 0, 0)
         }
-        val headerValueLabel = TextView(this).apply {
-            text = "Token / 密钥"
-            setTextColor(fieldColor)
-            setTypeface(typeface, Typeface.BOLD)
-        }
+        val headerValueLabel = CdsDialog.label(this, "Token / 密钥")
         val initialDisplayCred = existing?.displayCredential() ?: ""
-        val headerValueInput = field("填入密钥", initialDisplayCred, password = true)
+        val headerValueInput = CdsDialog.field(this, "填入密钥", initialDisplayCred, password = true)
         headerValueContainer.addView(headerValueLabel)
         headerValueContainer.addView(headerValueInput)
         layout.addView(headerValueContainer)
@@ -281,87 +254,86 @@ class McpServersActivity : BaseActivity() {
         val enabledCheck = CheckBox(this).apply {
             text = "启用（保存后立即连接并发现工具）"
             isChecked = existing?.enabled ?: true
-            setTextColor(fieldColor)
-            setPadding(0, 16, 0, 0)
+            setTextColor(cds.textPrimary)
+            typeface = CdsUi.fontSans()
+            setPadding(0, CdsUi.dp(context, 12), 0, 0)
         }
         layout.addView(enabledCheck)
 
-        val dialog = android.app.AlertDialog.Builder(this)
-            .setTitle(if (existing == null) "添加 MCP 服务器" else "编辑 ${existing.name}")
-            .setView(layout)
-            .setPositiveButton("保存", null)
-            .setNegativeButton("取消", null)
-            .create()
+        val dialog = CdsDialog.show(
+            context = this,
+            title = if (existing == null) "添加 MCP 服务器" else "编辑 ${existing.name}",
+            content = layout,
+            confirmText = "保存",
+            cancelText = "取消",
+            dismissOnConfirm = false,
+            onConfirm = { handle ->
+            val name = nameInput.text.toString().trim()
+            val url = urlInput.text.toString().trim()
 
-        dialog.setOnShowListener {
-            dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val name = nameInput.text.toString().trim()
-                val url = urlInput.text.toString().trim()
-
-                val selectedType = authTypes.getOrNull(authSpinner.selectedItemPosition)?.second ?: McpAuthType.BEARER
-                val (headerName, headerValue) = when (selectedType) {
-                    McpAuthType.NONE -> null to null
-                    McpAuthType.BEARER -> {
-                        val raw = headerValueInput.text.toString().trim()
-                        if (raw.isEmpty()) null to null
-                        else {
-                            val formatted = if (raw.startsWith("Bearer ", ignoreCase = true)) raw else "Bearer $raw"
-                            "Authorization" to formatted
-                        }
-                    }
-                    McpAuthType.BASIC -> {
-                        val raw = headerValueInput.text.toString().trim()
-                        if (raw.isEmpty()) null to null
-                        else {
-                            val formatted = if (raw.startsWith("Basic ", ignoreCase = true)) raw else "Basic $raw"
-                            "Authorization" to formatted
-                        }
-                    }
-                    McpAuthType.CUSTOM -> {
-                        val hName = headerNameInput.text.toString().trim().ifEmpty { null }
-                        val hVal = headerValueInput.text.toString().trim().ifEmpty { null }
-                        hName to hVal
+            val selectedType = authTypes.getOrNull(authSpinner.selectedItemPosition)?.second ?: McpAuthType.BEARER
+            val (headerName, headerValue) = when (selectedType) {
+                McpAuthType.NONE -> null to null
+                McpAuthType.BEARER -> {
+                    val raw = headerValueInput.text.toString().trim()
+                    if (raw.isEmpty()) null to null
+                    else {
+                        val formatted = if (raw.startsWith("Bearer ", ignoreCase = true)) raw else "Bearer $raw"
+                        "Authorization" to formatted
                     }
                 }
-
-                if (name.isEmpty()) {
-                    Toast.makeText(this, "名称不能为空", Toast.LENGTH_SHORT).show()
-                    return@setOnClickListener
+                McpAuthType.BASIC -> {
+                    val raw = headerValueInput.text.toString().trim()
+                    if (raw.isEmpty()) null to null
+                    else {
+                        val formatted = if (raw.startsWith("Basic ", ignoreCase = true)) raw else "Basic $raw"
+                        "Authorization" to formatted
+                    }
                 }
-                val lower = url.lowercase()
-                if (!lower.startsWith("http://") && !lower.startsWith("https://")) {
-                    Toast.makeText(this, "URL 必须以 http:// 或 https:// 开头", Toast.LENGTH_LONG).show()
-                    return@setOnClickListener
+                McpAuthType.CUSTOM -> {
+                    val hName = headerNameInput.text.toString().trim().ifEmpty { null }
+                    val hVal = headerValueInput.text.toString().trim().ifEmpty { null }
+                    hName to hVal
                 }
-
-                val fresh = McpServerConfig(
-                    name = name,
-                    url = url,
-                    headerName = headerName,
-                    headerValue = headerValue,
-                    enabled = enabledCheck.isChecked
-                )
-                var updated = configs.filterNot { it.name == name } + fresh
-                if (existing != null && existing.name != name) {
-                    // Renamed: drop the entry under the old name too
-                    updated = updated.filterNot { it.name == existing.name }
-                }
-                if (!McpConnectionManager.saveConfigs(this, updated)) {
-                    Toast.makeText(this, "配置写入失败", Toast.LENGTH_SHORT).show()
-                    return@setOnClickListener
-                }
-                configs = updated
-                if (existing != null && existing.name != name) {
-                    // Unregister the old server, otherwise its mcp_<oldName>_* tools
-                    // stay registered and callable after the rename.
-                    McpConnectionManager.removeServer(this, existing)
-                }
-                McpConnectionManager.connectOne(this, fresh)
-                renderServerItems()
-                Toast.makeText(this, "已保存，正在连接 ${fresh.name}…", Toast.LENGTH_SHORT).show()
-                dialog.dismiss()
             }
+
+            if (name.isEmpty()) {
+                Toast.makeText(this, "名称不能为空", Toast.LENGTH_SHORT).show()
+                return@show
+            }
+            val lower = url.lowercase()
+            if (!lower.startsWith("http://") && !lower.startsWith("https://")) {
+                Toast.makeText(this, "URL 必须以 http:// 或 https:// 开头", Toast.LENGTH_LONG).show()
+                return@show
+            }
+
+            val fresh = McpServerConfig(
+                name = name,
+                url = url,
+                headerName = headerName,
+                headerValue = headerValue,
+                enabled = enabledCheck.isChecked
+            )
+            var updated = configs.filterNot { it.name == name } + fresh
+            if (existing != null && existing.name != name) {
+                // Renamed: drop the entry under the old name too
+                updated = updated.filterNot { it.name == existing.name }
+            }
+            if (!McpConnectionManager.saveConfigs(this, updated)) {
+                Toast.makeText(this, "配置写入失败", Toast.LENGTH_SHORT).show()
+                return@show
+            }
+            configs = updated
+            if (existing != null && existing.name != name) {
+                // Unregister the old server, otherwise its mcp_<oldName>_* tools
+                // stay registered and callable after the rename.
+                McpConnectionManager.removeServer(this, existing)
+            }
+            McpConnectionManager.connectOne(this, fresh)
+            renderServerItems()
+            Toast.makeText(this, "已保存，正在连接 ${fresh.name}…", Toast.LENGTH_SHORT).show()
+            handle.dismiss()
         }
-        dialog.show()
+    )
     }
 }

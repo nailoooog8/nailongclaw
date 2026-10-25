@@ -129,11 +129,14 @@ class McpConfirmationGateTest {
     }
 
     @Test
-    fun `only the three allow outcomes let a tool run`() {
+    fun `only the allow outcomes let a tool run`() {
         val allowing = listOf(
             McpConfirmationGate.Outcome.ALLOW_REMEMBERED,
             McpConfirmationGate.Outcome.ALLOW_ONCE,
             McpConfirmationGate.Outcome.ALLOW_ALWAYS,
+            // The blanket policy from 模型与任务 settings — allowed without a
+            // card, but still an explicit allow, not a fallthrough.
+            McpConfirmationGate.Outcome.AUTO_ALLOWED,
         )
         val refusing = McpConfirmationGate.Outcome.entries - allowing.toSet()
         allowing.forEach { assertTrue("$it must allow", McpConfirmationGate.allows(it)) }

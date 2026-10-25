@@ -1,15 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 模型选择页。XML 只搭结构：底色、卡片面板、输入框框体、字体排版全部由
+     LlmConfigActivity 用 CdsUi 令牌绘制（深浅跟随系统 night mode），与设置
+     面板后面的其他分区页同一套路。ember 的 colorContainerBrighten /
+     bg_edit_text 在这里没有位置。 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/colorBgSecondary"
+    android:background="@color/colorBgPrimary"
     android:orientation="vertical">
 
     <io.agents.pokeclaw.widget.CommonToolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
-        android:layout_height="56dp" />
+        android:layout_height="44dp" />
 
     <ScrollView
         android:id="@+id/scrollContent"
@@ -28,38 +31,36 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <!-- Active Model Card -->
+            <!-- 当前模型 -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:paddingHorizontal="4dp"
                 android:paddingBottom="8dp"
-                android:text="Active Model"
-                android:textColor="@color/colorTextSecondary"
-                android:textSize="13dp"
+                android:text="当前模型"
+                android:textSize="11sp"
                 android:textStyle="bold" />
 
-            <androidx.cardview.widget.CardView
+            <LinearLayout
+                android:id="@+id/activeCard"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:cardBackgroundColor="@color/colorContainerBrighten"
-                app:cardCornerRadius="12dp"
-                app:cardElevation="1dp">
+                android:orientation="vertical"
+                android:padding="16dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:padding="16dp">
+                    android:orientation="horizontal">
 
                     <TextView
+                        android:id="@+id/avatarActive"
                         android:layout_width="40dp"
                         android:layout_height="40dp"
-                        android:background="@drawable/bg_avatar_ai"
                         android:gravity="center"
                         android:text="🦞"
-                        android:textSize="22dp" />
+                        android:textSize="22sp" />
 
                     <LinearLayout
                         android:layout_width="0dp"
@@ -72,9 +73,8 @@
                             android:id="@+id/tvActiveModelName"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="No model"
-                            android:textColor="@color/colorTextPrimary"
-                            android:textSize="15dp"
+                            android:text="未选择模型"
+                            android:textSize="15sp"
                             android:textStyle="bold" />
 
                         <TextView
@@ -82,178 +82,162 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
-                            android:text="Tap to download a model"
-                            android:textColor="@color/colorTextTertiary"
-                            android:textSize="12dp" />
+                            android:text="在下方配置模型"
+                            android:textSize="12sp" />
 
                         <TextView
                             android:id="@+id/tvActiveModelStatus"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="4dp"
-                            android:text="● Not configured"
-                            android:textColor="@color/colorSuccessPrimary"
-                            android:textSize="12dp" />
+                            android:text="● 未配置"
+                            android:textSize="12sp" />
                     </LinearLayout>
                 </LinearLayout>
-            </androidx.cardview.widget.CardView>
+            </LinearLayout>
 
+            <!-- 默认模型 -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="20dp"
                 android:paddingHorizontal="4dp"
                 android:paddingBottom="8dp"
-                android:text="Default Models"
-                android:textColor="@color/colorTextSecondary"
-                android:textSize="13dp"
+                android:text="默认模型"
+                android:textSize="11sp"
                 android:textStyle="bold" />
 
-            <androidx.cardview.widget.CardView
+            <LinearLayout
+                android:id="@+id/defaultsCard"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:cardBackgroundColor="@color/colorContainerBrighten"
-                app:cardCornerRadius="12dp"
-                app:cardElevation="1dp">
+                android:orientation="vertical"
+                android:padding="16dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp">
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:gravity="center"
+                        android:text="📱"
+                        android:textSize="18sp" />
 
                     <LinearLayout
-                        android:layout_width="match_parent"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal">
+                        android:layout_marginStart="12dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
 
                         <TextView
-                            android:layout_width="32dp"
-                            android:layout_height="32dp"
-                            android:gravity="center"
-                            android:text="📱"
-                            android:textSize="18dp" />
-
-                        <LinearLayout
-                            android:layout_width="0dp"
+                            android:id="@+id/labelDefaultLocal"
+                            android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="12dp"
-                            android:layout_weight="1"
-                            android:orientation="vertical">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Default local model"
-                                android:textColor="@color/colorTextTertiary"
-                                android:textSize="12dp" />
-
-                            <TextView
-                                android:id="@+id/tvDefaultLocalName"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="2dp"
-                                android:text="Not set"
-                                android:textColor="@color/colorTextPrimary"
-                                android:textSize="14dp"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                android:id="@+id/tvDefaultLocalMeta"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="2dp"
-                                android:text="Choose a local model below"
-                                android:textColor="@color/colorTextTertiary"
-                                android:textSize="12dp" />
-
-                            <TextView
-                                android:id="@+id/tvDefaultLocalStatus"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="4dp"
-                                android:text="● Not configured"
-                                android:textColor="@color/colorTextTertiary"
-                                android:textSize="12dp" />
-                        </LinearLayout>
-                    </LinearLayout>
-
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:layout_marginVertical="14dp"
-                        android:background="#1FFFFFFF" />
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal">
+                            android:text="默认本地模型"
+                            android:textSize="12sp" />
 
                         <TextView
-                            android:layout_width="32dp"
-                            android:layout_height="32dp"
-                            android:gravity="center"
-                            android:text="☁️"
-                            android:textSize="18dp" />
-
-                        <LinearLayout
-                            android:layout_width="0dp"
+                            android:id="@+id/tvDefaultLocalName"
+                            android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="12dp"
-                            android:layout_weight="1"
-                            android:orientation="vertical">
+                            android:layout_marginTop="2dp"
+                            android:text="未设置"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
 
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Default cloud model"
-                                android:textColor="@color/colorTextTertiary"
-                                android:textSize="12dp" />
+                        <TextView
+                            android:id="@+id/tvDefaultLocalMeta"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="在下方选择本地模型"
+                            android:textSize="12sp" />
 
-                            <TextView
-                                android:id="@+id/tvDefaultCloudName"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="2dp"
-                                android:text="Not set"
-                                android:textColor="@color/colorTextPrimary"
-                                android:textSize="14dp"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                android:id="@+id/tvDefaultCloudMeta"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="2dp"
-                                android:text="Configure a cloud model below"
-                                android:textColor="@color/colorTextTertiary"
-                                android:textSize="12dp" />
-
-                            <TextView
-                                android:id="@+id/tvDefaultCloudStatus"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:layout_marginTop="4dp"
-                                android:text="● Not configured"
-                                android:textColor="@color/colorTextTertiary"
-                                android:textSize="12dp" />
-                        </LinearLayout>
+                        <TextView
+                            android:id="@+id/tvDefaultLocalStatus"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="● 未配置"
+                            android:textSize="12sp" />
                     </LinearLayout>
                 </LinearLayout>
-            </androidx.cardview.widget.CardView>
 
-            <!-- Available Models -->
+                <View
+                    android:id="@+id/dividerDefaults"
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginVertical="14dp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:gravity="center"
+                        android:text="☁️"
+                        android:textSize="18sp" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/labelDefaultCloud"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="默认云端模型"
+                            android:textSize="12sp" />
+
+                        <TextView
+                            android:id="@+id/tvDefaultCloudName"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="未设置"
+                            android:textSize="14sp"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/tvDefaultCloudMeta"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="在下方配置云端模型"
+                            android:textSize="12sp" />
+
+                        <TextView
+                            android:id="@+id/tvDefaultCloudStatus"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="● 未配置"
+                            android:textSize="12sp" />
+                    </LinearLayout>
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- 可用本地模型 -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="20dp"
                 android:paddingHorizontal="4dp"
                 android:paddingBottom="8dp"
-                android:text="Available Models"
-                android:textColor="@color/colorTextSecondary"
-                android:textSize="13dp"
+                android:text="可用本地模型"
+                android:textSize="11sp"
                 android:textStyle="bold" />
 
             <LinearLayout
@@ -268,211 +252,192 @@
                 android:layout_width="0dp"
                 android:layout_height="0dp"
                 android:visibility="gone" />
+
             <ProgressBar
                 android:id="@+id/progressStorage"
                 style="?android:attr/progressBarStyleHorizontal"
                 android:layout_width="0dp"
                 android:layout_height="0dp"
                 android:visibility="gone" />
+
             <TextView
                 android:id="@+id/tvStorageDetail"
                 android:layout_width="0dp"
                 android:layout_height="0dp"
                 android:visibility="gone" />
 
-            <!-- Cloud LLM -->
+            <!-- 云端模型 -->
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="20dp"
                 android:paddingHorizontal="4dp"
                 android:paddingBottom="8dp"
-                android:text="Cloud LLM"
-                android:textColor="@color/colorTextSecondary"
-                android:textSize="13dp"
+                android:text="云端模型"
+                android:textSize="11sp"
                 android:textStyle="bold" />
 
-            <androidx.cardview.widget.CardView
+            <LinearLayout
+                android:id="@+id/cloudCard"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="24dp"
-                app:cardBackgroundColor="@color/colorContainerBrighten"
-                app:cardCornerRadius="12dp"
-                app:cardElevation="1dp">
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <!-- Provider Tabs -->
+                <HorizontalScrollView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:scrollbars="none"
+                    android:layout_marginBottom="12dp">
+
+                    <LinearLayout
+                        android:id="@+id/layoutProviderTabs"
+                        android:layout_width="wrap_content"
+                        android:layout_height="40dp"
+                        android:orientation="horizontal"
+                        android:padding="3dp" />
+
+                </HorizontalScrollView>
+
+                <!-- Model List (programmatic) -->
+                <LinearLayout
+                    android:id="@+id/layoutCloudModels"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+
+                <!-- API Key -->
+                <TextView
+                    android:id="@+id/labelApiKey"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="API Key"
+                    android:textSize="12sp"
+                    android:layout_marginTop="12dp"
+                    android:layout_marginBottom="4dp" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="16dp">
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
 
-                    <!-- Provider Tabs -->
-                    <HorizontalScrollView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:scrollbars="none"
-                        android:layout_marginBottom="12dp">
+                    <EditText
+                        android:id="@+id/etApiKey"
+                        android:layout_width="0dp"
+                        android:layout_height="44dp"
+                        android:layout_weight="1"
+                        android:hint="sk-..."
+                        android:inputType="textPassword"
+                        android:paddingHorizontal="12dp"
+                        android:textSize="13sp" />
 
-                        <LinearLayout
-                            android:id="@+id/layoutProviderTabs"
-                            android:layout_width="wrap_content"
-                            android:layout_height="40dp"
-                            android:background="@drawable/bg_edit_text"
-                            android:orientation="horizontal"
-                            android:padding="3dp" />
-
-                    </HorizontalScrollView>
-
-                    <!-- Model List (programmatic) -->
-                    <LinearLayout
-                        android:id="@+id/layoutCloudModels"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical" />
-
-                    <!-- API Key -->
                     <TextView
+                        android:id="@+id/btnClearApiKey"
                         android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="API Key"
-                        android:textColor="@color/colorTextSecondary"
-                        android:textSize="12dp"
-                        android:layout_marginTop="12dp"
-                        android:layout_marginBottom="4dp" />
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical">
-
-                        <EditText
-                            android:id="@+id/etApiKey"
-                            android:layout_width="0dp"
-                            android:layout_height="44dp"
-                            android:layout_weight="1"
-                            android:background="@drawable/bg_edit_text"
-                            android:hint="sk-..."
-                            android:inputType="textPassword"
-                            android:paddingHorizontal="12dp"
-                            android:textColor="@color/colorTextPrimary"
-                            android:textColorHint="@color/colorTextTertiary"
-                            android:textSize="13dp" />
-
-                        <TextView
-                            android:id="@+id/btnClearApiKey"
-                            android:layout_width="wrap_content"
-                            android:layout_height="44dp"
-                            android:gravity="center"
-                            android:paddingHorizontal="10dp"
-                            android:text="Clear"
-                            android:textColor="@color/colorErrorPrimary"
-                            android:textSize="12dp" />
-
-                    </LinearLayout>
-
-                    <!-- Base URL (Custom only) -->
-                    <LinearLayout
-                        android:id="@+id/layoutBaseUrl"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:visibility="gone">
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Base URL"
-                            android:textColor="@color/colorTextSecondary"
-                            android:textSize="12dp"
-                            android:layout_marginTop="10dp"
-                            android:layout_marginBottom="4dp" />
-
-                        <EditText
-                            android:id="@+id/etBaseUrl"
-                            android:layout_width="match_parent"
-                            android:layout_height="44dp"
-                            android:background="@drawable/bg_edit_text"
-                            android:hint="https://api.openrouter.ai/v1"
-                            android:inputType="textUri"
-                            android:paddingHorizontal="12dp"
-                            android:textColor="@color/colorTextPrimary"
-                            android:textColorHint="@color/colorTextTertiary"
-                            android:textSize="13dp" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Model Name"
-                            android:textColor="@color/colorTextSecondary"
-                            android:textSize="12dp"
-                            android:layout_marginTop="10dp"
-                            android:layout_marginBottom="4dp" />
-
-                        <EditText
-                            android:id="@+id/etModelName"
-                            android:layout_width="match_parent"
-                            android:layout_height="44dp"
-                            android:background="@drawable/bg_edit_text"
-                            android:hint="google/gemini-2.5-flash"
-                            android:inputType="text"
-                            android:paddingHorizontal="12dp"
-                            android:textColor="@color/colorTextPrimary"
-                            android:textColorHint="@color/colorTextTertiary"
-                            android:textSize="13dp" />
-
-                    </LinearLayout>
-
-                    <!-- Connection Status -->
-                    <TextView
-                        android:id="@+id/tvConnectionStatus"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:textSize="12dp"
-                        android:visibility="gone" />
-
-                    <!-- Buttons -->
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="14dp"
-                        android:orientation="horizontal">
-
-                        <TextView
-                            android:id="@+id/btnTestConnection"
-                            android:layout_width="0dp"
-                            android:layout_height="44dp"
-                            android:layout_weight="1"
-                            android:layout_marginEnd="6dp"
-                            android:background="@drawable/bg_edit_text"
-                            android:gravity="center"
-                            android:text="Test"
-                            android:textColor="@color/colorBrandPrimary"
-                            android:textSize="13dp" />
-
-                        <io.agents.pokeclaw.widget.KButton
-                            android:id="@+id/btnSaveCloud"
-                            android:layout_width="0dp"
-                            android:layout_height="44dp"
-                            android:layout_weight="2"
-                            android:text="Save &amp; Activate" />
-
-                    </LinearLayout>
-
-                    <!-- Compatible endpoints hint (Custom only) -->
-                    <TextView
-                        android:id="@+id/tvCustomHint"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:text="Compatible with: OpenRouter, Groq, Together AI, Ollama, any OpenAI-compatible endpoint"
-                        android:textColor="@color/colorTextTertiary"
-                        android:textSize="10dp"
-                        android:visibility="gone" />
+                        android:layout_height="44dp"
+                        android:gravity="center"
+                        android:paddingHorizontal="10dp"
+                        android:text="清除"
+                        android:textSize="12.5sp" />
 
                 </LinearLayout>
-            </androidx.cardview.widget.CardView>
+
+                <!-- Base URL (Custom only) -->
+                <LinearLayout
+                    android:id="@+id/layoutBaseUrl"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:id="@+id/labelBaseUrl"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Base URL"
+                        android:textSize="12sp"
+                        android:layout_marginTop="10dp"
+                        android:layout_marginBottom="4dp" />
+
+                    <EditText
+                        android:id="@+id/etBaseUrl"
+                        android:layout_width="match_parent"
+                        android:layout_height="44dp"
+                        android:hint="https://api.openrouter.ai/v1"
+                        android:inputType="textUri"
+                        android:paddingHorizontal="12dp"
+                        android:textSize="13sp" />
+
+                    <TextView
+                        android:id="@+id/labelModelName"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="模型名称"
+                        android:textSize="12sp"
+                        android:layout_marginTop="10dp"
+                        android:layout_marginBottom="4dp" />
+
+                    <EditText
+                        android:id="@+id/etModelName"
+                        android:layout_width="match_parent"
+                        android:layout_height="44dp"
+                        android:hint="google/gemini-2.5-flash"
+                        android:inputType="text"
+                        android:paddingHorizontal="12dp"
+                        android:textSize="13sp" />
+
+                </LinearLayout>
+
+                <!-- Connection Status -->
+                <TextView
+                    android:id="@+id/tvConnectionStatus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:textSize="12sp"
+                    android:visibility="gone" />
+
+                <!-- Buttons -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/btnTestConnection"
+                        android:layout_width="0dp"
+                        android:layout_height="44dp"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="6dp"
+                        android:gravity="center"
+                        android:text="测试"
+                        android:textSize="12.5sp" />
+
+                    <io.agents.pokeclaw.widget.KButton
+                        android:id="@+id/btnSaveCloud"
+                        android:layout_width="0dp"
+                        android:layout_height="44dp"
+                        android:layout_weight="2"
+                        android:text="保存并启用"
+                        android:textSize="14sp" />
+
+                </LinearLayout>
+
+                <!-- Compatible endpoints hint (Custom only) -->
+                <TextView
+                    android:id="@+id/tvCustomHint"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="兼容 OpenRouter、Groq、Together AI、Ollama 及任何 OpenAI 兼容端点"
+                    android:textSize="11sp"
+                    android:visibility="gone" />
+
+            </LinearLayout>
 
         </LinearLayout>
     </ScrollView>

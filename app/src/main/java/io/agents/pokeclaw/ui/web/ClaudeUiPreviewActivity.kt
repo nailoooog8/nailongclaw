@@ -28,6 +28,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import androidx.webkit.WebViewAssetLoader
 import io.agents.pokeclaw.BuildConfig
+import io.agents.pokeclaw.agent.EffortLevel
 import io.agents.pokeclaw.agent.mcp.McpConfirmationCoordinator
 import io.agents.pokeclaw.agent.mcp.McpConfirmationGate
 import io.agents.pokeclaw.agent.mcp.McpConfirmationRequest
@@ -37,12 +38,17 @@ import io.agents.pokeclaw.ui.chat.ChatHistoryManager
 import io.agents.pokeclaw.ui.chat.ChatSessionController
 import io.agents.pokeclaw.ui.chat.ChatSessionUiState
 import io.agents.pokeclaw.ui.chat.TaskFlowController
-import io.agents.pokeclaw.ui.settings.LlmConfigActivity
+import io.agents.pokeclaw.ui.settings.AboutActivity
+import io.agents.pokeclaw.ui.settings.ChannelsActivity
 import io.agents.pokeclaw.ui.settings.McpServersActivity
 import io.agents.pokeclaw.ui.settings.MemoryActivity
+import io.agents.pokeclaw.ui.settings.ModelSettingsActivity
+import io.agents.pokeclaw.ui.settings.MonitorActivity
 import io.agents.pokeclaw.ui.settings.SettingsActivity
 import io.agents.pokeclaw.ui.settings.ThemeActivity
+import io.agents.pokeclaw.ui.settings.ToolsActivity
 import io.agents.pokeclaw.ui.settings.UserSkillsActivity
+import io.agents.pokeclaw.utils.KVUtils
 import io.agents.pokeclaw.utils.XLog
 import java.util.concurrent.Executors
 
@@ -221,23 +227,26 @@ class ClaudeUiPreviewActivity : BaseActivity() {
          *
          * The page's settings sheet is presentation only — every row lands in
          * the native activity that owns the real behaviour, so the config logic
-         * stays in exactly one place. `all` opens the full SettingsActivity
-         * (permissions, monitor, about — the parts the sheet deliberately does
-         * not duplicate). An unknown section is logged and dropped rather than
+         * stays in exactly one place. The sheet is organized in the same
+         * sections as the native settings hub (配置 / 功能 / 外观 / 系统);
+         * there is no catch-all row any more — settings nested inside settings
+         * was pure noise. An unknown section is logged and dropped rather than
          * guessed at.
          */
         @JavascriptInterface
         fun openSettingsPage(section: String?) {
             val target = when (section) {
-                "model" -> LlmConfigActivity::class.java
-                // ChannelConfigActivity needs an EXTRA_CHANNEL_TYPE and finishes
-                // without one — the sheet row cannot pick a channel, so it lands
-                // on the full page that owns the per-channel rows instead.
-                "channels" -> SettingsActivity::class.java
+                "model" -> ModelSettingsActivity::class.java
+                "channels" -> ChannelsActivity::class.java
+                "monitor" -> MonitorActivity::class.java
+                "tools" -> ToolsActivity::class.java
                 "mcp" -> McpServersActivity::class.java
                 "skills" -> UserSkillsActivity::class.java
                 "memory" -> MemoryActivity::class.java
                 "theme" -> ThemeActivity::class.java
+                "about" -> AboutActivity::class.java
+                // Legacy mapping kept for older cached pages: the hub is the
+                // native full-settings door the Compose chat screen also uses.
                 "all" -> SettingsActivity::class.java
                 else -> {
                     XLog.e(TAG, "[chat] openSettingsPage('$section') ignored — unknown section")
@@ -250,6 +259,93 @@ class ClaudeUiPreviewActivity : BaseActivity() {
                 // activity — the Intent constructor needs the qualified label.
                 startActivity(Intent(this@ClaudeUiPreviewActivity, target))
             }
+        }
+
+        /**
+         * JS → Kotlin: current theme preferences as JSON
+         * (`{"mode":"dark","base":"clay","accent":"clay"}`).
+         *
+         * KVUtils is the single source of truth: the native 主题 page writes
+         * it, the sidebar popover and this page read it. An empty string means
+         * "nothing stored yet" — cds.js then falls back to its localStorage
+         * copy (pure-browser preview) or the system color scheme.
+         */
+        @JavascriptInterface
+        fun readThemePrefs(): String {
+            val mode = KVUtils.getString("THEME_MODE", "")
+            val base = KVUtils.getString("THEME_BASE", "")
+            val accent = KVUtils.getString("THEME_ACCENT", "")
+            if (mode.isBlank() && base.isBlank() && accent.isBlank()) return ""
+            return buildString {
+                append('{')
+                if (mode.isNotBlank()) append("\"mode\":\"").append(mode).append('"')
+                if (base.isNotBlank()) {
+                    if (length > 1) append(',')
+                    append("\"base\":\"").append(base).append('"')
+                }
+                if (accent.isNotBlank()) {
+                    if (length > 1) append(',')
+                    append("\"accent\":\"").append(accent).append('"')
+                }
+                append('}')
+            }
+        }
+
+        /**
+         * JS → Kotlin: the sidebar popover changed one or more theme axes.
+         *
+         * Writes straight through to the same KVUtils keys the native 主题
+         * page owns, so the two doors cannot disagree. A malformed payload is
+         * logged and dropped — never partially applied.
+         */
+        @JavascriptInterface
+        fun writeThemePrefs(json: String?) {
+            if (json.isNullOrBlank()) return
+            try {
+                val obj = org.json.JSONObject(json)
+                if (obj.has("mode")) {
+                    val mode = obj.getString("mode")
+                    if (mode == "light" || mode == "dark") KVUtils.putString("THEME_MODE", mode)
+                }
+                if (obj.has("base")) KVUtils.putString("THEME_BASE", obj.getString("base"))
+                if (obj.has("accent")) KVUtils.putString("THEME_ACCENT", obj.getString("accent"))
+                lastPushedPrefs = currentPrefsFingerprint()
+                XLog.e(TAG, "[chat] writeThemePrefs($json)")
+            } catch (e: Exception) {
+                XLog.e(TAG, "[chat] writeThemePrefs('$json') failed: ${e.message}")
+            }
+        }
+
+        /**
+         * JS → Kotlin: current task-gear preferences as JSON
+         * (`{"effort":"HIGH","autoAllow":false}`).
+         */
+        @JavascriptInterface
+        fun readTaskPrefs(): String =
+            "{\"effort\":\"${KVUtils.getEffortLevel()}\"," +
+                "\"autoAllow\":${KVUtils.isAutoAllowOperations()}}"
+
+        /** JS → Kotlin: the composer's effort gear. Maps to maxIterations. */
+        @JavascriptInterface
+        fun setEffort(level: String?) {
+            val normalized = level?.trim()?.uppercase()
+            if (normalized.isNullOrBlank() ||
+                !EffortLevel.entries.any { it.key == normalized }
+            ) {
+                XLog.e(TAG, "[chat] setEffort('$level') ignored — unknown level")
+                return
+            }
+            KVUtils.setEffortLevel(normalized)
+            lastPushedPrefs = currentPrefsFingerprint()
+            XLog.e(TAG, "[chat] setEffort($normalized)")
+        }
+
+        /** JS → Kotlin: the composer's sensitive-operation policy. */
+        @JavascriptInterface
+        fun setAutoAllow(enabled: Boolean) {
+            KVUtils.setAutoAllowOperations(enabled)
+            lastPushedPrefs = currentPrefsFingerprint()
+            XLog.e(TAG, "[chat] setAutoAllow($enabled)")
         }
 
         /**
@@ -644,7 +740,8 @@ class ClaudeUiPreviewActivity : BaseActivity() {
                 "o.url=String(location.href);" +
                 "o.scripts=document.scripts.length;" +
                 "var srcs=[];for(var i=0;i<document.scripts.length;i++){" +
-                "srcs.push(String(document.scripts[i].src||'(inline)'))+}o.srcs=srcs.join(',');" +
+                "srcs.push(String(document.scripts[i].src||'(inline)'));}" +
+                "o.srcs=srcs.join(',');" +
                 "var panel=document.getElementById('cdsQaPanel');" +
                 "o.panelExists=!!panel;" +
                 "o.panelChildNodes=panel?panel.childNodes.length:-1;" +
@@ -654,6 +751,8 @@ class ClaudeUiPreviewActivity : BaseActivity() {
                 "o.asideExists=!!document.querySelector('aside');" +
                 "o.feedExists=!!document.getElementById('feed');" +
                 "o.cdsExists=!!window.__cds;" +
+                "o.effort=String(window.__cds&&window.__cds.state?window.__cds.state().effort:'');" +
+                "o.policy=String(window.__cds&&window.__cds.state?window.__cds.state().policy:'');" +
                 "JSON.stringify(o);"
             )
         webView.evaluateJavascript(js) { value ->
@@ -668,6 +767,47 @@ class ClaudeUiPreviewActivity : BaseActivity() {
         // coordinator keeps the last one attached.
         confirmationSurface.isForeground = true
         McpConfirmationCoordinator.attach(confirmationSurface)
+        // The user may have changed theme or the two task gears on a native
+        // page (主题 / 模型与任务) while this activity was stopped. The page
+        // itself is not reloaded on resume, so push whatever changed — KVUtils
+        // is the source of truth, the page's localStorage is only a cache.
+        syncPrefsToPage()
+    }
+
+    /**
+     * Fingerprint of every preference the page mirrors. Compared on resume;
+     * a difference means a native page changed something and the page must be
+     * told. The bridge's write methods refresh it too, so a change made *on
+     * the page* never counts as "changed elsewhere".
+     */
+    private fun currentPrefsFingerprint(): String =
+        listOf(
+            KVUtils.getString("THEME_MODE", ""),
+            KVUtils.getString("THEME_BASE", ""),
+            KVUtils.getString("THEME_ACCENT", ""),
+            KVUtils.getEffortLevel(),
+            KVUtils.isAutoAllowOperations().toString(),
+        ).joinToString("|")
+
+    private var lastPushedPrefs: String = ""
+
+    private fun syncPrefsToPage() {
+        if (!::webView.isInitialized) return
+        val current = currentPrefsFingerprint()
+        if (current == lastPushedPrefs) return
+        lastPushedPrefs = current
+        val prefs = chatBridge.readThemePrefs()
+        val effort = KVUtils.getEffortLevel()
+        val auto = KVUtils.isAutoAllowOperations()
+        webView.post {
+            webView.evaluateJavascript(
+                "window.__cds && window.__cds.applyPrefs($prefs);" +
+                    "window.__cds && window.__cds.setEffort('$effort');" +
+                    "window.__cds && window.__cds.setAutoAllow($auto);",
+                null
+            )
+        }
+        XLog.e(TAG, "syncPrefsToPage: pushed prefs=$prefs effort=$effort autoAllow=$auto")
     }
 
     override fun onPause() {

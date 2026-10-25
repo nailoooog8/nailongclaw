@@ -52,6 +52,7 @@ class MenuGroup @JvmOverloads constructor(
         cardContainer.setStrokeColor(palette.border)
         cardContainer.cardElevation = 0f
         tvTitle.apply {
+            typeface = CdsUi.fontSans()
             setTextColor(palette.textMuted)
             setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11f)
             setTypeface(typeface, Typeface.BOLD)
@@ -119,6 +120,19 @@ class MenuGroup @JvmOverloads constructor(
                 setLeadingIconColor(cds.textPrimary)
                 setTrailingIconColor(cds.textMuted)
                 setDividerColor(cds.border)
+                // CDS typography + density, mirroring the reference's
+                // .settings-row: serif content title, sans meta, 13.5/12sp,
+                // 11px vertical padding, 5%-ink press. Without this the pages
+                // were colored like CDS but still typeset in the system font
+                // at the stock 14dp/16dp — a different product from the sheet
+                // that links to them.
+                setTitleTypeface(CdsUi.fontSerif())
+                setTrailingTextTypeface(CdsUi.fontSans())
+                setTitleTextSizeSp(13.5f)
+                setTrailingTextSizeSp(12f)
+                setRowPaddingVerticalDp(11f)
+                setLeadingIconSize(20, 20)
+                setCdsPress(cds)
             }
         }
         itemsContainer.addView(item)

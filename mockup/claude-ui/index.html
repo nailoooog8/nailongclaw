@@ -56,23 +56,24 @@
     </nav>
 
     <div class="sidebar-foot">
-      <button class="row-btn" id="memoryBtn" type="button">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10 10 10 0 0 0-10-10zM8 12h8M12 8v8"/></svg>
-        记忆库 · 128 条
-      </button>
-      <button class="row-btn" id="skillsBtn" type="button">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
-        技能管理
-      </button>
-
-      <!-- 主题：底色 × 强调色，两个维度合并在一个面板 -->
-      <div class="theme-pop-wrap">
+      <!-- 主题：深浅 × 底色 × 强调色，三个维度合并在一个面板里。
+           侧边栏只留这一个入口（原来的「深浅色」独立行已合并进面板，
+           记忆库 / 技能管理快捷行移入设置面板的「功能」区，避免同一
+           功能在侧边栏和设置里各挂一个入口）。 -->
+      <div class="theme-pop-wrap" id="themePopWrap">
         <button class="row-btn" id="themePickerBtn" type="button" aria-haspopup="true" aria-expanded="false">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r="1.5"/><circle cx="17.5" cy="10.5" r="1.5"/><circle cx="8.5" cy="7.5" r="1.5"/><circle cx="6.5" cy="12.5" r="1.5"/><path d="M12 2a10 10 0 0 0 0 20c.9 0 1.6-.7 1.6-1.6 0-.4-.2-.8-.4-1.1-.3-.3-.4-.7-.4-1.1 0-.9.7-1.6 1.6-1.6H16a6 6 0 0 0 6-6c0-5-4.5-8.6-10-8.6z"/></svg>
           主题 · <span id="themeNameInline">米黄 陶土橙</span>
         </button>
         <div class="pop theme-pop" id="themePop" data-open="false" role="menu">
 
+          <div class="pop-label">深浅</div>
+          <div class="seg" id="themeModeSeg" role="radiogroup" aria-label="深浅色">
+            <button class="seg-opt" type="button" role="radio" data-mode-key="light" aria-checked="false">浅色</button>
+            <button class="seg-opt" type="button" role="radio" data-mode-key="dark" aria-checked="false">深色</button>
+          </div>
+
+          <div class="pop-divider"></div>
           <div class="pop-label">底色</div>
           <button class="base-row" role="menuitemradio" data-base-key="clay"      type="button">
             <span class="base-swatch" style="--b0:#f2e9e1;--b1:#faf2eb;--b2:#fdf8f4"></span>
@@ -115,11 +116,6 @@
         </div>
       </div>
 
-      <button class="row-btn" id="themeToggle" type="button" aria-label="切换深浅色">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
-        深浅色
-      </button>
-
       <button class="row-btn" id="settingsBtn" type="button">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33h.08a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.08a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.08a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         设置
@@ -144,10 +140,12 @@
       <div class="settings-title">设置</div>
     </header>
     <div class="settings-body scroller">
+      <!-- 设置即本面板：每一行直达对应的原生 section 页。
+           不再有「全部设置」这一层 —— 设置里再套一个全部设置是纯噪音。 -->
       <div class="group-label">配置</div>
       <button class="settings-row" type="button" data-section="model">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
-        模型与预算
+        模型与任务
         <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
       </button>
       <button class="settings-row" type="button" data-section="channels">
@@ -155,13 +153,23 @@
         渠道接入
         <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
       </button>
+      <button class="settings-row" type="button" data-section="monitor">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        监听
+        <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+      </button>
+
+      <div class="group-label">功能</div>
+      <button class="settings-row" type="button" data-section="tools">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        工具
+        <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+      </button>
       <button class="settings-row" type="button" data-section="mcp">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="13" width="18" height="7" rx="1.5"/><path d="M7 8h.01M7 17h.01"/></svg>
         MCP 服务器
         <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
       </button>
-
-      <div class="group-label">功能</div>
       <button class="settings-row" type="button" data-section="skills">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
         技能
@@ -180,13 +188,13 @@
         <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
       </button>
 
-      <div class="group-label">更多</div>
-      <button class="settings-row" type="button" data-section="all">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33h.08a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.08a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.08a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        全部设置
+      <div class="group-label">系统</div>
+      <button class="settings-row" type="button" data-section="about">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+        关于
         <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
       </button>
-      <p class="settings-foot">权限、监控与关于等完整项目在「全部设置」。</p>
+      <p class="settings-foot">深浅、底色与强调色在侧边栏「主题」里，随手可调。</p>
     </div>
   </section>
 
@@ -316,12 +324,12 @@ G1201  09:15 → 10:42   二等座  ¥93.0   有票</pre>
         <div class="composer">
           <textarea id="composerInput" rows="1" placeholder="描述你想让手机做的事…（Enter 发送，Shift + Enter 换行）"></textarea>
           <div class="composer-bar">
-            <div class="pop-wrap">
-              <button class="pill" type="button" aria-haspopup="true">
+            <div class="pop-wrap" id="modelWrap">
+              <button class="pill" type="button" aria-haspopup="true" id="modelBtn">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
                 <span class="pill-label">本地模型</span>
               </button>
-              <div class="pop" data-open="false" role="menu">
+              <div class="pop" id="modelPop" data-open="false" role="menu">
                 <div class="pop-label">选择模型</div>
                 <button class="pop-item" role="menuitemradio" data-label="本地模型" aria-checked="true" type="button">本地模型 · LiteRT-LM <span class="tag">离线</span></button>
                 <button class="pop-item" role="menuitemradio" data-label="云端 MiniMax" aria-checked="false" type="button">云端 MiniMax <span class="tag">视觉</span></button>
@@ -329,14 +337,35 @@ G1201  09:15 → 10:42   二等座  ¥93.0   有票</pre>
               </div>
             </div>
 
-            <button class="pill" type="button">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-              高努力
-            </button>
-            <button class="pill" type="button">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.4 11.1 12.4 2.1a2 2 0 0 0-2.8 0l-9 9a2 2 0 0 0 0 2.8l9 9a2 2 0 0 0 2.8 0l9-9a2 2 0 0 0 0-2.8z"/></svg>
-              允许操作
-            </button>
+            <!-- 努力档位：换档键（低/中/高/最大），经桥写 KVUtils，
+                 真实映射到 AgentConfig.maxIterations。原来是个死 pill。 -->
+            <div class="pop-wrap" id="effortWrap">
+              <button class="pill" type="button" aria-haspopup="true" id="effortBtn">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                努力·<span class="pill-label" id="effortLabel">高</span>
+              </button>
+              <div class="pop" id="effortPop" data-open="false" role="menu">
+                <div class="pop-label">努力档位（单任务工具调用轮数上限）</div>
+                <button class="pop-item" role="menuitemradio" data-effort-key="low"    aria-checked="false" type="button">低 <span class="tag">15 轮</span></button>
+                <button class="pop-item" role="menuitemradio" data-effort-key="medium" aria-checked="false" type="button">中 <span class="tag">30 轮</span></button>
+                <button class="pop-item" role="menuitemradio" data-effort-key="high"   aria-checked="true"  type="button">高 <span class="tag">60 轮</span></button>
+                <button class="pop-item" role="menuitemradio" data-effort-key="max"    aria-checked="false" type="button">最大 <span class="tag">150 轮</span></button>
+              </div>
+            </div>
+
+            <!-- 敏感操作确认策略：询问 / 自动允许，经桥写 KVUtils，
+                 真实控制 MCP 工具调用要不要弹确认卡。原来也是个死 pill。 -->
+            <div class="pop-wrap" id="policyWrap">
+              <button class="pill" type="button" aria-haspopup="true" id="policyBtn">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.4 11.1 12.4 2.1a2 2 0 0 0-2.8 0l-9 9a2 2 0 0 0 0 2.8l9 9a2 2 0 0 0 2.8 0l9-9a2 2 0 0 0 0-2.8z"/></svg>
+                允许操作·<span class="pill-label" id="policyLabel">询问</span>
+              </button>
+              <div class="pop" id="policyPop" data-open="false" role="menu">
+                <div class="pop-label">MCP 工具调用确认</div>
+                <button class="pop-item" role="menuitemradio" data-policy-key="ask"  aria-checked="true"  type="button">每次询问 <span class="tag">默认</span></button>
+                <button class="pop-item" role="menuitemradio" data-policy-key="auto" aria-checked="false" type="button">自动允许 <span class="tag">跳过确认卡</span></button>
+              </div>
+            </div>
 
             <span class="spacer"></span>
             <button class="send cds-btn-squish" id="sendBtn" type="button" disabled aria-label="发送">
