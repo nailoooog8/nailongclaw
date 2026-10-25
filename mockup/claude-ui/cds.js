@@ -938,8 +938,9 @@
   var tasksBackBtn = document.getElementById('tasksBackBtn');
   var tasksBadge = document.getElementById('tasksBadge');
 
-  /* glyph 是终态 pill 的字形（✓/✕）——open-claude-ui 的终态卡用字形
-     而非色点标状态，淡染边框 + 字形 pill 一套带走。 */
+  /* glyph 是终态标的字形（✓/✕）——扫读时比辨色快，且不依赖颜色感知
+     （Setproduct：纯色点对读屏不可见，文字标同时是它的可读形态）。
+     行里只有一个信号族：带表面色描边的状态点 + 无底色彩字。 */
   var TASK_STATES = {
     RUNNING:         { label: '运行中', dot: 'running', glyph: '' },
     WAITING_CONFIRM: { label: '待确认', dot: 'clay', glyph: '' },
@@ -1142,10 +1143,6 @@
       '<div class="task-card-last"></div>';
     card.querySelector('.status-dot').setAttribute('data-kind', st.dot);
     card.querySelector('.task-card-title').textContent = t.title || '（无标题任务）';
-    // 终态淡染边框 + 字形 pill（open-claude-ui terminal 形态）；
-    // data-terminal 同时让 CSS 收掉状态点。
-    if (t.state === 'SUCCEEDED') card.setAttribute('data-terminal', 'done');
-    if (t.state === 'FAILED') card.setAttribute('data-terminal', 'failed');
     var pill = card.querySelector('.task-state');
     pill.setAttribute('data-state', String(t.state || ''));
     pill.textContent = st.glyph ? st.glyph + ' ' + st.label : st.label;

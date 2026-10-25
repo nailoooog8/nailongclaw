@@ -1298,7 +1298,8 @@ body {
 .tasks-body .group-label { margin: 14px 4px 6px; }
 
 /* 侧栏「任务」行的待处理计数。只在有真实数据时亮（data-show），
-   无桥预览与空账本都不显示 —— 徽标是状态不是装饰。 */
+   无桥预览与空账本都不显示 —— 徽标是状态不是装饰。表面色描边同
+   Setproduct 的 single fix：让数字从侧栏底面上脱出来。 */
 .tasks-badge {
   margin-left: auto;
   min-width: 18px; height: 18px; padding: 0 5px;
@@ -1308,6 +1309,7 @@ body {
   font-size: 10.5px; font-weight: 600;
   align-items: center; justify-content: center;
   display: none;
+  box-shadow: 0 0 0 2px var(--cds-surface-0);
 }
 .tasks-badge[data-show="true"] { display: inline-flex; }
 
@@ -1330,54 +1332,48 @@ body {
 .task-card-head { display: flex; align-items: center; gap: 8px; }
 .task-card-title {
   flex: 1; min-width: 0;
-  font-size: 13.5px; font-weight: 600;
+  font-size: 14px; font-weight: 600;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .task-card-meta {
   display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-  margin-top: 5px;
-  font-size: 11px; color: var(--cds-text-muted);
+  margin-top: 6px;
+  font-size: 12px; color: var(--cds-text-muted);
 }
 .task-card-last {
-  margin-top: 5px;
-  font-size: 11.5px; color: var(--cds-text-secondary);
+  margin-top: 4px;
+  font-size: 12px; color: var(--cds-text-secondary);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.task-channel {
-  padding: 1px 7px;
-  border-radius: 999px;
-  background: var(--cds-fill-secondary);
-  font-size: 10.5px; color: var(--cds-text-secondary);
-}
+/* 渠道：分类信息，但一行里出现第二个「药丸」会让状态信号翻倍。降为
+   正文灰字——位置即扫描依据，quiet panels 的纪律。 */
+.task-channel { font-size: 11.5px; color: var(--cds-text-muted); }
 
-/* 状态标：文字色用 color-mix 混一点正文色，深浅两 mode 都保对比度，
-   不必为每个 mode 各写一份 hex。 */
+/* 状态点：表面色描边把它从卡面上「摘」出来（Setproduct 的 single fix：
+   1-2px 同色环让标志在任何背景上都脱得开）。没有这道环，点直接坐在
+   卡面上，和卡沿、和文字糊在一起。 */
+.task-card .status-dot { box-shadow: 0 0 0 2px var(--cds-surface-2); }
+
+/* 状态标：无底色彩字，Linear/Slack 式安静行。一个状态一个信号——点管
+   扫描、文字管读屏与精确读法（Setproduct：纯色点对读屏不可见），
+   「淡染底 + 淡染边框 + 点」三保险是 UI 套装感，不是设计。
+   ✓/✕ 字形保留：扫读时比辨色更快，且不依赖颜色感知。 */
 .task-state {
   flex: none;
-  padding: 1px 8px;
-  border-radius: 999px;
-  font-size: 10.5px; font-weight: 600;
+  font-size: 11px; font-weight: 600;
+  white-space: nowrap;
 }
-.task-state[data-state="RUNNING"] {
-  color: var(--cds-fill-brand);
-  background: var(--cds-fill-brand-subtle);
-}
+.task-state[data-state="RUNNING"] { color: var(--cds-fill-brand); }
 .task-state[data-state="WAITING_CONFIRM"] {
   color: color-mix(in srgb, var(--cds-fill-warning) 75%, var(--cds-text-primary));
-  background: color-mix(in srgb, var(--cds-fill-warning) 14%, transparent);
 }
 .task-state[data-state="SUCCEEDED"] {
   color: color-mix(in srgb, var(--cds-fill-success) 75%, var(--cds-text-primary));
-  background: color-mix(in srgb, var(--cds-fill-success) 12%, transparent);
 }
 .task-state[data-state="FAILED"] {
   color: color-mix(in srgb, var(--cds-fill-danger) 80%, var(--cds-text-primary));
-  background: color-mix(in srgb, var(--cds-fill-danger) 12%, transparent);
 }
-.task-state[data-state="CANCELLED"] {
-  color: var(--cds-text-muted);
-  background: var(--cds-fill-ghost-hover);
-}
+.task-state[data-state="CANCELLED"] { color: var(--cds-text-muted); }
 
 /* 详情头：标题 + meta（状态/渠道/发起/完成/耗时）+ 原始请求 */
 .task-detail-title { font-size: 15px; font-weight: 600; color: var(--cds-text-primary); }
@@ -1419,19 +1415,6 @@ body {
 }
 .task-detail-error .task-detail-block-label { color: var(--cds-fill-danger); }
 .task-detail-answer .task-detail-block-label { color: var(--cds-text-muted); }
-
-/* 终态卡的淡染边框——open-claude-ui 的 terminal 形态：完成=emerald 系、
-   失败=红系，40% 混进既有边框色。运行中/待确认不染：它们已有动态状态点，
-   再染边框就过了。CANCELLED 也不染——它既不是成功也不是失败。 */
-.task-card[data-terminal="done"] {
-  border-color: color-mix(in srgb, var(--cds-fill-success) 40%, var(--cds-border));
-}
-.task-card[data-terminal="failed"] {
-  border-color: color-mix(in srgb, var(--cds-fill-danger) 40%, var(--cds-border));
-}
-/* 终态不画状态点：✓/✕ pill 加淡染边框已经把话说完，点只是噪音
-   （参考实现的终态卡头里也没有状态点，pill 即状态）。 */
-.task-card[data-terminal] .status-dot { display: none; }
 
 /* 卡片末行是失败原因时整行染危险色——列表里一眼看出谁没成。 */
 .task-card-last[data-kind="error"] {
