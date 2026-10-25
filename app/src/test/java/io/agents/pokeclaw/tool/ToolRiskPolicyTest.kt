@@ -51,6 +51,7 @@ class ToolRiskPolicyTest {
             "kb_read",
             "kb_search",
             "memory_recall",
+            "web_search",
         )
         for (name in readOnly) {
             assertEquals(
@@ -115,6 +116,9 @@ class ToolRiskPolicyTest {
         assertFalse(ToolRiskPolicy.isBlockedForChannel("get_screen_info", Channel.TELEGRAM))
         assertFalse(ToolRiskPolicy.isBlockedForChannel("get_notifications", Channel.QQ))
         assertFalse(ToolRiskPolicy.isBlockedForChannel("memory_recall", Channel.DISCORD))
+        // Knowledge questions from a chat channel are the primary web_search
+        // use case — the gate must not refuse them.
+        assertFalse(ToolRiskPolicy.isBlockedForChannel("web_search", Channel.WECHAT))
     }
 
     @Test

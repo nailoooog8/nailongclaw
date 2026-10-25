@@ -49,6 +49,7 @@ class SettingsActivity : BaseActivity() {
     private var monitorItem: io.agents.pokeclaw.widget.MenuItem? = null
     private var toolsItem: io.agents.pokeclaw.widget.MenuItem? = null
     private var mcpItem: io.agents.pokeclaw.widget.MenuItem? = null
+    private var webSearchItem: io.agents.pokeclaw.widget.MenuItem? = null
     private var skillsItem: io.agents.pokeclaw.widget.MenuItem? = null
     private var memoryItem: io.agents.pokeclaw.widget.MenuItem? = null
     private var themeItem: io.agents.pokeclaw.widget.MenuItem? = null
@@ -131,6 +132,12 @@ class SettingsActivity : BaseActivity() {
             onClick = { open(McpServersActivity::class.java) },
             showDivider = true
         )
+        webSearchItem = featureGroup.addMenuItem(
+            leadingIcon = android.R.drawable.ic_menu_search,
+            title = "网络搜索",
+            onClick = { open(WebSearchActivity::class.java) },
+            showDivider = true
+        )
         skillsItem = featureGroup.addMenuItem(
             leadingIcon = android.R.drawable.ic_menu_agenda,
             title = getString(R.string.settings_section_skills),
@@ -170,6 +177,7 @@ class SettingsActivity : BaseActivity() {
         monitorItem?.setTrailingText(monitorLabel())
         toolsItem?.setTrailingText("${ToolRegistry.getAllTools().size} 个")
         mcpItem?.setTrailingText(mcpLabel())
+        webSearchItem?.setTrailingText(webSearchLabel())
         skillsItem?.setTrailingText(skillsLabel())
         memoryItem?.setTrailingText(memoryLabel())
         themeItem?.setTrailingText(themeLabel())
@@ -215,6 +223,11 @@ class SettingsActivity : BaseActivity() {
         val count = McpConnectionManager.loadConfigs(this).size
         return if (count == 0) getString(R.string.settings_status_not_configured)
         else getString(R.string.settings_count_configured, count)
+    }
+
+    private fun webSearchLabel(): String {
+        if (!KVUtils.isWebSearchConfigured()) return getString(R.string.settings_status_not_configured)
+        return io.agents.pokeclaw.agent.SearchProvider.fromName(KVUtils.getWebSearchProvider()).displayName
     }
 
     private fun skillsLabel(): String {

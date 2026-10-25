@@ -3,6 +3,7 @@
 
 package io.agents.pokeclaw.ui.settings
 
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.widget.CheckBox
 import android.widget.LinearLayout
@@ -243,6 +244,40 @@ class McpServersActivity : BaseActivity() {
             }
         }
         updateAuthFieldVisibility(initialType)
+
+        // Web-search server templates, only on add (not edit). Hosted endpoints
+        // overseas — prefills fields, save still goes through the normal path.
+        if (existing == null) {
+            val tplLabel = CdsDialog.label(this, "从模板开始（托管搜索 MCP，海外端点需海外网络），或在下方手动填写：")
+            val templatesRow = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setPadding(0, CdsUi.dp(context, 8), 0, 0)
+            }
+            fun templateChip(text: String, name: String, url: String, type: McpAuthType) {
+                templatesRow.addView(TextView(this).apply {
+                    this.text = text
+                    typeface = CdsUi.fontSans()
+                    textSize = 13f
+                    setTextColor(cds.accent)
+                    setPadding(CdsUi.dp(context, 12), CdsUi.dp(context, 6), CdsUi.dp(context, 12), CdsUi.dp(context, 6))
+                    background = GradientDrawable().apply {
+                        cornerRadius = CdsUi.dp(context, 16f)
+                        setStroke(CdsUi.dp(context, 1), cds.border)
+                        setColor(0x00000000)
+                    }
+                    setOnClickListener {
+                        nameInput.setText(name)
+                        urlInput.setText(url)
+                        val idx = authTypes.indexOfFirst { it.second == type }
+                        if (idx >= 0) authSpinner.setSelection(idx)
+                    }
+                })
+            }
+            templateChip("You.com 免费·免Key", "you-search", "https://api.you.com/mcp?profile=free", McpAuthType.NONE)
+            templateChip("Tavily", "tavily", "https://mcp.tavily.com/mcp", McpAuthType.BEARER)
+            layout.addView(tplLabel, 0)
+            layout.addView(templatesRow, 1)
+        }
 
         authSpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: android.view.View?, position: Int, id: Long) {

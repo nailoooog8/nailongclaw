@@ -446,6 +446,23 @@ object KVUtils {
         )
     }
 
+    // ==================== Web Search ====================
+
+    private const val KEY_WEBSEARCH_PROVIDER = "KEY_WEBSEARCH_PROVIDER"
+
+    fun getWebSearchProvider(): String = getString(KEY_WEBSEARCH_PROVIDER, "DEEPSEEK")
+    fun setWebSearchProvider(value: String) = putString(KEY_WEBSEARCH_PROVIDER, value)
+
+    /** Per-provider search API key, encrypted at rest. */
+    fun getWebSearchApiKeyFor(provider: String): String =
+        getEncryptedString("KEY_WEBSEARCH_API_KEY_${provider.uppercase()}", "")
+    fun setWebSearchApiKeyFor(provider: String, key: String) =
+        putEncryptedString("KEY_WEBSEARCH_API_KEY_${provider.uppercase()}", key)
+
+    /** True when the currently selected provider has a key — drives the settings row label. */
+    fun isWebSearchConfigured(): Boolean =
+        getWebSearchApiKeyFor(getWebSearchProvider()).isNotBlank()
+
     // ==================== Independent Default Models ====================
     // Local and Cloud each have their own default model config.
     // Switching tabs reads from these keys — they never overwrite each other.
