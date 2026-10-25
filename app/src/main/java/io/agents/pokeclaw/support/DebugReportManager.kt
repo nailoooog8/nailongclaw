@@ -8,6 +8,7 @@ import android.content.Context
 import android.os.Build
 import io.agents.pokeclaw.AppCapabilityCoordinator
 import io.agents.pokeclaw.BuildConfig
+import io.agents.pokeclaw.agent.langchain.http.HeaderMask
 import io.agents.pokeclaw.agent.llm.LocalBackendHealth
 import io.agents.pokeclaw.agent.llm.LocalModelManager
 import io.agents.pokeclaw.agent.llm.ModelConfigRepository
@@ -209,14 +210,20 @@ object DebugReportManager {
 
     private fun addText(zip: ZipOutputStream, entryName: String, content: String) {
         zip.putNextEntry(ZipEntry(entryName))
-        zip.write(content.toByteArray(Charsets.UTF_8))
+        // The report leaves the device (it is shared with whoever is helping),
+        // so logs written before the masking fix, or by a path that does not
+        // mask, are scrubbed here as well. See F8.
+        zip.write(HeaderMask.scrubText(content).toByteArray(Charsets.UTF_8))
         zip.closeEntry()
     }
 
     private fun addFile(zip: ZipOutputStream, entryName: String, file: File) {
         if (!file.exists() || !file.isFile) return
         zip.putNextEntry(ZipEntry(entryName))
-        FileInputStream(file).use { input -> input.copyTo(zip) }
+        FileInputStream(file).use { input ->
+            val text = input.readBytes().toString(Charsets.UTF_8)
+            zip.write(HeaderMask.scrubText(text).toByteArray(Charsets.UTF_8))
+        }
         zip.closeEntry()
     }
 

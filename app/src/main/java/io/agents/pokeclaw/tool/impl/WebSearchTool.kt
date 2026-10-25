@@ -3,6 +3,7 @@
 
 package io.agents.pokeclaw.tool.impl
 
+import io.agents.pokeclaw.agent.ContextFence
 import io.agents.pokeclaw.agent.SearchProvider
 import io.agents.pokeclaw.agent.web.WebSearchClient
 import io.agents.pokeclaw.tool.BaseTool
@@ -65,7 +66,12 @@ class WebSearchTool : BaseTool() {
             }
             WebSearchClient(provider, apiKey).search(query, maxResults).fold(
                 onSuccess = { hits ->
-                    ToolResult.success(WebSearchClient.formatHits(query, hits))
+                    // Search snippets are third-party web text: a page can be
+                    // authored to read like a system instruction. Fence them so
+                    // the agent treats them as data (R3-02).
+                    ToolResult.success(
+                        ContextFence.wrap("web_search", WebSearchClient.formatHits(query, hits))
+                    )
                 },
                 onFailure = { ToolResult.error("web_search failed: ${it.message}") }
             )

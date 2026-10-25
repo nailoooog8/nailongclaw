@@ -77,6 +77,22 @@ object ExternalAutomationContract {
         )
     }
 
+    /**
+     * Decides where a callback may be sent.
+     *
+     * The caller chooses `return_action`, and PokeClaw then broadcasts an
+     * intent with it. Without a named, installed target that makes PokeClaw a
+     * broadcast proxy for whichever app happens to listen for that action
+     * (confused deputy, docs/SECURITY_AUDIT_R2.md F3) — so an action with no
+     * `return_package`, or one naming a package that is not on the device, is
+     * refused. Returns the package to send to, or null to send nothing.
+     */
+    fun callbackTarget(returnPackage: String?, isInstalled: (String) -> Boolean): String? {
+        val target = returnPackage?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        if (!isInstalled(target)) return null
+        return target
+    }
+
     fun sendCallback(
         context: Context,
         returnAction: String?,
@@ -88,9 +104,25 @@ object ExternalAutomationContract {
         mode: Mode? = null,
     ) {
         if (returnAction.isNullOrBlank()) return
+        val target = try {
+            callbackTarget(returnPackage) { pkg ->
+                context.packageManager.getPackageInfo(pkg, 0) != null
+            }
+        } catch (e: Exception) {
+            XLog.w(TAG, "Package lookup failed for automation callback target", e)
+            null
+        }
+        if (target == null) {
+            XLog.w(
+                TAG,
+                "Refused automation callback to '$returnAction': return_package " +
+                    "'$returnPackage' is missing or not installed on this device"
+            )
+            return
+        }
         try {
             val callback = Intent(returnAction).apply {
-                returnPackage?.takeIf { it.isNotBlank() }?.let { setPackage(it) }
+                setPackage(target)
                 requestId?.let { putExtra(EXTRA_REQUEST_ID, it) }
                 putExtra(EXTRA_STATUS, status)
                 mode?.let { putExtra(EXTRA_MODE, it.name.lowercase()) }

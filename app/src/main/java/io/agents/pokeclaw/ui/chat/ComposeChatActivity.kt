@@ -21,6 +21,7 @@ import io.agents.pokeclaw.agent.mcp.McpConfirmationCoordinator
 import io.agents.pokeclaw.automation.ExternalAutomationContract
 import io.agents.pokeclaw.automation.ExternalAutomationEntrypoint
 import io.agents.pokeclaw.appViewModel
+import io.agents.pokeclaw.channel.Channel
 import io.agents.pokeclaw.floating.FloatingCircleManager
 import io.agents.pokeclaw.ui.settings.LlmConfigActivity
 import io.agents.pokeclaw.ui.settings.SettingsActivity
@@ -353,7 +354,14 @@ class ComposeChatActivity : ComponentActivity() {
         handler.postDelayed(object : Runnable {
             override fun run() {
                 if (isTask) {
-                    taskFlowController.sendTask(automationText)
+                    // The task came from another app's broadcast, not from this
+                    // screen. Record it as EXTERNAL so ToolRiskPolicy treats it
+                    // like any other unwatched source instead of as the local
+                    // user (R3-01: it used to inherit Channel.LOCAL).
+                    val channel = if (
+                        intent?.getBooleanExtra(ExternalAutomationEntrypoint.EXTRA_EXTERNAL_SOURCE, false) == true
+                    ) Channel.EXTERNAL else Channel.LOCAL
+                    taskFlowController.sendTask(automationText, channel)
                     return
                 }
                 if (!KVUtils.hasLlmConfig()) {

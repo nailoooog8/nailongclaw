@@ -21,6 +21,22 @@ enum class Channel(val displayName: String) {
     QQ("QQ"),
     DOUYIN("Douyin"),
     LOCAL("Local"),
+
+    /**
+     * A task driven by another app through the external-automation broadcast
+     * (Tasker, MacroDroid, an `adb shell am broadcast`).
+     *
+     * This is deliberately *not* [LOCAL]: a broadcast has no human in front of
+     * the screen even when the user enabled the feature, and it used to be
+     * recorded as LOCAL — which handed every automation task the unrestricted
+     * LOCAL tier in [io.agents.pokeclaw.tool.ToolRiskPolicy] (R3-01). High
+     * impact tools are refused for this channel exactly as for Telegram.
+     *
+     * There is no handler for it in [ChannelManager.handlers]; outbound sends
+     * are no-ops, and the result travels back to the caller through the
+     * automation callback broadcast instead.
+     */
+    EXTERNAL("External Automation"),
 }
 
 object ChannelManager {

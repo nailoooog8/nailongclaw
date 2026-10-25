@@ -7,6 +7,7 @@ import android.content.Context
 import androidx.annotation.VisibleForTesting
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
+import io.agents.pokeclaw.agent.ContextFence
 import io.agents.pokeclaw.utils.KVUtils
 import io.agents.pokeclaw.utils.XLog
 import java.io.File
@@ -713,7 +714,10 @@ object MemoryStore {
                 // system prompt as untrusted data. Fence the text and neutralize
                 // any fence a memory tries to smuggle in, so a poisoned memory
                 // cannot close the boundary and continue as an instruction.
-                val body = e.content.replace(OPEN_FENCE, "").replace(CLOSE_FENCE, "")
+                // The marker list lives in ContextFence so every exit (briefing,
+                // memory_recall, kb_read, MCP results) neutralizes the same set
+                // instead of each inventing its own.
+                val body = ContextFence.sanitize(e.content)
                 sb.append("- [${e.kindLabel}#${e.id}] $OPEN_FENCE$body$CLOSE_FENCE$tags$warn\n")
             }
             sb.append("共 ${entries.size} 条仍有效的记忆。\n")

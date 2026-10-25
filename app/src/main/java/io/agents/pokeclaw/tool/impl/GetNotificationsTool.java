@@ -112,7 +112,12 @@ public class GetNotificationsTool extends BaseTool {
             }
 
             XLog.d(TAG, "Read " + count + " notifications");
-            return ToolResult.success(sb.toString().trim());
+            // Notification text is third-party app content that any app on the
+            // device can author — a verification code arrives next to whatever
+            // instructions the same notification happens to carry. Fence it as
+            // data so the model reads it, but does not obey it.
+            return ToolResult.success(
+                    io.agents.pokeclaw.agent.ContextFence.wrap("notifications", sb.toString().trim()));
 
         } catch (Exception e) {
             XLog.e(TAG, "Failed to read notifications", e);

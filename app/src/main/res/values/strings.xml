@@ -88,6 +88,7 @@
     <string name="wechat_media_voice">voice</string>
     <string name="wechat_media_unknown">media</string>
     <string name="channel_config_saved">Configuration saved</string>
+    <string name="secure_write_failed">Could not save securely: this device\'s keystore refused to encrypt, so nothing was stored (a token stored in the clear is not an option). Reboot the device and try again; if it persists, report it.</string>
     <string name="channel_config_lan_hint">Enable \"LAN Config\" in Settings to configure via browser</string>
     <string name="channel_config_lan_hint_running">Open %s in your browser to configure</string>
     <string name="channel_config_lan_copied">Address copied</string>

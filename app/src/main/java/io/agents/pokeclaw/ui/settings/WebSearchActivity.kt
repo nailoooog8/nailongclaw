@@ -198,7 +198,12 @@ class WebSearchActivity : BaseActivity() {
                     }
                 }
                 renderProviderItems()
-                Toast.makeText(this, "已保存", Toast.LENGTH_SHORT).show()
+                // F6: a failed encryption stores nothing; don't claim otherwise.
+                if (KVUtils.consumeSecureWriteFailure() != null) {
+                    Toast.makeText(this, R.string.secure_write_failed, Toast.LENGTH_LONG).show()
+                } else {
+                    Toast.makeText(this, "已保存", Toast.LENGTH_SHORT).show()
+                }
             }
         )
     }

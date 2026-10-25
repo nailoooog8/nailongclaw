@@ -682,7 +682,13 @@ class LlmConfigActivity : BaseActivity() {
             ClawApplication.appViewModelInstance.updateAgentConfig()
             ClawApplication.appViewModelInstance.initAgent()
             ClawApplication.appViewModelInstance.afterInit()
-            Toast.makeText(this, "已保存云端默认模型：$modelId", Toast.LENGTH_SHORT).show()
+            // F6: encryption failure now means "not saved", so the success toast
+            // has to be conditional or it would lie about the API key.
+            if (KVUtils.consumeSecureWriteFailure() != null) {
+                Toast.makeText(this, R.string.secure_write_failed, Toast.LENGTH_LONG).show()
+            } else {
+                Toast.makeText(this, "已保存云端默认模型：$modelId", Toast.LENGTH_SHORT).show()
+            }
             finish()
         }
 

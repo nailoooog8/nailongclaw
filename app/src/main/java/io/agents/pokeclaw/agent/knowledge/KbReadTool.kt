@@ -3,6 +3,7 @@
 
 package io.agents.pokeclaw.agent.knowledge
 
+import io.agents.pokeclaw.agent.ContextFence
 import io.agents.pokeclaw.tool.BaseTool
 import io.agents.pokeclaw.tool.ToolParameter
 import io.agents.pokeclaw.tool.ToolResult
@@ -30,7 +31,9 @@ class KbReadTool : BaseTool() {
             val path = requireString(params, "path")
             val result = KBManager.read(path)
             result.fold(
-                onSuccess = { ToolResult.success(it) },
+                // Vault notes are user/agent-written text that a later task
+                // trusts; a note can be planted once and re-read forever.
+                onSuccess = { ToolResult.success(ContextFence.wrap("knowledge_base", it)) },
                 onFailure = { ToolResult.error(it.message ?: "kb_read failed") }
             )
         } catch (e: IllegalArgumentException) {

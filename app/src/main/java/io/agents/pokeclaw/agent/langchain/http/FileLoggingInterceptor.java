@@ -95,11 +95,10 @@ public class FileLoggingInterceptor implements Interceptor {
         for (int i = 0; i < request.headers().size(); i++) {
             String name = request.headers().name(i);
             String value = request.headers().value(i);
-            // Mask the actual Authorization value
-            if ("Authorization".equalsIgnoreCase(name)) {
-                value = value.length() > 15 ? value.substring(0, 15) + "..." : value;
-            }
-            sb.append(" \\\n  -H '").append(name).append(": ").append(value).append("'");
+            // Same masking rule as the header block below — one function, so the
+            // two copies cannot drift apart again (F8).
+            sb.append(" \\\n  -H '").append(name).append(": ")
+                    .append(HeaderMask.mask(name, value).replace("'", "'\\''")).append("'");
         }
 
         // Body
@@ -128,7 +127,10 @@ public class FileLoggingInterceptor implements Interceptor {
                 writer.write("Time: " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US).format(new Date()) + "\n");
                 writer.write("\n--- Headers ---\n");
                 for (int i = 0; i < request.headers().size(); i++) {
-                    writer.write(request.headers().name(i) + ": " + request.headers().value(i) + "\n");
+                    String name = request.headers().name(i);
+                    // Was written verbatim, which put the full LLM API key and
+                    // every bot token on disk and into the shareable report ZIP.
+                    writer.write(name + ": " + HeaderMask.mask(name, request.headers().value(i)) + "\n");
                 }
                 writer.write("\n--- Body ---\n");
                 writer.write(requestBody.isEmpty() ? "(empty)\n" : requestBody + "\n");
@@ -142,7 +144,8 @@ public class FileLoggingInterceptor implements Interceptor {
                 if (response != null) {
                     writer.write("\n--- Headers ---\n");
                     for (int i = 0; i < response.headers().size(); i++) {
-                        writer.write(response.headers().name(i) + ": " + response.headers().value(i) + "\n");
+                        String name = response.headers().name(i);
+                        writer.write(name + ": " + HeaderMask.mask(name, response.headers().value(i)) + "\n");
                     }
                 }
                 writer.write("\n--- Body ---\n");

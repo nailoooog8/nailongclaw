@@ -3,6 +3,7 @@
 
 package io.agents.pokeclaw.agent.memory
 
+import io.agents.pokeclaw.agent.ContextFence
 import io.agents.pokeclaw.tool.BaseTool
 import io.agents.pokeclaw.tool.ToolParameter
 import io.agents.pokeclaw.tool.ToolResult
@@ -78,14 +79,20 @@ class MemoryRecallTool : BaseTool() {
             // The line format is a UI contract, not just model-facing text: the
             // web surface reads chips back out of this exact text. Format and
             // parser live together in MemoryRecallFormat so they cannot drift.
+            // Content is sanitized first — a memory can be written by the agent
+            // from untrusted input, so it must not be able to close the fence.
             val body = results.joinToString("\n") { r ->
                 val e = r.entry
                 val content =
                     if (e.isInvalidated) e.content + MemoryRecallFormat.historyMark(e.supersededBy)
                     else e.content
-                MemoryRecallFormat.chipLine(e.kindLabel, e.id, content, e.hits + 1)
+                MemoryRecallFormat.chipLine(e.kindLabel, e.id, ContextFence.sanitize(content), e.hits + 1)
             }
-            ToolResult.success(MemoryRecallFormat.header(query) + "\n" + body)
+            ToolResult.success(
+                // Recall returns stored text, and stored text is data — fence it
+                // the same way the briefing already was (R3-03).
+                ContextFence.wrap("memory_recall", MemoryRecallFormat.header(query) + "\n" + body)
+            )
         } catch (e: Exception) {
             ToolResult.error("memory_recall error: ${e.message}")
         }

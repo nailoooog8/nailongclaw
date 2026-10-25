@@ -14,6 +14,7 @@ import io.agents.pokeclaw.R;
 import io.agents.pokeclaw.channel.Channel;
 import io.agents.pokeclaw.channel.ChannelManager;
 import io.agents.pokeclaw.tool.BaseTool;
+import io.agents.pokeclaw.tool.SendFilePolicy;
 import io.agents.pokeclaw.tool.ToolParameter;
 import io.agents.pokeclaw.tool.ToolResult;
 
@@ -60,6 +61,16 @@ public class SendFileTool extends BaseTool {
         }
 
         String filePath = requireString(params, "file_path");
+
+        // R3-04: an arbitrary absolute path made this the last hop of any
+        // injection chain — a poisoned snippet could ask for the app's private
+        // data directory (encrypted tokens, chat DB) and the tool would comply.
+        String rejectReason = SendFilePolicy.INSTANCE.rejectReason(
+                filePath, ctx.getApplicationInfo().dataDir);
+        if (rejectReason != null) {
+            return ToolResult.error("send_file refused: " + rejectReason);
+        }
+
         File file = new File(filePath);
 
         if (!file.exists()) {
@@ -70,6 +81,10 @@ public class SendFileTool extends BaseTool {
         }
         if (!file.canRead()) {
             return ToolResult.error(ctx.getString(R.string.tool_no_storage_permission));
+        }
+        if (file.length() > SendFilePolicy.MAX_BYTES) {
+            return ToolResult.error("send_file refused: the file is " + (file.length() / (1024 * 1024))
+                    + " MB, over the " + (SendFilePolicy.MAX_BYTES / (1024 * 1024)) + " MB attachment limit.");
         }
 
         // Get current task channel and message ID

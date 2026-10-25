@@ -140,7 +140,10 @@ public class ReadConversationTool extends BaseTool {
 
         XLog.i(TAG, "Read " + visibleCount + " visible messages, " + scrollsDone + " history scrolls, "
                 + lines.size() + " merged, returning last " + (lines.size() - from));
-        return ToolResult.success(sb.toString().trim());
+        // Another app's chat history: someone else wrote every line, and that
+        // someone may be trying to talk to the agent through it. Fence as data.
+        return ToolResult.success(
+                io.agents.pokeclaw.agent.ContextFence.wrap("conversation", sb.toString().trim()));
     }
 
     /**

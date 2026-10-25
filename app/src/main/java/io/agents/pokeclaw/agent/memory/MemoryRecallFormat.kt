@@ -3,6 +3,8 @@
 
 package io.agents.pokeclaw.agent.memory
 
+import io.agents.pokeclaw.agent.ContextFence
+
 /**
  * The text contract of `memory_recall` output, and the parser that reads it
  * back into chips.
@@ -73,12 +75,17 @@ object MemoryRecallFormat {
 
     /**
      * The tail of a chip: `  (命中 N 次)`, followed by the next `- [` bullet,
-     * a truncation ellipsis, or the end of the text. The lookahead is what
-     * keeps a `(命中 N 次)` occurrence *inside* a memory's content from ending
-     * the chip early — the non-greedy content group extends past it instead.
+     * a truncation ellipsis, the end of the text, or the close of the untrusted
+     * region the chips sit in (see [ContextFence]). The lookahead is what keeps
+     * a `(命中 N 次)` occurrence *inside* a memory's content from ending the
+     * chip early — the non-greedy content group extends past it instead.
+     *
+     * `<<<` is accepted as a terminator because `memory_recall` output is
+     * fenced as untrusted data (R3-03): the last chip is followed by the fence
+     * close, and sanitized content can never contain `<<<` itself.
      */
     private val CHIP = Regex(
-        """-\s*\[([^\[\]#]+)#([0-9a-f]+)]\s*(.*?)\s*\(命中 (\d+) 次\)(?=\s*(?:- \[|\.{3}|$))"""
+        """-\s*\[([^\[\]#]+)#([0-9a-f]+)]\s*(.*?)\s*\(命中 (\d+) 次\)(?=\s*(?:- \[|\.{3}|<<<|$))"""
     )
 
     /** Parses chip data out of [chipLine] output, multi-line or flattened. */
@@ -86,7 +93,10 @@ object MemoryRecallFormat {
         Chip(
             id = match.groupValues[2],
             kindLabel = match.groupValues[1].trim(),
-            content = match.groupValues[3].trim(),
+            // Fence markers may sit inside the content region (each chip is
+            // wrapped individually when the caller fences them). They are for
+            // the model, not for the chip the user reads.
+            content = ContextFence.sanitize(match.groupValues[3].trim()),
         )
     }.toList()
 }

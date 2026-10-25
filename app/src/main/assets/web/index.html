@@ -130,6 +130,19 @@ input:focus {
 .toast.show { transform: translateX(-50%) translateY(0); }
 .toast.success { background: #34C759; }
 .toast.error { background: #FF3B30; }
+.cleartext-warning {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(255, 159, 10, 0.12);
+  border: 1px solid rgba(255, 159, 10, 0.35);
+  color: #B25000;
+  font-size: 13px;
+  line-height: 1.5;
+}
+@media (prefers-color-scheme: dark) {
+  .cleartext-warning { color: #FFB340; }
+}
 .loading {
   text-align: center;
   padding: 40px;
@@ -146,6 +159,7 @@ input:focus {
   <div id="loading" class="loading" data-i18n="loading"></div>
 
   <div id="content" style="display:none">
+    <div class="cleartext-warning" data-i18n="cleartext_warning"></div>
     <div class="card llm">
       <div class="card-title"><span class="dot"></span><span data-i18n="llm_title"></span></div>
       <div class="field">
@@ -257,6 +271,8 @@ const i18nMessages = {
     ph_llm_model: '如 gpt-4o、gpt-4o-mini',
     llm_tip: 'API Key 仅保存在设备本地，可通过设置 → LLM 配置 在应用内修改',
     load_failed: '加载失败，请检查连接',
+    pin_prompt: '请输入 6 位局域网配置 PIN（设置 → 局域网配置 中查看）：',
+    cleartext_warning: '此页面通过明文 HTTP 提供服务：同一网络上的任何人都可能看到你保存的 bot token 与 API Key。请只在可信网络上使用，用后及时关闭。',
     dingtalk: '钉钉',
     feishu: '飞书',
     ph_dingtalk_id: '输入 Client ID',
@@ -289,6 +305,8 @@ const i18nMessages = {
     ph_llm_model: 'e.g. gpt-4o, gpt-4o-mini',
     llm_tip: 'API Key is stored locally only. You can also edit in Settings → LLM Config',
     load_failed: 'Failed to load, please check connection',
+    pin_prompt: 'Enter the 6-digit LAN console PIN (Settings → LAN Config):',
+    cleartext_warning: 'This page is served over plain HTTP: anyone on the same network can see the bot tokens and API keys you save here. Use it only on a trusted network, and turn it off when done.',
     dingtalk: 'DingTalk',
     feishu: 'Feishu (Lark)',
     ph_dingtalk_id: 'Enter Client ID',
@@ -321,6 +339,8 @@ const i18nMessages = {
     ph_llm_model: '例: gpt-4o、gpt-4o-mini',
     llm_tip: 'API Key は端末内にのみ保存されます。設定 → LLM 設定 からも変更可能',
     load_failed: '読み込みに失敗しました。接続を確認してください',
+    pin_prompt: '6桁のLAN設定PINを入力してください（設定 → LAN設定 で確認）：',
+    cleartext_warning: 'このページは平文の HTTP で提供されています。同じネットワーク上の誰もが、ここで保存するボットトークンと API キーを閲覧できる可能性があります。信頼できるネットワークでのみ使用し、使い終わったらオフにしてください。',
     dingtalk: 'DingTalk',
     feishu: 'Feishu (Lark)',
     ph_dingtalk_id: 'Client ID を入力',
@@ -389,9 +409,42 @@ function togglePassword(inputId, btn) {
 const fields = ['dingtalkAppKey', 'dingtalkAppSecret', 'feishuAppId', 'feishuAppSecret', 'qqAppId', 'qqAppSecret', 'discordBotToken', 'telegramBotToken'];
 const llmFields = ['llmApiKey', 'llmBaseUrl', 'llmModelName'];
 
+// The console PIN is sent as a header, never in the URL: a query string ends up
+// in browser history, in proxy logs, and in the Referer of every later request.
+// The page used to send no PIN at all and therefore could not authenticate; it
+// now asks for it once and attaches it to every call. Kept in memory only — a
+// reload re-asks, which is the point (this page is served over plain HTTP).
+let consolePin = '';
+
+function apiHeaders(extra) {
+  const h = Object.assign({}, extra || {});
+  if (consolePin) h['X-Config-PIN'] = consolePin;
+  return h;
+}
+
+function promptPin() {
+  const pin = window.prompt(t('pin_prompt'), '');
+  if (pin) consolePin = pin.trim();
+  return consolePin;
+}
+
+async function api(path, options) {
+  const opts = options || {};
+  opts.headers = apiHeaders(opts.headers);
+  let res = await fetch(path, opts);
+  if (res.status === 401) {
+    // Lockout and a wrong PIN are both 401 here; re-asking is safe either way
+    // because the server is the one rate-limiting.
+    if (!promptPin()) return res;
+    opts.headers = apiHeaders(opts.headers);
+    res = await fetch(path, opts);
+  }
+  return res;
+}
+
 async function load() {
   try {
-    const [chanRes, llmRes] = await Promise.all([fetch('/api/channels'), fetch('/api/llm')]);
+    const [chanRes, llmRes] = await Promise.all([api('/api/channels'), api('/api/llm')]);
     const chanJson = await chanRes.json();
     const llmJson = await llmRes.json();
     if (chanJson.code === 0 && chanJson.data) {
@@ -429,8 +482,8 @@ async function save() {
       if (el) llmBody[f] = el.value.trim();
     });
     const [chanRes, llmRes] = await Promise.all([
-      fetch('/api/channels', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(chanBody) }),
-      fetch('/api/llm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(llmBody) })
+      api('/api/channels', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(chanBody) }),
+      api('/api/llm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(llmBody) })
     ]);
     const chanJson = await chanRes.json();
     const llmJson = await llmRes.json();

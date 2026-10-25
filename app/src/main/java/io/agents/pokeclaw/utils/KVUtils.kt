@@ -61,6 +61,27 @@ object KVUtils {
     }
 
     // ==================== Encrypted String ====================
+
+    /**
+     * Key of the most recent secret that could not be encrypted, or null.
+     *
+     * F6 used to swallow the failure — `SecretBox.encrypt(value) ?: value` wrote
+     * the token in the clear, which is the one outcome this whole path exists to
+     * prevent, and the user had no way to see it happen. Now nothing is written
+     * and the caller can tell the user why the save failed. Consume with
+     * [consumeSecureWriteFailure] so the message is shown once, at the moment
+     * of the save, rather than lingering.
+     */
+    @Volatile
+    private var secureWriteFailure: String? = null
+
+    /** Returns the pending secure-write failure (if any) and clears it. */
+    fun consumeSecureWriteFailure(): String? {
+        val value = secureWriteFailure
+        secureWriteFailure = null
+        return value
+    }
+
     fun putEncryptedString(key: String, value: String?): Boolean {
         if (value.isNullOrEmpty()) {
             return putString(key, "")
@@ -68,7 +89,14 @@ object KVUtils {
         if (SecretBox.isEncrypted(value)) {
             return putString(key, value)
         }
-        val encrypted = SecretBox.encrypt(value) ?: value
+        // Fail closed. A keystore that refuses to encrypt must not turn into
+        // "store the secret in plaintext" — that is the bug, not a fallback.
+        val encrypted = SecretBox.encrypt(value)
+        if (encrypted == null) {
+            secureWriteFailure = key
+            XLog.e("KVUtils", "Refused to store '$key': encryption unavailable, nothing written")
+            return false
+        }
         return putString(key, encrypted)
     }
 

@@ -74,6 +74,10 @@ object ExternalAutomationEntrypoint {
             putExtra(EXTRA_EXTERNAL_REQUEST_ID, request.requestId)
             putExtra(EXTRA_EXTERNAL_RETURN_ACTION, request.returnAction)
             putExtra(EXTRA_EXTERNAL_RETURN_PACKAGE, request.returnPackage)
+            // Explicit marker that this task was driven from outside the app.
+            // The chat screen reads it to record the session as
+            // Channel.EXTERNAL instead of inferring (R3-01).
+            putExtra(EXTRA_EXTERNAL_SOURCE, true)
             flags = launchFlags
         }
         context.startActivity(launch)
@@ -102,4 +106,7 @@ object ExternalAutomationEntrypoint {
     const val EXTRA_EXTERNAL_REQUEST_ID = "external_request_id"
     const val EXTRA_EXTERNAL_RETURN_ACTION = "external_return_action"
     const val EXTRA_EXTERNAL_RETURN_PACKAGE = "external_return_package"
+
+    /** Boolean marker on the launched chat intent: true when driven by an external broadcast. */
+    const val EXTRA_EXTERNAL_SOURCE = "external_source"
 }

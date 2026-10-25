@@ -59,4 +59,23 @@ class ExternalAutomationContractTest {
         assertNull(ExternalAutomationContract.parse("other.action") { null })
         assertNull(ExternalAutomationContract.parse(ExternalAutomationContract.ACTION_RUN_TASK) { null })
     }
+
+    // ---- Callback targeting (R2 F3 confused deputy) ----
+
+    @Test
+    fun `callback requires a named installed package`() {
+        // Without a target the callback is an implicit broadcast to whatever
+        // app listens for that action — PokeClaw becomes the caller's proxy.
+        assertNull(ExternalAutomationContract.callbackTarget(null) { false })
+        assertNull(ExternalAutomationContract.callbackTarget("   ") { true })
+        assertNull(ExternalAutomationContract.callbackTarget("net.dinglisch.android.taskerm") { false })
+    }
+
+    @Test
+    fun `callback accepts a named installed package`() {
+        assertEquals(
+            "net.dinglisch.android.taskerm",
+            ExternalAutomationContract.callbackTarget(" net.dinglisch.android.taskerm ") { true },
+        )
+    }
 }

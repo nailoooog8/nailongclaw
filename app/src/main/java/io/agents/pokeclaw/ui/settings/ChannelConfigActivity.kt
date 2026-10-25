@@ -253,7 +253,19 @@ class ChannelConfigActivity : BaseActivity() {
             putExtra(EXTRA_RESULT_CONFIG, result)
         }
         setResult(RESULT_OK, intent)
-        Toast.makeText(this, R.string.channel_config_saved, Toast.LENGTH_SHORT).show()
+        // F6: a keystore that refuses to encrypt now stores nothing instead of
+        // silently storing the token in the clear. Say so, rather than showing
+        // the usual "saved" for a save that did not happen.
+        val secureFailure = KVUtils.consumeSecureWriteFailure()
+        if (secureFailure != null) {
+            Toast.makeText(
+                this,
+                R.string.secure_write_failed,
+                Toast.LENGTH_LONG
+            ).show()
+        } else {
+            Toast.makeText(this, R.string.channel_config_saved, Toast.LENGTH_SHORT).show()
+        }
         finish()
     }
 

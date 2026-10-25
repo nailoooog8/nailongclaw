@@ -16,7 +16,6 @@ import io.agents.pokeclaw.tool.ToolRegistry
 import io.agents.pokeclaw.tool.ToolResult
 import io.agents.pokeclaw.utils.KVUtils
 import io.agents.pokeclaw.utils.XLog
-import java.net.InetAddress
 import java.net.URI
 
 /**
@@ -153,7 +152,12 @@ class ConfigServer(
     // ==================== Security Validation Methods ====================
 
     /**
-     * Authenticates request using X-Config-PIN header, Authorization header, or pin query parameter.
+     * Authenticates request using X-Config-PIN header or Authorization header.
+     *
+     * The PIN is deliberately *not* read from the query string: `?pin=123456`
+     * ends up in browser history, in HTTP access logs on anything between here
+     * and the browser, and in the Referer header of every subsequent request
+     * from the console page. The console already sends it as a header (F5).
      */
     private fun authenticate(session: IHTTPSession): Boolean {
         val expectedPin = ChannelSecurityGuard.getPairPin().trim()
@@ -175,7 +179,6 @@ class ConfigServer(
         session.headers[HEADER_AUTH]?.trim()?.takeIf { it.isNotEmpty() }?.let {
             candidates.add(it.removePrefix("Bearer ").removePrefix("bearer ").trim())
         }
-        session.parms["pin"]?.trim()?.takeIf { it.isNotEmpty() }?.let { candidates.add(it) }
 
         val matched = candidates.any { BruteForceGuard.constantTimeEquals(it, expectedPin) }
         if (matched) {
@@ -194,43 +197,21 @@ class ConfigServer(
     /**
      * Prevents DNS Rebinding attacks by validating the Host header.
      * Host must be localhost or a valid private IP address (LAN).
+     *
+     * Rules live in [HostPolicy] so they are unit-testable without a socket.
      */
-    private fun isValidHost(host: String?): Boolean {
-        if (host.isNullOrBlank()) return true
-        val hostWithoutPort = host.substringBefore(":")
-        if (hostWithoutPort == "localhost" || hostWithoutPort == "127.0.0.1" || hostWithoutPort == "::1") {
-            return true
-        }
-        return isPrivateIp(hostWithoutPort)
-    }
+    private fun isValidHost(host: String?): Boolean = HostPolicy.isValidHost(host)
 
     /**
      * Checks if an IP string is a private IPv4/IPv6 address.
-     * Rejects domain names upfront to prevent DNS Rebinding attacks via InetAddress DNS resolution.
+     * Rejects domain names upfront: parsing the literal keeps the check offline,
+     * which is the whole point of having it.
      */
     private fun isPrivateIp(ipStr: String): Boolean {
-        if (!isNumericIpLiteral(ipStr)) {
+        if (!HostPolicy.isIpLiteral(ipStr)) {
             return false
         }
-        return try {
-            val addr = InetAddress.getByName(ipStr)
-            addr.isSiteLocalAddress || addr.isLoopbackAddress || addr.isLinkLocalAddress
-        } catch (_: Exception) {
-            false
-        }
-    }
-
-    private fun isNumericIpLiteral(str: String): Boolean {
-        val ipv4Parts = str.split(".")
-        if (ipv4Parts.size == 4) {
-            return ipv4Parts.all { part ->
-                part.toIntOrNull()?.let { it in 0..255 } == true
-            }
-        }
-        if (str.contains(":") && str.all { it.isDigit() || it in 'a'..'f' || it in 'A'..'F' || it == ':' }) {
-            return true
-        }
-        return false
+        return HostPolicy.isPrivateRange(ipStr)
     }
 
     /**

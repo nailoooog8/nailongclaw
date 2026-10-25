@@ -3,6 +3,7 @@
 
 package io.agents.pokeclaw.agent.knowledge
 
+import io.agents.pokeclaw.agent.ContextFence
 import io.agents.pokeclaw.tool.BaseTool
 import io.agents.pokeclaw.tool.ToolParameter
 import io.agents.pokeclaw.tool.ToolResult
@@ -41,7 +42,8 @@ class KbSearchTool : BaseTool() {
                             sb.appendLine(r.snippet)
                             sb.appendLine()
                         }
-                        ToolResult.success(sb.toString().trimEnd())
+                        // Snippets are stored note text, not instructions (R3-03).
+                        ToolResult.success(ContextFence.wrap("knowledge_base", sb.toString().trimEnd()))
                     }
                 },
                 onFailure = { ToolResult.error(it.message ?: "kb_search failed") }

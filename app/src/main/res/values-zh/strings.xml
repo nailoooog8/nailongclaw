@@ -88,6 +88,7 @@
     <string name="wechat_media_voice">语音</string>
     <string name="wechat_media_unknown">媒体</string>
     <string name="channel_config_saved">配置已保存</string>
+    <string name="secure_write_failed">无法安全保存：本机 keystore 拒绝加密，因此没有写入任何内容（把 token 明文存下来不在选项里）。请重启设备后重试；若仍失败请反馈。</string>
     <string name="channel_config_lan_hint">在设置页开启「局域网配置」，即可通过电脑浏览器配置</string>
     <string name="channel_config_lan_hint_running">电脑浏览器打开 %s 即可配置</string>
     <string name="channel_config_lan_copied">已复制地址</string>

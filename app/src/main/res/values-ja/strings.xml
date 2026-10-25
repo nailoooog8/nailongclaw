@@ -88,6 +88,7 @@
     <string name="wechat_media_voice">音声</string>
     <string name="wechat_media_unknown">メディア</string>
     <string name="channel_config_saved">設定を保存しました</string>
+    <string name="secure_write_failed">安全に保存できませんでした：この端末のキーストアが暗号化を拒否したため、何も書き込みませんでした（トークンを平文で保存することは選択肢にありません）。端末を再起動して再試行してください。続く場合は報告してください。</string>
     <string name="channel_config_lan_hint">設定ページで「LAN設定」を有効にすると、ブラウザから設定できます</string>
     <string name="channel_config_lan_hint_running">ブラウザで %s を開いて設定してください</string>
     <string name="channel_config_lan_copied">アドレスをコピーしました</string>
