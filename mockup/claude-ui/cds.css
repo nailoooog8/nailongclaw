@@ -136,11 +136,15 @@
   --cds-fill-brand: var(--theme-accent);
   --cds-fill-brand-hover: var(--theme-accent-hover);
   --cds-fill-brand-subtle: var(--theme-accent-subtle);
-  --cds-fill-danger: #ef4444;
-  /* 任务账本的两个状态色：待确认（琥珀）与完成（绿）。与 danger 一样是
-     裸 hex —— 它们不随底色 scheme 变，文字对比度靠 color-mix 混正文色保证。 */
-  --cds-fill-warning: #f59e0b;
-  --cds-fill-success: #34c759;
+  /* 任务账本的三个状态色取 Google 图标调色板（#EA4335 / #FBBC04 / #34A853）。
+     原先的 Tailwind red-500 (#ef4444) / amber-500 / Apple system green
+     (#34c759) 饱和度太高——终态卡的淡染边框 + 字形 pill + 混色文字一套
+     上去就发荧光，塑料味来自色相不是结构。Google 这三个同明度下更沉，
+     混进边框色与正文色都不刺眼。仍是裸 hex：不随底色 scheme 变，深浅
+     两 mode 的对比度靠 color-mix 混正文色保证。 */
+  --cds-fill-danger: #ea4335;
+  --cds-fill-warning: #fbbc04;
+  --cds-fill-success: #34a853;
 
   /* 7. 圆角阶梯 */
   --radius-xs: .125rem;
