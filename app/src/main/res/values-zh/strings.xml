@@ -273,6 +273,12 @@
     <string name="chat_sugg_draft_email">帮我起草一封邮件</string>
 
     <string name="chat_quick_task_templates">快捷任务模板</string>
+    <string name="chat_smart_search_title">智能搜索</string>
+    <string name="chat_smart_search_caption_on">实时与知识问题，自动搜索</string>
+    <string name="chat_smart_search_caption_off">点此配置搜索服务</string>
+    <string name="chat_smart_search_provider_label">搜索服务商</string>
+    <string name="chat_smart_search_key_set">密钥</string>
+    <string name="chat_smart_search_manage_keys">管理密钥…</string>
     <string name="chat_task_open_reddit">🦞 打开社交应用搜索 PokeClaw</string>
     <string name="chat_task_search_youtube">🎬 在视频应用搜索搞笑猫咪视频</string>
     <string name="chat_task_install_telegram">📦 从应用商店下载或更新应用</string>

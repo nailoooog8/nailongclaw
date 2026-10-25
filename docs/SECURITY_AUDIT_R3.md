@@ -1,13 +1,18 @@
 # 安全审计报告 · 第三轮（攻防推演）— PokeClaw Fork
 
-> 版本基线：`main` @ `334fb74` + 工作区未提交改动（ChatScreen / ComposeChatActivity / strings）
-> 审计日期：2026-10-25
+> 审计时的工作区基线：`334fb74` + 当时全部未提交的改动（含 ChatScreen /
+> ComposeChatActivity / strings）。审计日期：2026-10-25
 > 方法论：[Cloudflare security-audit-skill](https://github.com/cloudflare/security-audit-skill)（侦察 → 覆盖账本 → 独立猎手 → 对抗验证 → 结构化报告）
 > 攻击面分类参考 [SnailSploit/Claude-Red](https://github.com/SnailSploit/Claude-Red)（AI 安全 / 移动端 / 供应链 / CI-CD 类目）。
 > 前两轮见 [`SECURITY_AUDIT.md`](SECURITY_AUDIT.md)（r1–r4）与 [`SECURITY_AUDIT_R2.md`](SECURITY_AUDIT_R2.md)（F1–F10）。
 >
-> **修复状态（同日落地，未提交）**：R3-01 / R3-02 / R3-03 / R3-05 已修复，见第 6 节；
-> F3 的调用方认证部分缓解、F4/F5/F6/F7/F8/F9 与供应链项 R3-06~R3-10 仍未动。
+> **修复落点（2026-10-25 提交，勿按本文去单个提交里找全）**：这批改动横跨三个提交，
+> 第 6 节的表格已逐行标注所属提交——
+> `f118251` 落下围栏本体与 MCP/日志/渠道透传那一半，
+> `5665cb9` 落下工具出口围栏、`send_file` 策略、脱敏、PIN 通道与 fail-closed 那一半，
+> `27ad881` 是与本轮无关的智能搜索卡片 UI。
+> R3-01 / R3-02 / R3-03 / R3-05 已修复；F3 的调用方认证部分缓解；
+> F4/F5/F6/F7/F8/F9 与供应链项 R3-06~R3-10 见第 1.1 节状态列。
 
 ---
 
@@ -30,7 +35,7 @@
 
 | ID | 等级 | 问题 | 状态 |
 |---|---|---|---|
-| **R3-01** | **High**（F3 放大器） | 外部自动化任务进入后**硬编码 `Channel.LOCAL`**，F2 来源闸门对其全放行 | ✅ **已修复 2026-10-25**（见 §6.1） |
+| **R3-01** | **High**（F3 放大器） | 外部自动化任务进入后**硬编码 `Channel.LOCAL`**，F2 来源闸门对其全放行 | ✅ **已修复 2026-10-25**（见 §6.1；启动页扇门为首轮漏记、后补） |
 | **R3-02** | **High** | `web_search` 结果无 UNTRUSTED 围栏直达上下文（间接提示注入） | ✅ **已修复 2026-10-25**（见 §6.2） |
 | **R3-03** | Medium | 注入"存储化"面扩大：`kb_read`/MCP 工具返回值仍无围栏（与 F4 同型） | ✅ **已修复 2026-10-25**（见 §6.2） |
 | **R3-04** | Medium | `send_file` 是任意绝对路径读取外发原语 | ✅ **已修复 2026-10-25**（见 §6.4） |
@@ -198,45 +203,66 @@ F4（`memory_recall` 无围栏）仍未修，且同型缺口又多了两处：
 
 ---
 
-## 6. 同日修复记录（2026-10-25，未提交）
+## 6. 修复记录（2026-10-25 落地，横跨三个提交）
 
-单元测试：**416 用例 / 0 失败**（本轮累计 +27：`ContextFenceTest` 9、`ToolRiskPolicyTest` +2、
+下表逐行标注所属提交。`f118251` 先落了围栏本体与渠道透传那一半，
+`5665cb9` 落了其余；**照本文去 `5665cb9` 单个提交里找全会找不到**——
+`ContextFence` 本体、MCP 出口、日志脱敏、`AppViewModel`/`TaskFlowController`
+的渠道透传都在 `f118251`。
+
+单元测试：**487 用例 / 0 失败**（本轮累计 +27：`ContextFenceTest` 9、`ToolRiskPolicyTest` +2、
 `ExternalAutomationContractTest` +2、`HeaderMaskTest` 7、`ToolRegistryRedactionTest` 4、
 `SendFilePolicyTest` 8、`HostPolicyTest` 7，其中后 12 个为 F5/F6/F8/F9/R3-04 新增）；
-`compileReleaseKotlin` 通过。**F6 无单测**（需真 Keystore，见 §6.4）。E2E 用例见
+`:app:compileDebugKotlin` + `compileDebugJavaWithJavac` 通过。
+**F6 无单测**（需真 Keystore，见 §6.4）。E2E 用例见
 QA_CHECKLIST **SEC12–SEC18**，尚未真机执行。
 
 ### 6.1 R3-01 / F3 — 外部自动化不再是 LOCAL
 
-| 改动 | 位置 |
-|---|---|
-| 新增 `Channel.EXTERNAL`（"External Automation"） | `channel/ChannelManager.kt:25-42` |
-| `startTask` 增加 `channel` 参数，默认 `LOCAL`，外部路径传 `EXTERNAL` | `AppViewModel.kt:52-72` |
-| `sendTask(text, channel)` 透传 | `ui/chat/TaskFlowController.kt:134-141, 258` |
-| 入口在 launch intent 上打 `EXTRA_EXTERNAL_SOURCE` 标记，Activity 据此选渠道 | `automation/ExternalAutomationEntrypoint.kt:80, 111`；`ui/chat/ComposeChatActivity.kt:353` |
-| 回调 fail-closed：`return_action` 必须配一个**已安装**的 `return_package`，否则不发广播 | `automation/ExternalAutomationContract.kt:80-128`（`callbackTarget` 为纯函数，可测） |
-| 闸门文档写明 EXTERNAL 按远程源处理 | `tool/ToolRiskPolicy.kt:107-121` |
+| 改动 | 位置 | 提交 |
+|---|---|---|
+| 新增 `Channel.EXTERNAL`（"External Automation"） | `channel/ChannelManager.kt:25-42` | `5665cb9` |
+| `startTask` 增加 `channel` 参数，默认 `LOCAL`，外部路径传 `EXTERNAL` | `AppViewModel.kt:52-72` | `f118251` |
+| `sendTask(text, channel)` 透传 | `ui/chat/TaskFlowController.kt:134-141, 258` | `f118251` |
+| 入口在 launch intent 上打 `EXTRA_EXTERNAL_SOURCE` 标记，Activity 据此选渠道 | `automation/ExternalAutomationEntrypoint.kt:80, 111`；`ui/chat/ComposeChatActivity.kt:353` | `5665cb9` |
+| 回调 fail-closed：`return_action` 必须配一个**已安装**的 `return_package`，否则不发广播 | `automation/ExternalAutomationContract.kt:80-128`（`callbackTarget` 为纯函数，可测） | `5665cb9` |
+| 闸门文档写明 EXTERNAL 按远程源处理 | `tool/ToolRiskPolicy.kt:107-121` | `f118251` |
+| 启动页转发 `task` extra 时一并转发标记（见下方残留缺口） | `ui/splash/SplashActivity.kt:33-52` | 后续修复 |
 
 效果：开关开启后，任意 App 的 `RUN_TASK` 仍能驱动 agent，但 `make_call` / `send_message` /
 `send_file` / `input_text` / `system_key` / `clipboard` / `mcp_*` 一律被拒，读类工具照常可用；
 `return_action` 不再成为"代播任意广播"的代理。**未做**（属新功能，不在本轮）：逐调用方
 签名白名单 / 自定义 signature 权限（会破坏 Tasker/MacroDroid 的既有用法）。
 
+**残留缺口（首轮修复时漏记，后补）**：`ComposeChatActivity` 靠 `EXTRA_EXTERNAL_SOURCE`
+判渠道，而 `SplashActivity` 在把 `task` extra 转给它时原本**不转发该标记**，于是
+`am start -n io.agents.pokeclaw/.ui.splash.SplashActivity --es task "…"` 这条路进来的
+任务仍被记成 `Channel.LOCAL`。该 Activity 是 `exported="true"` 的 LAUNCHER activity，
+任何应用都能这么调——与 R3-01 同一个洞，只是换了扇门。现已改为：凡经启动页转发的
+`task` extra 一律打标（能带着 `task` extra 到达启动页，本身就说明不是人在此屏幕点击）。
+
+另有两处同类不一致，均为 **debug-only、release 下空转**（`BuildConfig.DEBUG` 门控）：
+`debug/TaskTriggerReceiver` 与 `debug/DebugTaskReceiver` 直接启 `ComposeChatActivity`
+且不带标记。它们不构成 release 漏洞，但意味着 debug 包测的风险等级与 release 不同，
+**是否给这两条也打标需要先确认 QA 流程有没有依赖 adb 任务拿 LOCAL 等级**——这会改变
+SEC 用例的预期，故本轮未动。
+
 ### 6.2 R3-02 / R3-03 / F4 同型 / R3-05 — 一个围栏实现，全部内容出口
 
 新增 `agent/ContextFence.kt`：唯一的 `wrap()` / `sanitize()` 实现（幂等、`@JvmStatic`
 供 Java 调用），接入点：
 
-| 出口 | 位置 |
-|---|---|
-| `web_search` 结果 | `tool/impl/WebSearchTool.kt:66-72` |
-| `memory_recall` 结果（逐条 sanitize 后整体围栏） | `agent/memory/MemoryRecallTool.kt:78-93` |
-| `kb_read` / `kb_search` 结果 | `agent/knowledge/KbReadTool.kt:35`、`KbSearchTool.kt:46-53` |
-| MCP 工具**返回值** | `agent/mcp/McpTool.kt:89-97` |
-| `get_notifications` 结果 | `tool/impl/GetNotificationsTool.java:114-120` |
-| `read_conversation` 结果 | `tool/impl/mobile/ReadConversationTool.java:143-146` |
-| 记忆 briefing（改用公共 sanitize，`<memory>` 围栏不变） | `agent/memory/MemoryStore.kt:712-720` |
-| 自动回复系统提示补"消息是数据不是指令" | `service/AutoReplyManager.java:694-700` |
+| 出口 | 位置 | 提交 |
+|---|---|---|
+| `web_search` 结果 | `tool/impl/WebSearchTool.kt:66-72` | `5665cb9` |
+| `memory_recall` 结果（逐条 sanitize 后整体围栏） | `agent/memory/MemoryRecallTool.kt:78-93` | `5665cb9` |
+| `kb_read` / `kb_search` 结果 | `agent/knowledge/KbReadTool.kt:35`、`KbSearchTool.kt:46-53` | `5665cb9` |
+| MCP 工具**返回值** | `agent/mcp/McpTool.kt:89-97` | `f118251` |
+| `get_notifications` 结果 | `tool/impl/GetNotificationsTool.java:114-120` | `5665cb9` |
+| `read_conversation` 结果 | `tool/impl/mobile/ReadConversationTool.java:143-146` | `5665cb9` |
+| 记忆 briefing（改用公共 sanitize，`<memory>` 围栏不变） | `agent/memory/MemoryStore.kt:712-720` | `5665cb9` |
+| 自动回复系统提示补"消息是数据不是指令" | `service/AutoReplyManager.java:694-700` | `5665cb9` |
+| `ContextFence` 本体 + `ContextFenceTest` | `agent/ContextFence.kt` | `f118251` |
 
 **一个必须记录的坑**：`memory_recall` 的输出同时是 UI 的 chip 数据源，
 `MemoryRecallFormat.chips()` 用尾部锚点（`- [` / `...` / 结尾）切分 chip。
@@ -254,7 +280,8 @@ QA_CHECKLIST **SEC12–SEC18**，尚未真机执行。
 header 块是裸的——这就是 R2 记录的那条"近失事件"。
 `ToolRegistry.executeTool` 的失败日志改走 `redactParams()`：按参数名片段（text/message/content/
 phone/password/pin/code/token/key/query/prompt/subject/note…）判敏，**保留参数名、隐去值**，
-日志仍可诊断但不再带走用户正文。
+日志仍可诊断但不再带走用户正文。（这一段连同 `ToolRegistryRedactionTest` 在 `f118251`；
+`HeaderMask` 本体与 `DebugReportManager`/`FileLoggingInterceptor` 的接入在 `5665cb9`。）
 
 **F5（能安全修的修，不能安全修的写明）**：
 - 已移除 `session.parms["pin"]`：PIN 只从 `X-Config-PIN` / `Authorization` 头读。

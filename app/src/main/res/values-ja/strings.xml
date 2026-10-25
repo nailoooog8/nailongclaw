@@ -273,6 +273,12 @@
     <string name="chat_sugg_draft_email">メールの下書きを手伝って</string>
 
     <string name="chat_quick_task_templates">クイックタスクテンプレート</string>
+    <string name="chat_smart_search_title">スマート検索</string>
+    <string name="chat_smart_search_caption_on">リアルタイム・知識の質問に自動検索</string>
+    <string name="chat_smart_search_caption_off">タップして検索サービスを設定</string>
+    <string name="chat_smart_search_provider_label">検索プロバイダ</string>
+    <string name="chat_smart_search_key_set">キー</string>
+    <string name="chat_smart_search_manage_keys">キーを管理…</string>
     <string name="chat_task_open_reddit">🦞 アプリを開いて PokeClaw を検索</string>
     <string name="chat_task_search_youtube">🎬 YouTube で面白い猫動画を検索</string>
     <string name="chat_task_install_telegram">📦 Play ストアからアプリをインストール</string>
