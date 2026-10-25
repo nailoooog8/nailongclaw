@@ -783,10 +783,10 @@ When in doubt, rerun the smaller bundle first, then expand only if something dri
 
 - [ ] **C1. Start monitor**: "monitor Girlfriend on WhatsApp" → top bar shows "Monitoring: Girlfriend" → user stays in PokeClaw chat (no Home press)
 - [ ] **C1-b. Monitor dialog honors chosen app**: open Monitor dialog → choose `Telegram` (or another supported app) → start monitor → top bar / stop shell show `... on Telegram`, not `... on WhatsApp`
-- [ ] **C2. Auto-reply triggers**: Girlfriend sends message → notification caught → WhatsApp opens → reads context → Cloud LLM generates reply → reply sent
+- [ ] **C2. Auto-reply triggers**: Girlfriend sends message → notification caught → fast path replies through the notification's own direct-reply action (WhatsApp never opens; works with the screen locked) → when the notification carries no reply action → WhatsApp opens → reads context → Cloud LLM generates reply → reply sent
 - [ ] **C3. Stop monitor**: tap top bar → expand → Stop → monitoring stops
 - [ ] **C4. Start Telegram monitor**: "monitor NicoleBot on Telegram" → top bar shows "Monitoring: NicoleBot" → user stays in PokeClaw chat
-- [ ] **C5. Telegram auto-reply triggers**: external Telegram sender / bot sends message → notification caught → Telegram opens → reads context → Cloud LLM generates reply → reply sent
+- [ ] **C5. Telegram auto-reply triggers**: external Telegram sender / bot sends message → notification caught → notification direct-reply fast path sends the reply (no UI) → if unavailable, Telegram opens → reads context → Cloud LLM generates reply → reply sent
 - [ ] **C6. Stop Telegram monitor**: tap top bar → expand → Stop → Telegram monitoring stops without affecting WhatsApp monitors
 
 ## C2. Background Call Follow-Up
@@ -1230,6 +1230,45 @@ When in doubt, rerun the smaller bundle first, then expand only if something dri
   - ⚠️ **MCP 确认卡只走了代码路径**：三按钮 CdsDialog 与其他已验弹窗同构件，但真机触发需要一次真实 MCP 工具任务（H27 的回显服务器套路），本轮未排。登记录为「代码同级、待任务触发复看」。
   - ⚠️ **PIN 弹窗的「校验不过不关窗」难经点击验证**：键盘顶升会让对话框位移，点到窗外即标准 dismiss。非法值不落盘已证（PIN 保持 762494）；不关窗分支按代码结构成立（只有合法分支调 `handle.dismiss()`）。
 
+### 记忆库时效接替 —— 矛盾不再并存等裁决（2026-10-25，参照 getzep/graphiti）
+
+> 起因：`MEMORY_DESIGN.md` §4 预研时把「事实带有效期、被顶替时作废而非并存」标记为 Zep/Graphiti 领先的核心能力，结论是「若要做，只借『有效期』这一半」。本轮把那一半落地：矛盾判定命中后，**新事实顶替旧事实**（旧条目标 `invalidAt` 作废、保留可查，不删除），简报与默认召回只注入仍有效的事实。诚实失败的三道保险：工具返回值如实报告作废了什么；管理页可一键恢复（恢复=方向互换，接替者反而作废）；**置顶条目永不自动作废**（用户显式动作高于时间逻辑，与抑制豁免同一条原则）。旧数据里已有的 ⚠ 冲突对**不做静默迁移**，继续按老规则显示，直到用户处置或新事实接替其中一条。
+>
+> 纯逻辑部分（接替写入、简报过滤、恢复互换、淘汰顺序、JSON 兼容）按 CLAUDE.md 纯逻辑例外走单测：`MemoryStoreTest` 36 例（新增 9、改写 3）、`MemoryEntryTest` 19 例（时间字段往返 + 旧文件回退）、`MemoryRecallFormatTest` 8 例（作废标注往返）；2026-10-25 实测全套 **363 / 363 绿**。下列两条为真机 E2E。
+
+- [x] **H49. 矛盾写入触发时效接替，旧记忆作废且可恢复 [PASS — 2026-10-25 真机]**: `adb push` 旧格式 `memories.json`（单条「用户的手机是Pixel。」，无时间字段——顺带验旧文件按仍有效解析）+ 三个技能夹具（`h49save`/`h50recall`/`h50history`，Tier 1.5 确定性触发，0 LLM）→ 聊天发 `h49save` → ①`memory_save` 工具卡：「已记住 [事实] 用户的手机是小米。⏳ 这条顶替了 1 条旧记忆（已作废，默认不再召回）：- 用户的手机是Pixel。请把被顶替的内容转告用户…」②管理页：Pixel 行「事实 · 已作废」（muted），小米行「事实 · 2次」活条目③页脚「作废 1 条」④点 Pixel 行 → 恢复对话框写明「恢复后，接替它的这条会被作废：用户的手机是小米。」→ 确认 → Pixel 回活、小米变「已作废 · 2次」⑤长按删除小米 → 删除确认（抑制指纹）→ 删除后库剩 1 条、「遗忘抑制（1）」。
+  - **盘面证据**（`adb shell cat memories.json`）：接替后 Pixel `invalidAt=1792897339034` / `supersededBy=408f934742b0`，小米 `validAt` 同刻 / `supersedes=["546c5e077b20"]` / `conflictsWith=[]`（作废时清掉旧 ⚠）；恢复后指针反向互换且 Pixel `validAt` 刷新为恢复时刻；删除小米后 Pixel `supersedes` 剪空——三条路径都无悬空引用。
+  - ⚠️ **本机 `am broadcast` 链路在 release 包里是哑的**：`TaskTriggerReceiver.onReceive` 第一行 `if (!BuildConfig.DEBUG) return;`（`DebugTaskReceiver` 同样）。release 包只能用 UI 路径：`input text 'h49save'` + **BACK 收键盘**再点发送 FAB（键盘开着点 [1178,2627] 会打到 IME）。
+  - ⚠️ **重装会重置无障碍服务**（系统设置被打回 null，重装后 `sendTask` 走 `DISABLED` 分支弹「Task mode needs Accessibility」）。`settings put secure enabled_accessibility_services` 在 V2502DA 上写了不生效——正确路径是 无障碍设置 → 已下载的服务 → PokeClaw → 允许（vivo 敏感权限弹窗）。技能触发词不自动豁免该门（`canRunWithoutAccessibility` 只放行 DirectIntent）。
+- [x] **H50. 默认检索只回仍有效的事实，历史按需可见 [PASS — 2026-10-25 真机]**: 接 H49 接替后状态 → ①发 `h50recall` → 工具步骤渲染成**单个 chip** `#408f934742b0 用户的手机是小米。`（Pixel 不出现）②发 `h50history`（技能带 `include_history: "true"`）→ 两个 chip 都在，Pixel 的内容区带「（已作废，被 #408f934742b0 接替）」③chips 渲染不退化（标注在内容区，`(命中 N 次)` 尾缀不动，`MemoryRecallFormatTest` 有往返回归）。
+
+### 感知回路降本 + 通知直回复 + 意图在场感（2026-10-25，`docs/AGENT_PERCEPTION_RESEARCH.md` 调研落地）
+
+> 起因：用户原话「帮你回消息要截图再看，再滑动，才能回消息，而且你并不知道他在想什么，因为他已经跳转到另一个网页了」。调研（社区 mobile-mcp / DroidRun / android-use / Open-AutoGLM；海外 Apple App Intents、Android 16 AppFunctions、Assist 通道、ChatGPT Agent watch 模式；国产厂商；通知 RemoteInput 专项）落地五件事：
+> ① 提示词把 take_screenshot 收窄为「树拿不到的视觉内容」专用，Send Message 技能先试 reply_via_notification；
+> ② 新工具 `reply_via_notification`：经通知自带 RemoteInput action 直回复——零 UI、锁屏可用、不需要无障碍（微信/QQ 无标准 reply action，自动落回原路径）；
+> ③ 新工具 `read_conversation`：节点树一次读整屏会话（them/me 归属）+ ACTION_SCROLL_FORWARD 语义滚动读历史，取代「滑动+截图」循环；
+> ④ `ClawAccessibilityService.awaitUiStable`（TYPE_WINDOW_CONTENT_CHANGED 版本计数）替换 SendMessageTool 四处固定 sleep；
+> ⑤ 任务预热附带最近通知摘要与「屏幕快照可能已过期」提示；auto_reply 新消息先走通知直回复（不开 app、不解锁），失败回退原 UI 导航。
+> 风险分类：reply_via_notification 属 HIGH_IMPACT（外发消息，远程渠道禁用）；read_conversation 只读。
+
+- [ ] **H51. reply_via_notification 直回复（零 UI）[RELEASE-OK] [HUMAN]**: 对方设备刚发来 WhatsApp/Telegram 消息（通知仍活跃）→ 聊天发 `reply to Mom on WhatsApp: almost there` → 工具卡报「replied via notification direct reply (app was not opened)」→ 全程 `mResumedActivity` 不是 WhatsApp、屏幕可保持熄灭 → 对方设备实际收到该文本。
+- [ ] **H51-b. 无可回复通知时诚实降级 [RELEASE-OK]**: 通知已清理 / 联系人不匹配 / 微信 QQ（无标准 reply action）→ 工具返回明确错误（`no replyable notification`，并建议改用 send_message）→ 模型下一轮改调 send_message 成功发送。联系人不匹配时**不得**把回复发给同 app 的其他对话。
+- [ ] **H52. read_conversation 一次读会话 [RELEASE-OK]**: 手动打开与任一联系人的聊天 → 发 `read my current chat and summarize`（或直接验工具）→ 一次调用返回 them/me 归属的消息行；工具轨迹无 take_screenshot；`scroll_back=2` 能读到更早历史且去重（同文本不重复出现）；停在聊天列表页调用时返回「needs an open chat」而非乱猜。
+- [ ] **H53. 自动回复快速路径（锁屏可用）[RELEASE-OK] [HUMAN]**: auto_reply 监控 WhatsApp 联系人 → 熄屏 → 对方发消息 → 回复经通知 action 发出：不解锁、不开 app（对方收到；exit-info 无新异常），trace 依次出现 `notification-direct :: found` → `send-success :: notification-direct`。同一监控在微信上走回退：`notification-direct-unavailable` → 原 UI 导航流程照常回信。
+- [ ] **H54. 回消息任务不再截图优先 [LLM-CLOUD]**: `send hi to Mom on WhatsApp` → 工具轨迹先 reply_via_notification（无通知则直接 send_message），全程无 take_screenshot；仅「看看图片/地图」类视觉任务才出现截图（对 H 段任务轨迹抽查 3 例统计）。
+- [ ] **H55. awaitUiStable 不劣化发送链路 [RELEASE-OK]**: 走 H51-b 的 send_message 路径计时：开 app → 发送成功的墙钟不劣于改动前基线（快设备提前返回、慢设备仍有完整等待窗口）；连续 5 次发送无一次因等待不足而漏发（didMessageLeaveComposer 校验仍兜底）。
+- [ ] **H56. 任务预热带通知摘要与过期提示 [LLM-CLOUD] [LOGCAT-DEBUG]**: 留几条未读通知 → 发任务 `check my messages` → 初始用户消息含 `Recent notifications` 摘要（≤5 条、应用名: 标题 — 摘文）与「the user may have navigated away since」提示；通知监听未开时摘要缺席不报错。
+
+### 悬浮窗超级岛化 + AppFunctions 探针（2026-10-25，P2 落地）
+
+> 对应调研报告 §5 P2。①悬浮窗从「只有 Step N 的圆点/胶囊」升级为超级岛形态：运行胶囊第二行实时显示 agent 正在干什么（工具显示名），完成/失败浮出带摘要的结果胶囊（✓/✗ + 截断摘要，点按回聊天，5 秒后收回）——用户在别的 app 里也能看见进度和结果，随时点停。②`get_device_info(category="app_functions")` 新增 AppFunctions 探针（全反射）：如实报告 Android 16 通道在该设备的可用性。查证结论（AOSP）：`EXECUTE_APP_FUNCTIONS` 为 `internal|role`（仅 ASSISTANT 角色预装应用），第三方 app 拿不到，平台层无公开发现 API——所以只做探针不做执行路径，等生态开门探针结论自动翻转。
+
+- [ ] **H57. AppFunctions 探针如实报告 [RELEASE-OK]**: V2502DA（API 36）→ `get_device_info(category="app_functions")` → 返回包含 manager 是否拿到、`android.permission.EXECUTE_APP_FUNCTIONS` 是否 granted、protection 描述与「stay on the accessibility/UI path」结论；预期生产 ROM 上为「service present + not granted」（除非 vivo 放开）。API <36 设备/模拟器 → 返回「requires Android 16 (API 36)」。任何情况下不崩溃、不崩溃于无障碍关闭时。
+- [ ] **H58. 运行胶囊显示当前动作 [RELEASE-OK]**: 悬浮窗开启 → 发一个多步任务（如 `open youtube and search cats`）→ 切到别的 app 观察悬浮窗：胶囊展开为 Step 行 + 动作行（如「Open App」「Tap Node」，随每个工具调用刷新，>26 字符截断）+ Tap to stop；点胶囊 → 任务取消（聊天里出现取消提示）。
+- [ ] **H59. 完成浮出摘要、点按回聊天 [RELEASE-OK]**: 任务成功时人在别的 app → 悬浮窗变绿色结果胶囊「✓ + 摘要前 60 字符」（如回消息任务显示已发送内容），5 秒后收回圆点；期间点按 → 回到 PokeClaw 聊天页且该任务的完成卡片在。失败同理为红色「✗ + 原因」。Tier1 直连/技能路径（无 LLM 回合）同样有摘要（route.description / skillResult.message）。
+
+> **评审修复（2026-10-25，open-code-review 全量过审后）**：①`read_conversation` 滚动读历史时按趟收集、旧趟前插——修掉「滚动后消息按屏倒序」的 High 缺陷；遍历不再 `recycle()` 已入结果集的节点（API 28–32 上访问已回收节点会抛异常）。②`reply_via_notification` 成功后只取消被回复的那一条通知（新增 `ClawNotificationListener.dismissNotification`），不再清掉同 app 其他未读。③自动回复快速路径从 MessagingStyle 通知的 `EXTRA_MESSAGES` 提取最近会话作上下文（零 UI 找回上下文，H53 的 trace 多一行 `context=…`）。④`SendMessageTool` 发送验证的静默等待保底 500ms（防安静清空输入框时误报未发送）。⑤`MemoryStore.restoreSuperseded` 改为「恢复即裁决」：复活条目按新写入口径顶替活跃矛盾者（直系配对行为不变，A→B→C 链恢复 A 不再留下 A、C 双活，新增单测 `restoring through a chain supersedes the live tail`）。⑥删除根目录 29 个 QA uiautomator dump 并在 .gitignore 加 `/*.xml` 防再犯。全部修复后 364/364 单测绿。
 ## CI. Emulator Smoke Harness
 The runner itself is code. When it reports red for a reason that has nothing to do with
 the app, it burns triage time and trains everyone to ignore the matrix — which is worse
@@ -1938,6 +1977,28 @@ grep -i 'custom local model url\|Custom URL set' /tmp/dump.xml
 
 # X6 — persistence in MMKV
 adb shell run-as io.agents.pokeclaw strings /data/data/io.agents.pokeclaw/files/mmkv/mmkv.default | grep -E "KEY_CUSTOM_LOCAL_MODEL_URL|https://"
+```
+
+## AC. 网络搜索（web_search 工具） — 2026-10-25
+
+内置 `web_search` 工具（博查 Bocha / Tavily 双服务商，密钥加密存于 MMKV），系统提示词在纯聊天例外区增加了「实时/知识类问题 → web_search」路由。取舍记录见 `docs/WEB_SEARCH_DESIGN.md`。
+**单测:** `WebSearchClientTest` 9 例（解析/截断/错误提取），`ToolRiskPolicyTest` 补 `web_search` 白名单两例。
+**注意:** 「在某 App 里搜索」仍走设备自动化（InAppSearchGuard 不变），W 组验证不覆盖也不改动该路径。
+
+- [ ] **AC1. Knowledge question uses web_search when configured**: 设置 → 功能 → 网络搜索，配置博查（或 Tavily）Key 并设为当前服务后，问「今天上海天气怎么样？」→ **Expected**: 工具轨迹出现 `web_search`，回答带结果依据（如温度区间），全程不打开浏览器/搜索 App、不调 `get_screen_info`。
+- [ ] **AC2. Unconfigured web_search fails soft**: 未配置 Key 时问知识题 → **Expected**: 模型收到「未配置」错误后明确告知需要去设置页配置，随后凭自身知识作答；不崩、不重试轰炸。
+- [ ] **AC3. Remote channel may search**: 微信/QQ/Telegram 任一通道问「最近有什么科技新闻」→ **Expected**: 远程通道不被 ToolRiskPolicy 拒绝（READ_ONLY 白名单生效），回复基于搜索结果。
+- [ ] **AC4. In-app search path unchanged**: 「在淘宝搜运动鞋」→ **Expected**: 仍走 open_app → input_text 自动化，InAppSearchGuard 照常拦截未打字的提前完成（回归确认，行为与改动前一致）。
+- [ ] **AC5. Settings page round-trip**: 网络搜索页：保存 Key →「测试连接」返回成功/失败提示；切换「当前服务」后 Settings 行 trailing 标签随之变化（已配置服务名/未配置）；Key 清空保存后不切换当前服务。
+- [ ] **AC6. MCP search template prefills only**: MCP 服务器页「＋添加服务器」对话框出现模板 chips（You.com 免费·免Key / Tavily）→ **Expected**: 点击仅预填名称/URL/鉴权方式，保存仍走正常校验流程；You.com 模板为无鉴权，Tavily 模板为 Bearer。
+
+### ADB verification commands
+
+```bash
+# AC2 — the soft-fail error reaches the tool result (debug build only)
+adb shell run-as io.agents.pokeclaw logcat -d | grep -i "web_search is not configured"
+# AC5 — key persisted encrypted (no plaintext sk-/tvly- in MMKV)
+adb shell run-as io.agents.pokeclaw strings /data/data/io.agents.pokeclaw/files/mmkv/mmkv.default | grep -c "enc:v1:"
 ```
 
 ---
