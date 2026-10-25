@@ -53,6 +53,11 @@ object FloatingCircleManager {
     private var currentRound: Int = 0
     private var currentChannel: Channel? = null
     private var currentTokenState: io.agents.pokeclaw.agent.TokenMonitor.State = io.agents.pokeclaw.agent.TokenMonitor.State.NORMAL
+    /** What the agent is doing right now (tool display name), shown on the running pill. */
+    private var currentAction: String = ""
+    /** Result summary surfaced on the SUCCESS/ERROR pill; blank keeps the old circle. */
+    private var resultSummary: String = ""
+    private var resultSuccess: Boolean = true
 
     private const val TASK_NOTIFY_DURATION_MS = 3000L // task notification shown for 3 seconds before collapsing
 
@@ -195,6 +200,8 @@ object FloatingCircleManager {
      */
     fun setIdleState() {
         ThreadUtils.runOnUiThread {
+            resultSummary = ""
+            currentAction = ""
             setState(State.IDLE)
             hide()
         }
@@ -209,6 +216,9 @@ object FloatingCircleManager {
         ThreadUtils.runOnUiThread {
             pendingTaskText = taskText
             currentChannel = channel
+            // A new task clears the previous run's action label and result summary
+            currentAction = ""
+            resultSummary = ""
             cancelNotifyCollapse()
             setState(State.TASK_NOTIFY)
             // Auto-collapse to RUNNING after 3 seconds (call setState directly, bypassing TASK_NOTIFY guard)
@@ -276,20 +286,41 @@ object FloatingCircleManager {
     }
 
     /**
-     * Switch to task completed state (auto-resets to IDLE after 5 seconds)
+     * Update what the agent is doing right now, shown as a second line on the
+     * running pill. No-op when the float is not showing, so callers never
+     * have to check the overlay permission state first.
      */
-    fun setSuccessState() {
+    fun updateTaskAction(action: String) {
         ThreadUtils.runOnUiThread {
+            currentAction = action
+            val view = EasyFloat.getFloatView(FLOAT_TAG) ?: return@runOnUiThread
+            val tvAction = view.findViewById<TextView>(R.id.tvTaskAction) ?: return@runOnUiThread
+            tvAction.text = if (action.length > 26) action.substring(0, 26) + "…" else action
+        }
+    }
+
+    /**
+     * Switch to task completed state (auto-resets to IDLE after 5 seconds).
+     * With a summary the float expands to a result pill so the user sees the
+     * outcome wherever they are; tapping it opens the chat.
+     */
+    fun setSuccessState(summary: String? = null) {
+        ThreadUtils.runOnUiThread {
+            resultSummary = summary?.trim().orEmpty()
+            resultSuccess = true
             setState(State.SUCCESS)
             scheduleAutoReset()
         }
     }
 
     /**
-     * Switch to task failed state (auto-resets to IDLE after 5 seconds)
+     * Switch to task failed state (auto-resets to IDLE after 5 seconds).
+     * With a summary the float expands to a result pill showing the failure.
      */
-    fun setErrorState() {
+    fun setErrorState(summary: String? = null) {
         ThreadUtils.runOnUiThread {
+            resultSummary = summary?.trim().orEmpty()
+            resultSuccess = false
             setState(State.ERROR)
             scheduleAutoReset()
         }
@@ -317,6 +348,7 @@ object FloatingCircleManager {
         val cardRunning = view.findViewById<View>(R.id.cardRunning)
         val cardSuccess = view.findViewById<View>(R.id.cardSuccess)
         val cardError = view.findViewById<View>(R.id.cardError)
+        val cardResult = view.findViewById<View>(R.id.cardResult)
 
         // Hide all state views
         cardIdle?.visibility = View.GONE
@@ -324,6 +356,7 @@ object FloatingCircleManager {
         cardRunning?.visibility = View.GONE
         cardSuccess?.visibility = View.GONE
         cardError?.visibility = View.GONE
+        cardResult?.visibility = View.GONE
 
         // Cancel any previous auto-reset
         cancelAutoReset()
@@ -354,19 +387,37 @@ object FloatingCircleManager {
                 // Expand to pill shape for token display
                 setFloatRootWidth(view, WindowManager.LayoutParams.WRAP_CONTENT)
                 cardRunning?.visibility = View.VISIBLE
-                // Update token status text
+                // Update token status text + current action label
                 val tvStatus = view.findViewById<TextView>(R.id.tvTokenStatus)
                 tvStatus?.text = "Step ${currentRound}"
+                val tvAction = view.findViewById<TextView>(R.id.tvTaskAction)
+                tvAction?.text = if (currentAction.length > 26) currentAction.substring(0, 26) + "…" else currentAction
             }
-            State.SUCCESS -> {
+            State.SUCCESS, State.ERROR -> {
                 cancelNotifyCollapse()
-                cardSuccess?.visibility = View.VISIBLE
-                setFloatRootWidth(view, getCircleWidth(view))
-            }
-            State.ERROR -> {
-                cancelNotifyCollapse()
-                cardError?.visibility = View.VISIBLE
-                setFloatRootWidth(view, getCircleWidth(view))
+                val hasSummary = resultSummary.isNotEmpty()
+                if (hasSummary) {
+                    // Result pill: ✓/✗ + summary, tap opens the chat
+                    cardResult?.visibility = View.VISIBLE
+                    setFloatRootWidth(view, WindowManager.LayoutParams.WRAP_CONTENT)
+                    val card = cardResult as? androidx.cardview.widget.CardView
+                    if (card != null) {
+                        val colorRes = if (resultSuccess) R.color.colorSuccessPrimary else R.color.colorErrorPrimary
+                        val app = appRef
+                        if (app != null) {
+                            try { card.setCardBackgroundColor(app.getColor(colorRes)) } catch (_: Exception) {}
+                        }
+                    }
+                    view.findViewById<ImageView>(R.id.ivResultIcon)?.setImageResource(
+                        if (resultSuccess) R.drawable.ic_check else R.drawable.ic_close
+                    )
+                    view.findViewById<TextView>(R.id.tvResultSummary)?.text =
+                        if (resultSummary.length > 60) resultSummary.substring(0, 60) + "…" else resultSummary
+                } else {
+                    if (state == State.SUCCESS) cardSuccess?.visibility = View.VISIBLE
+                    else cardError?.visibility = View.VISIBLE
+                    setFloatRootWidth(view, getCircleWidth(view))
+                }
             }
         }
     }

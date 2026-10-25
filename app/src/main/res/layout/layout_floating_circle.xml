@@ -118,14 +118,71 @@
 
             </LinearLayout>
 
+            <!-- Current action label (what the agent is doing right now) -->
             <TextView
+                android:id="@+id/tvTaskAction"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
+                android:text=""
+                android:textColor="@color/colorBrandOnPrimary"
+                android:textSize="9dp"
+                android:maxWidth="190dp"
+                android:maxLines="1"
+                android:ellipsize="end" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
                 android:text="Tap to stop"
                 android:textColor="@color/colorBrandOnPrimary"
                 android:alpha="0.6"
                 android:textSize="8dp" />
+
+        </LinearLayout>
+
+    </androidx.cardview.widget.CardView>
+
+    <!-- 任务结果状态（带摘要的胶囊：完成浮出摘要，点按回聊天） -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/cardResult"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="4dp"
+        app:cardBackgroundColor="@color/colorSuccessPrimary"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="12dp"
+            android:paddingEnd="14dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp">
+
+            <ImageView
+                android:id="@+id/ivResultIcon"
+                android:layout_width="18dp"
+                android:layout_height="18dp"
+                android:contentDescription="@string/cd_task_success"
+                android:src="@drawable/ic_check"
+                app:tint="@color/colorBrandOnPrimary" />
+
+            <TextView
+                android:id="@+id/tvResultSummary"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text=""
+                android:textColor="@color/colorBrandOnPrimary"
+                android:textSize="10dp"
+                android:maxWidth="210dp"
+                android:maxLines="2"
+                android:ellipsize="end" />
 
         </LinearLayout>
 

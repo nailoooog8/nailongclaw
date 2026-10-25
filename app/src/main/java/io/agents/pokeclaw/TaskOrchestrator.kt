@@ -102,7 +102,7 @@ class TaskOrchestrator(
                 taskEventCallback?.invoke(TaskEvent.Failed(reason))
                 ChannelManager.sendMessage(targetChannel, "✗ $reason", targetMsgId)
                 ChannelManager.flushMessages(targetChannel)
-                FloatingCircleManager.setErrorState()
+                FloatingCircleManager.setErrorState(reason)
                 if (session.autoReturnToChat) {
                     try {
                         val service = ClawAccessibilityService.getInstance()
@@ -256,7 +256,7 @@ class TaskOrchestrator(
                     taskEventCallback?.invoke(TaskEvent.Completed(route.description))
                     ChannelManager.sendMessage(channel, "✓ ${route.description}", messageID)
                     ForegroundService.resetToIdle(ClawApplication.instance)
-                    FloatingCircleManager.setSuccessState()
+                    FloatingCircleManager.setSuccessState(route.description)
                     onTaskFinished()
                 }
                 return
@@ -292,9 +292,9 @@ class TaskOrchestrator(
                         if (session.isRunning) {
                             ForegroundService.resetToIdle(ClawApplication.instance)
                             if (success) {
-                                FloatingCircleManager.setSuccessState()
+                                FloatingCircleManager.setSuccessState(route.description)
                             } else {
-                                FloatingCircleManager.setErrorState()
+                                FloatingCircleManager.setErrorState("Failed: ${route.description}")
                             }
                             onTaskFinished()
                         }
@@ -339,7 +339,7 @@ class TaskOrchestrator(
                                 if (session.isRunning) {
                                     ChannelManager.sendMessage(channel, skillResult.message, messageID)
                                     taskEventCallback?.invoke(TaskEvent.Completed(skillResult.message))
-                                    FloatingCircleManager.setSuccessState()
+                                    FloatingCircleManager.setSuccessState(skillResult.message)
                                     ForegroundService.resetToIdle(ClawApplication.instance)
                                     onTaskFinished()
                                 }
@@ -444,6 +444,7 @@ class TaskOrchestrator(
                     val displayName = io.agents.pokeclaw.tool.ToolRegistry.getInstance().getDisplayName(toolName)
                     taskEventCallback?.invoke(TaskEvent.ToolAction(displayName))
                     ForegroundService.updateTaskStatus(ClawApplication.instance, "$displayName...")
+                    FloatingCircleManager.updateTaskAction(displayName)
                 }
             }
 
@@ -509,7 +510,7 @@ class TaskOrchestrator(
                 ForegroundService.resetToIdle(ClawApplication.instance)
                 flushRoundBuffer()
                 ChannelManager.flushMessages(completedSession.channel ?: channel)
-                FloatingCircleManager.setSuccessState()
+                FloatingCircleManager.setSuccessState(answer)
                 // Auto-return to the surface that started the task
                 if (completedSession.autoReturnToChat) {
                     XLog.i(
@@ -553,7 +554,7 @@ class TaskOrchestrator(
                     failedMessageId
                 )
                 ChannelManager.flushMessages(failedChannel)
-                FloatingCircleManager.setErrorState()
+                FloatingCircleManager.setErrorState(error.message)
                 onTaskFinished()
             }
 
