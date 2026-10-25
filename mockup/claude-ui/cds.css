@@ -1386,33 +1386,48 @@ body {
   font-size: 12.5px; color: var(--cds-text-secondary);
 }
 
-/* 终态载荷块：失败原因（危险染）与结果（中性）。失败原因必须比步骤更
-   早被看见——用户打开一个失败任务的详情，第一个问题就是「它怎么死的」。
-   所以错误块排在步骤账本之前，见 cds.js 的 append 顺序。 */
+/* 终态载荷块：失败原因与最终答案。形态抄 open-claude-ui 的终态输出面——
+   标签行（✓/✕ + 小字）+ 深色等宽 console 块。console 块固定深色不随
+   深浅 mode 变：它是「机器输出」层，与页面 chrome 由此分层；参考实现
+   同样在两个 mode 下都用 neutral-950。 */
+.task-detail-error,
+.task-detail-answer { margin-top: 12px; }
 .task-detail-block-label {
+  display: flex; align-items: center; gap: 5px;
   font-size: 10.5px; font-weight: 600;
   letter-spacing: .03em;
-  margin-bottom: 3px;
 }
-.task-detail-block-text { font-size: 12.5px; line-height: 1.6; }
-.task-detail-error {
-  margin-top: 10px; padding: 10px 12px;
-  border: var(--cds-ring-hairline) solid color-mix(in srgb, var(--cds-fill-danger) 35%, transparent);
-  border-radius: var(--cds-radius);
-  background: color-mix(in srgb, var(--cds-fill-danger) 8%, transparent);
+.task-detail-block-glyph { font-weight: 700; }
+.task-detail-block-text {
+  margin-top: 5px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  background: #1b1b19;
+  border: var(--cds-ring-hairline) solid rgba(255, 255, 255, 0.08);
+  color: #e6e4de;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 220px;
+  overflow-y: auto;
 }
 .task-detail-error .task-detail-block-label { color: var(--cds-fill-danger); }
-.task-detail-error .task-detail-block-text {
-  color: color-mix(in srgb, var(--cds-fill-danger) 85%, var(--cds-text-primary));
-}
-.task-detail-answer {
-  margin-top: 10px; padding: 10px 12px;
-  border: var(--cds-ring-hairline) solid var(--cds-border);
-  border-radius: var(--cds-radius);
-  background: var(--cds-surface-2);
-}
 .task-detail-answer .task-detail-block-label { color: var(--cds-text-muted); }
-.task-detail-answer .task-detail-block-text { color: var(--cds-text-secondary); }
+
+/* 终态卡的淡染边框——open-claude-ui 的 terminal 形态：完成=emerald 系、
+   失败=红系，40% 混进既有边框色。运行中/待确认不染：它们已有动态状态点，
+   再染边框就过了。CANCELLED 也不染——它既不是成功也不是失败。 */
+.task-card[data-terminal="done"] {
+  border-color: color-mix(in srgb, var(--cds-fill-success) 40%, var(--cds-border));
+}
+.task-card[data-terminal="failed"] {
+  border-color: color-mix(in srgb, var(--cds-fill-danger) 40%, var(--cds-border));
+}
+/* 终态不画状态点：✓/✕ pill 加淡染边框已经把话说完，点只是噪音
+   （参考实现的终态卡头里也没有状态点，pill 即状态）。 */
+.task-card[data-terminal] .status-dot { display: none; }
 
 /* 卡片末行是失败原因时整行染危险色——列表里一眼看出谁没成。 */
 .task-card-last[data-kind="error"] {

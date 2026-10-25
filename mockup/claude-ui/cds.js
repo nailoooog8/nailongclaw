@@ -938,12 +938,14 @@
   var tasksBackBtn = document.getElementById('tasksBackBtn');
   var tasksBadge = document.getElementById('tasksBadge');
 
+  /* glyph 是终态 pill 的字形（✓/✕）——open-claude-ui 的终态卡用字形
+     而非色点标状态，淡染边框 + 字形 pill 一套带走。 */
   var TASK_STATES = {
-    RUNNING:         { label: '运行中', dot: 'running' },
-    WAITING_CONFIRM: { label: '待确认', dot: 'clay' },
-    SUCCEEDED:       { label: '已完成', dot: 'ready' },
-    FAILED:          { label: '失败',   dot: 'error' },
-    CANCELLED:       { label: '已取消', dot: 'muted' }
+    RUNNING:         { label: '运行中', dot: 'running', glyph: '' },
+    WAITING_CONFIRM: { label: '待确认', dot: 'clay', glyph: '' },
+    SUCCEEDED:       { label: '已完成', dot: 'ready', glyph: '✓' },
+    FAILED:          { label: '失败',   dot: 'error', glyph: '✕' },
+    CANCELLED:       { label: '已取消', dot: 'muted', glyph: '' }
   };
 
   function taskState(key) {
@@ -1065,15 +1067,19 @@
     return box;
   }
 
-  /* 详情里的终态载荷块：标签 + 正文。className 决定配色（error 危险 /
-     answer 中性），文字一律 textContent——失败原因与最终答案都来自任务
-     执行过程，拼 innerHTML 就是注入面。 */
-  function buildDetailBlock(label, text, className) {
+  /* 详情里的终态载荷块：标签（✓/✕ + 小字）+ 深色 console 正文。
+     文字一律 textContent——失败原因与最终答案都来自任务执行过程，
+     拼 innerHTML 就是注入面。 */
+  function buildDetailBlock(label, text, className, glyph) {
     var box = el('div', className);
     box.innerHTML =
-      '<div class="task-detail-block-label"></div>' +
+      '<div class="task-detail-block-label">' +
+        '<span class="task-detail-block-glyph"></span>' +
+        '<span class="task-detail-block-name"></span>' +
+      '</div>' +
       '<div class="task-detail-block-text"></div>';
-    box.querySelector('.task-detail-block-label').textContent = label;
+    box.querySelector('.task-detail-block-glyph').textContent = glyph || '';
+    box.querySelector('.task-detail-block-name').textContent = label;
     box.querySelector('.task-detail-block-text').textContent = text;
     return box;
   }
@@ -1136,9 +1142,13 @@
       '<div class="task-card-last"></div>';
     card.querySelector('.status-dot').setAttribute('data-kind', st.dot);
     card.querySelector('.task-card-title').textContent = t.title || '（无标题任务）';
+    // 终态淡染边框 + 字形 pill（open-claude-ui terminal 形态）；
+    // data-terminal 同时让 CSS 收掉状态点。
+    if (t.state === 'SUCCEEDED') card.setAttribute('data-terminal', 'done');
+    if (t.state === 'FAILED') card.setAttribute('data-terminal', 'failed');
     var pill = card.querySelector('.task-state');
     pill.setAttribute('data-state', String(t.state || ''));
-    pill.textContent = st.label;
+    pill.textContent = st.glyph ? st.glyph + ' ' + st.label : st.label;
 
     var meta = card.querySelector('.task-card-meta');
     if (t.channel) {
@@ -1246,6 +1256,11 @@
       meta.appendChild(document.createTextNode(' · 发起于 ' + fmtClock(task.createdAt || Date.now())));
       if (task.finishedAt) {
         meta.appendChild(document.createTextNode(' · 完成于 ' + fmtClock(task.finishedAt)));
+        // 参考实现的终态输出区带时长（mono tabular-nums）。同样只报起止
+        // 差——耗时是说事实，不是估进度。
+        meta.appendChild(document.createTextNode(
+          ' · 耗时 ' + fmtElapsed(task.finishedAt - (task.createdAt || task.finishedAt))
+        ));
       }
     }
 
@@ -1255,14 +1270,15 @@
       wrap.appendChild(prompt);
     }
 
-    // 终态载荷两个块：失败原因（危险色）与最终答案。Failed 事件在账本里
-    // 不产步骤，没有这个块，失败任务的详情就只剩一串正常步骤、看不到
-    // 它是怎么死的——设备上看不见失败原因正是这个页面要补的旧账。
+    // 终态载荷两个块：失败原因（✕ 危险染）与最终答案（✓ 中性）。形态抄
+    // open-claude-ui 的终态输出面。Failed 事件在账本里不产步骤，没有这个
+    // 块，失败任务的详情就只剩一串正常步骤、看不到它是怎么死的——设备上
+    // 看不见失败原因正是这个页面要补的旧账。
     if (task.error) {
-      wrap.appendChild(buildDetailBlock('失败原因', task.error, 'task-detail-error'));
+      wrap.appendChild(buildDetailBlock('失败原因', task.error, 'task-detail-error', '✕'));
     }
     if (task.answer) {
-      wrap.appendChild(buildDetailBlock('结果', task.answer, 'task-detail-answer'));
+      wrap.appendChild(buildDetailBlock('结果', task.answer, 'task-detail-answer', '✓'));
     }
 
     var steps = task.steps || [];
