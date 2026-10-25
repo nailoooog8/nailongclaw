@@ -40,9 +40,11 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import io.agents.pokeclaw.R
+import io.agents.pokeclaw.agent.SearchProvider
 import io.agents.pokeclaw.agent.skill.Skill
 import io.agents.pokeclaw.agent.skill.SkillCategory
 import io.agents.pokeclaw.agent.skill.SkillRegistry
+import io.agents.pokeclaw.utils.KVUtils
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -152,6 +154,10 @@ fun ChatScreen(
     inputEnabled: Boolean = true,
     onModelSwitch: (modelId: String, displayName: String) -> Unit = { _, _ -> },
     colors: PokeclawColors = AbyssDark,
+    webSearchProvider: String = SearchProvider.DEEPSEEK.name,
+    webSearchConfigured: Boolean = false,
+    onSelectSearchProvider: (SearchProvider) -> Unit = {},
+    onManageSearchKeys: () -> Unit = {},
 ) {
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -295,6 +301,14 @@ fun ChatScreen(
                             },
                             onMonitorClick = { showMonitorSheet = true },
                             monitorActive = activeTasks.isNotEmpty(),
+                            colors = colors,
+                        )
+
+                        SmartSearchCard(
+                            providerName = webSearchProvider,
+                            configured = webSearchConfigured,
+                            onSelectProvider = onSelectSearchProvider,
+                            onManageKeys = onManageSearchKeys,
                             colors = colors,
                         )
 
@@ -1401,6 +1415,160 @@ private fun EmptyStateWithPrompts(
 }
 
 // ======================== QUICK TASKS PANEL (v9) ========================
+
+/**
+ * The smart-search card docked above the composer. web_search itself is routed
+ * by the system prompt — the model calls the tool when a question needs current
+ * or factual grounding — so the card's job is to tell the truth about that
+ * capability: which provider is active, whether its key is set, and the taps
+ * that fix the latter. Shaped after the open-claude-ui mockup's pill-and-pop
+ * pattern: the card carries the current value, the pop carries the choices.
+ */
+@Composable
+private fun SmartSearchCard(
+    providerName: String,
+    configured: Boolean,
+    onSelectProvider: (SearchProvider) -> Unit,
+    onManageKeys: () -> Unit,
+    colors: PokeclawColors,
+) {
+    var menuOpen by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier.background(colors.surface),
+    ) {
+        HorizontalDivider(color = colors.divider, thickness = 1.dp)
+
+        Box {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { menuOpen = true }
+                    .padding(horizontal = 12.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(30.dp)
+                        .background(
+                            if (configured) colors.accent.copy(alpha = 0.12f) else colors.background,
+                            RoundedCornerShape(8.dp),
+                        ),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Default.TravelExplore,
+                        contentDescription = null,
+                        tint = if (configured) colors.accent else colors.textTertiary,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+                Spacer(Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        stringResource(R.string.chat_smart_search_title),
+                        fontSize = 12.5.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = colors.textPrimary,
+                    )
+                    Text(
+                        if (configured) {
+                            stringResource(R.string.chat_smart_search_caption_on)
+                        } else {
+                            stringResource(R.string.chat_smart_search_caption_off)
+                        },
+                        fontSize = 10.5.sp,
+                        color = if (configured) colors.textTertiary else colors.accent,
+                    )
+                }
+                Text(
+                    text = if (configured) {
+                        SearchProvider.fromName(providerName).displayName
+                    } else {
+                        stringResource(R.string.settings_status_not_configured)
+                    },
+                    fontSize = 11.sp,
+                    color = if (configured) colors.accent else colors.textTertiary,
+                )
+                Spacer(Modifier.width(2.dp))
+                Icon(
+                    Icons.Default.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = colors.textTertiary,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
+
+            // No MaterialTheme wraps this composition, so the menu's defaults
+            // would land on the light baseline scheme inside a dark screen —
+            // container and every text color are set from the CDS palette.
+            DropdownMenu(
+                expanded = menuOpen,
+                onDismissRequest = { menuOpen = false },
+                containerColor = colors.surface,
+            ) {
+                Text(
+                    stringResource(R.string.chat_smart_search_provider_label),
+                    fontSize = 11.sp,
+                    color = colors.textTertiary,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                )
+                SearchProvider.entries.forEach { provider ->
+                    // A provider is only worth selecting if its key is already
+                    // saved — show that, so the radio is an informed choice.
+                    val hasKey = KVUtils.getWebSearchApiKeyFor(provider.name).isNotBlank()
+                    DropdownMenuItem(
+                        text = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    provider.displayName,
+                                    fontSize = 13.sp,
+                                    color = colors.textPrimary,
+                                )
+                                if (hasKey) {
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        stringResource(R.string.chat_smart_search_key_set),
+                                        fontSize = 10.sp,
+                                        color = colors.accent,
+                                    )
+                                }
+                            }
+                        },
+                        leadingIcon = {
+                            RadioButton(
+                                selected = provider.name == providerName,
+                                onClick = null,
+                                colors = RadioButtonDefaults.colors(
+                                    selectedColor = colors.accent,
+                                    unselectedColor = colors.textTertiary,
+                                ),
+                            )
+                        },
+                        onClick = {
+                            onSelectProvider(provider)
+                            menuOpen = false
+                        },
+                    )
+                }
+                HorizontalDivider(color = colors.divider, thickness = 1.dp)
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            stringResource(R.string.chat_smart_search_manage_keys),
+                            fontSize = 13.sp,
+                            color = colors.accent,
+                        )
+                    },
+                    onClick = {
+                        menuOpen = false
+                        onManageKeys()
+                    },
+                )
+            }
+        }
+    }
+}
 
 @Composable
 private fun QuickTasksPanel(

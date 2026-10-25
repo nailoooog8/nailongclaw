@@ -272,6 +272,12 @@
     <string name="chat_sugg_draft_email">Help me draft an email</string>
 
     <string name="chat_quick_task_templates">Quick Task Templates</string>
+    <string name="chat_smart_search_title">Smart Search</string>
+    <string name="chat_smart_search_caption_on">Real-time &amp; knowledge questions, auto-searched</string>
+    <string name="chat_smart_search_caption_off">Tap to configure a search service</string>
+    <string name="chat_smart_search_provider_label">Search provider</string>
+    <string name="chat_smart_search_key_set">Key</string>
+    <string name="chat_smart_search_manage_keys">Manage keys…</string>
     <string name="chat_task_open_reddit">🦞 Open Reddit and search for pokeclaw</string>
     <string name="chat_task_search_youtube">🎬 Search YouTube for funny cat fails</string>
     <string name="chat_task_install_telegram">📦 Install Telegram from Play Store</string>

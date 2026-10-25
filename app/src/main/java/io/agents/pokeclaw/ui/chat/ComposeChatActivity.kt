@@ -15,6 +15,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.runtime.*
 import androidx.compose.runtime.collectAsState
 import io.agents.pokeclaw.TaskEvent
+import io.agents.pokeclaw.agent.SearchProvider
 import io.agents.pokeclaw.agent.llm.ModelConfigRepository
 import io.agents.pokeclaw.agent.mcp.McpConfirmationCoordinator
 import io.agents.pokeclaw.automation.ExternalAutomationContract
@@ -23,6 +24,7 @@ import io.agents.pokeclaw.appViewModel
 import io.agents.pokeclaw.floating.FloatingCircleManager
 import io.agents.pokeclaw.ui.settings.LlmConfigActivity
 import io.agents.pokeclaw.ui.settings.SettingsActivity
+import io.agents.pokeclaw.ui.settings.WebSearchActivity
 import io.agents.pokeclaw.ui.web.ClaudeUiPreviewActivity
 import io.agents.pokeclaw.utils.KVUtils
 import io.agents.pokeclaw.utils.XLog
@@ -60,6 +62,10 @@ class ComposeChatActivity : ComponentActivity() {
     // Session-level token tracking for chat mode
     private val _sessionTokens = mutableStateOf(0)
     private val _sessionCost = mutableStateOf(0.0)
+    // Smart-search card state — refreshed on resume so a key saved in the
+    // web-search settings page shows up without leaving and re-entering chat.
+    private val _webSearchProvider = mutableStateOf(SearchProvider.DEEPSEEK.name)
+    private val _webSearchConfigured = mutableStateOf(false)
     private var deferLocalChatBootstrapForAutoTask = false
     private var pendingExternalRequestId: String? = null
     private var pendingExternalReturnAction: String? = null
@@ -222,9 +228,19 @@ class ComposeChatActivity : ComponentActivity() {
                 },
                 onModelSwitch = { modelId, displayName -> switchModel(modelId, displayName) },
                 colors = composeColors,
+                webSearchProvider = _webSearchProvider.value,
+                webSearchConfigured = _webSearchConfigured.value,
+                onSelectSearchProvider = { provider ->
+                    KVUtils.setWebSearchProvider(provider.name)
+                    refreshWebSearchStatus()
+                },
+                onManageSearchKeys = {
+                    startActivity(Intent(this, WebSearchActivity::class.java))
+                },
             )
         }
 
+        refreshWebSearchStatus()
         refreshSidebarHistory()
 
         // Restore last conversation if Activity was recreated (e.g., system killed it during a task)
@@ -281,6 +297,7 @@ class ComposeChatActivity : ComponentActivity() {
         _isLocalModelActive.value = ModelConfigRepository.isLocalActive()
         _isTaskRunning.value = appViewModel.isTaskRunning()
         refreshSidebarHistory()
+        refreshWebSearchStatus()
         permHandler.removeCallbacks(permPoller)
         permHandler.postDelayed(permPoller, 1000)
         activeTaskShellController.onResume()
@@ -452,6 +469,12 @@ class ComposeChatActivity : ComponentActivity() {
 
     private fun refreshSidebarHistory() {
         syncSidebar(conversationStore.refreshSidebar())
+    }
+
+    /** Reads the web-search card's truth from KVUtils — the card never caches. */
+    private fun refreshWebSearchStatus() {
+        _webSearchProvider.value = KVUtils.getWebSearchProvider()
+        _webSearchConfigured.value = KVUtils.isWebSearchConfigured()
     }
 
     private fun syncSidebar(convos: List<ChatHistoryManager.ConversationSummary>) {
