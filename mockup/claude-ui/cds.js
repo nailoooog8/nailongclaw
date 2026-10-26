@@ -1905,29 +1905,32 @@
     wrap.querySelector('.task-detail-title').textContent = task.title || '定时详情';
 
     var meta = wrap.querySelector('.task-detail-meta');
-    var bits = [st.label, task.repeat || '单次'];
+    // 顺序即读法：状态 · 周期 · （倒计时/排队说明）· 触发时间 · 创建于 ·
+    // 日历锚定。倒计时是 span 不是文本节点（ticker 要按 data-fire 续算），
+    // 所以它不能进纯文本的 bits 数组——拼在行尾就成了「创建于…还有 15 小时」
+    // 这种倒装句。
+    meta.appendChild(document.createTextNode(st.label));
+    meta.appendChild(document.createTextNode(' · '));
+    meta.appendChild(document.createTextNode(task.repeat || '单次'));
     if (task.state === 'SCHEDULED') {
-      // 倒计时不进静态 bits——它挂在下面可续算的 span 上，30s 一刷。
-      if (!task.nextFireAt) bits.push('运行时间待定');
-    } else if (task.state === 'QUEUED') {
-      bits.push('前一个任务结束后自动补跑');
-    } else if (task.lastFiredAt) {
-      bits.push(fmtClock(task.lastFiredAt) + (task.state === 'MISSED' ? ' 错过' : ' 触发'));
-    }
-    bits.push('创建于 ' + fmtClock(task.createdAt || Date.now()));
-    if (task.calendarAnchorHours) {
-      bits.push('触发时带入 ' + task.calendarAnchorHours + ' 小时日历');
-    }
-    bits.forEach(function (bit, i) {
-      if (i > 0) meta.appendChild(document.createTextNode(' · '));
-      meta.appendChild(document.createTextNode(bit));
-    });
-    if (task.state === 'SCHEDULED' && task.nextFireAt) {
-      // 倒计时挂可续算的 span，ticker 每 30s 刷（data-fire 是未来时刻）。
-      var span = el('span', 'schedule-next', '还有 ' + fmtUntil(task.nextFireAt));
-      span.setAttribute('data-fire', String(task.nextFireAt));
       meta.appendChild(document.createTextNode(' · '));
-      meta.appendChild(span);
+      if (task.nextFireAt) {
+        var span = el('span', 'schedule-next', '还有 ' + fmtUntil(task.nextFireAt));
+        span.setAttribute('data-fire', String(task.nextFireAt));
+        meta.appendChild(span);
+      } else {
+        meta.appendChild(document.createTextNode('运行时间待定'));
+      }
+    } else if (task.state === 'QUEUED') {
+      meta.appendChild(document.createTextNode(' · 前一个任务结束后自动补跑'));
+    } else if (task.lastFiredAt) {
+      meta.appendChild(document.createTextNode(
+        ' · ' + fmtClock(task.lastFiredAt) + (task.state === 'MISSED' ? ' 错过' : ' 触发')
+      ));
+    }
+    meta.appendChild(document.createTextNode(' · 创建于 ' + fmtClock(task.createdAt || Date.now())));
+    if (task.calendarAnchorHours) {
+      meta.appendChild(document.createTextNode(' · 触发时带入 ' + task.calendarAnchorHours + ' 小时日历'));
     }
 
     if (task.prompt) {
