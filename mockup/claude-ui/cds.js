@@ -734,7 +734,7 @@
      过来，用户点一个按钮，PokeClawChat.decideMcp 把决定送回 Kotlin，
      阻塞在 executeTool 里的那个线程才继续。
 
-     三个细节都是有原因的：
+     四个细节都是有原因的：
        1. 卡片**不放进消息列表**。它由 renderConfirmation 单独画在 feed 末尾，
           因为 renderLiveRaw 会先清空 feed 再重建——同一批 evaluateJavascript
           里先画卡再重建，卡就没了。Kotlin 侧也据此分两次调用。
@@ -742,24 +742,32 @@
           决定送给同一次等待，而第二次会被 coordinator 当作过期点击丢掉——
           禁用让"点了没反应"和"没点上"在画面上可区分。
        3. 无桥（纯浏览器打开）时按钮点了只禁用自己：那是设计稿，没有人在
-          等这个决定，不能假装有回路。                                       */
+          等这个决定，不能假装有回路。
+       4. 破坏性档（risk=DESTRUCTIVE，mcp_* 一律如此）**没有「始终允许」**：
+          gate 会把始终允许静默降级成允许一次，卡面给一个不会被兑现的按钮
+          就是卡面在说谎（QA H62）。倒计时只转述 coordinator 的时限，
+          权威在 Kotlin——到点卡片会被收走。                          */
   function renderConfirmation(req) {
     removeConfirmation();
     if (!req) return;
+    var destructive = req.risk === 'DESTRUCTIVE';
     var card = turn('turn-assistant',
       '<div class="mcp-card" id="mcpConfirm">' +
         '<div class="mcp-head">' +
           '<span class="status-dot" data-kind="clay"></span>' +
           '<span>需要你确认</span>' +
           '<span class="mcp-tool"></span>' +
+          (destructive ? '<span class="mcp-risk">破坏性</span>' : '') +
         '</div>' +
         '<div class="mcp-desc"></div>' +
         '<div class="mcp-params"></div>' +
+        (destructive ? '<div class="mcp-consequence"></div>' : '') +
         '<div class="mcp-actions">' +
           '<button class="pill cds-btn-squish" type="button" data-decide="allow_once">允许一次</button>' +
-          '<button class="pill cds-btn-squish" type="button" data-decide="allow_always">始终允许</button>' +
+          (destructive ? '' : '<button class="pill cds-btn-squish" type="button" data-decide="allow_always">始终允许</button>') +
           '<button class="pill cds-btn-squish" type="button" data-decide="deny">本次拒绝</button>' +
         '</div>' +
+        '<div class="mcp-timeout"></div>' +
       '</div>');
     card.querySelector('.mcp-tool').textContent = req.displayName + ' · ' + req.serverName;
     card.querySelector('.mcp-desc').textContent = req.description || '';
@@ -769,12 +777,18 @@
     } else {
       params.parentNode.removeChild(params);
     }
+    if (destructive) {
+      card.querySelector('.mcp-consequence').textContent =
+        '破坏性操作不可撤销，只能允许这一次——拒绝后模型会换别的方式。';
+    }
+    startConfirmationCountdown(req.timeoutMs);
     card.addEventListener('click', function (e) {
       var btn = e.target && e.target.closest ? e.target.closest('button[data-decide]') : null;
       if (!btn) return;
       var decision = btn.getAttribute('data-decide');
       var buttons = card.querySelectorAll('button[data-decide]');
       for (var i = 0; i < buttons.length; i++) { buttons[i].disabled = true; }
+      stopConfirmationCountdown();
       if (window.PokeClawChat && window.PokeClawChat.decideMcp) {
         window.PokeClawChat.decideMcp(decision);
       }
@@ -783,7 +797,36 @@
     return card;
   }
 
+  /* 确认卡倒计时：1s 一刷，只转述 Kotlin 给的 timeoutMs。数到 0 不是
+     裁决——裁决在 coordinator 超时那一刻发生，这里只是让用户在知道
+     时限的情况下做决定。 */
+  var confirmationTimer = null;
+
+  function startConfirmationCountdown(timeoutMs) {
+    stopConfirmationCountdown();
+    var box = document.getElementById('mcpConfirm');
+    var node = box && box.querySelector('.mcp-timeout');
+    if (!node) return;
+    var left = Math.max(1, Math.round((timeoutMs || 60000) / 1000));
+    var tick = function () {
+      if (left <= 0) {
+        node.textContent = '已超时，按拒绝处理';
+        stopConfirmationCountdown();
+        return;
+      }
+      node.textContent = left + ' 秒后未应答将按拒绝处理';
+      left -= 1;
+    };
+    tick();
+    confirmationTimer = setInterval(tick, 1000);
+  }
+
+  function stopConfirmationCountdown() {
+    if (confirmationTimer) { clearInterval(confirmationTimer); confirmationTimer = null; }
+  }
+
   function removeConfirmation() {
+    stopConfirmationCountdown();
     var existing = document.getElementById('mcpConfirm');
     if (existing && existing.parentNode) {
       existing.parentNode.removeChild(existing);

@@ -314,15 +314,20 @@
           <div class="mcp-head">
             <span class="status-dot" data-kind="clay"></span>
             需要你确认
+            <span class="mcp-risk">破坏性</span>
           </div>
           <div class="mcp-desc">
             下单前需要填入乘客人身份证号。是否允许 PokeClaw 读取已保存的实名信息并填入表单？
           </div>
+          <div class="mcp-params">field: id_card · value: 3301**********1234</div>
+          <div class="mcp-consequence">
+            破坏性操作不可撤销，只能允许这一次——拒绝后模型会换别的方式。
+          </div>
           <div class="mcp-actions">
             <button class="pill cds-btn-squish" type="button">允许一次</button>
-            <button class="pill cds-btn-squish" type="button">始终允许</button>
             <button class="pill cds-btn-squish" type="button">本次拒绝</button>
           </div>
+          <div class="mcp-timeout">60 秒后未应答将按拒绝处理</div>
         </div>
       </div>
 

@@ -6,6 +6,7 @@ package io.agents.pokeclaw.ui.chat
 import android.os.Handler
 import android.os.Looper
 import androidx.activity.ComponentActivity
+import io.agents.pokeclaw.agent.mcp.ConfirmationButtons
 import io.agents.pokeclaw.agent.mcp.McpConfirmationCoordinator
 import io.agents.pokeclaw.agent.mcp.McpConfirmationGate
 import io.agents.pokeclaw.agent.mcp.McpConfirmationRequest
@@ -49,6 +50,9 @@ class McpConfirmationSurface(
             if (activity.isFinishing) return@post
             dismissDialog()
             onNote(McpConfirmationGate.pendingNote(request))
+            // 破坏性档没有「始终允许」：卡面不给 gate 会静默降级的出口
+            // （ConfirmationButtons 与 gate 同规则，H62）。
+            val buttons = ConfirmationButtons.forRisk(request.risk)
             // CDS frame: the same panel/serif/accent treatment the settings
             // editors got, so a confirmation that parks the agent thread
             // doesn't drop the user into a stock system dialog.
@@ -61,9 +65,10 @@ class McpConfirmationSurface(
                 ),
                 confirmText = "允许一次",
                 cancelText = "本次拒绝",
-                neutralText = "始终允许",
+                neutralText = "始终允许".takeIf { buttons.offersRememberedYes },
                 onConfirm = { answer(McpConfirmationGate.Decision.ALLOW_ONCE) },
-                onNeutral = { answer(McpConfirmationGate.Decision.ALLOW_ALWAYS) },
+                onNeutral = { answer(McpConfirmationGate.Decision.ALLOW_ALWAYS) }
+                    .takeIf { buttons.offersRememberedYes },
                 // Cancelling answers "no" — see the class comment. The cancel
                 // button and BACK/outside-touch both land here (CdsDialog
                 // routes the button through onCancel on purpose).
@@ -105,6 +110,11 @@ class McpConfirmationSurface(
         }
         if (request.paramsPreview.isNotBlank()) {
             append("\n\n参数：\n").append(request.paramsPreview)
+        }
+        if (!ConfirmationButtons.forRisk(request.risk).offersRememberedYes) {
+            // 破坏性档：解释为什么没有「始终允许」。缺了这句话，两个按钮
+            // 看起来像少了一个，而不是像它本来就不该有。
+            append("\n\n⚠ 破坏性操作，不可撤销：只能允许这一次。")
         }
         append("\n\n这是模型请求的第三方工具，执行前需要你确认。")
     }

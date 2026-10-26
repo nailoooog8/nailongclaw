@@ -840,6 +840,32 @@ body {
 /* 点击后本地禁用：让「点了，正在等」和「没点上」在画面上可区分。 */
 .mcp-actions button:disabled { opacity: .45; pointer-events: none; }
 
+/* 破坏性档徽标：卡头行尾。danger 文字 + 细描边，不用填充——那一行已经
+   够吵，填充会把卡片变成警报条。 */
+.mcp-risk {
+  flex: none;
+  font-size: 10.5px; font-weight: 600;
+  color: var(--cds-fill-danger);
+  border: var(--cds-ring-hairline) solid color-mix(in srgb, var(--cds-fill-danger) 45%, transparent);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+/* 破坏性档的后果说明：解释为什么没有「始终允许」——缺了这句话，两个
+   按钮看起来像少了一个，而不是像它本来就不该有。 */
+.mcp-consequence {
+  font-size: 12px; line-height: 1.6;
+  color: var(--cds-text-secondary);
+  margin: -4px 0 11px;
+}
+/* 超时倒计时：只转述 coordinator 的时限（权威在 Kotlin），等宽 1s 一刷。
+   用户在不知道时限的情况下做决定，和没有卡住是两回事。 */
+.mcp-timeout {
+  margin-top: 9px;
+  font-size: 10.5px;
+  color: var(--cds-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
 /* 记忆库召回 chip：淡蓝底、无边框 */
 .chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
 .chip {

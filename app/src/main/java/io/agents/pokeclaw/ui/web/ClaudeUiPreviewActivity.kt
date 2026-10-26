@@ -572,6 +572,12 @@ class ClaudeUiPreviewActivity : BaseActivity() {
      * emptying `#feed`, so drawing the card in the same `evaluateJavascript`
      * would delete it. The page therefore renders the card *after* the feed,
      * and this method is the only thing that touches it.
+     *
+     * [McpConfirmationRequest.risk] rides along so the card can drop the
+     * 始终允许 exit on a destructive tier — the same rule
+     * [ConfirmationButtons] gives the native dialog and the gate enforces.
+     * `timeoutMs` is what the page counts down from; the coordinator's
+     * timeout is the authority, the card only reports it.
      */
     private fun publishConfirmation(request: McpConfirmationRequest?) {
         if (!::webView.isInitialized) return
@@ -584,6 +590,8 @@ class ClaudeUiPreviewActivity : BaseActivity() {
                 append(",\"serverName\":"); appendJsonString(request.serverName)
                 append(",\"description\":"); appendJsonString(request.description)
                 append(",\"paramsPreview\":"); appendJsonString(request.paramsPreview)
+                append(",\"risk\":"); appendJsonString(request.risk.name)
+                append(",\"timeoutMs\":").append(McpConfirmationCoordinator.DEFAULT_CONFIRM_TIMEOUT_MS)
                 append("}")
             }
         }
