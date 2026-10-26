@@ -151,14 +151,6 @@
         </activity>
 
         <receiver
-            android:name=".debug.DebugTaskReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="io.agents.pokeclaw.DEBUG_TASK" />
-            </intent-filter>
-        </receiver>
-
-        <receiver
             android:name=".automation.ExternalAutomationReceiver"
             android:exported="true">
             <intent-filter>
@@ -228,15 +220,6 @@
             android:name=".task.TaskAlarmReceiver"
             android:enabled="true"
             android:exported="false" />
-
-        <!-- Debug: trigger tasks via ADB broadcast -->
-        <receiver
-            android:name=".debug.TaskTriggerReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="io.agents.pokeclaw.TASK" />
-            </intent-filter>
-        </receiver>
 
     </application>
 

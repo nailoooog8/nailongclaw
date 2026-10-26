@@ -490,18 +490,23 @@ Verified on a Pixel 8 Pro on 2026-04-30:
 MacroDroid setup:
 
 1. In PokeClaw, enable `Settings -> Remote Control -> External Automation`.
-2. In MacroDroid, create a new macro.
-3. Add any trigger you want. For a simple smoke test, use `User Input -> Shortcut Launched`.
-4. Add action `Device Actions -> Send Intent`.
-5. Set `Target` to `Activity`.
-6. Set `Action` to `io.agents.pokeclaw.RUN_TASK`.
-7. Set `Package` to `io.agents.pokeclaw`.
-8. Set `Class` to `io.agents.pokeclaw.automation.ExternalAutomationActivity`.
-9. Set `Extra 1` name to `task`.
-10. Set `Extra 1` value to the task text, for example `how much battery left`.
-11. Save the macro, then run MacroDroid's `Test macro`.
+2. In PokeClaw, open `Settings -> Channels -> 入口 -> Pairing token` and copy the token.
+3. In MacroDroid, create a new macro.
+4. Add any trigger you want. For a simple smoke test, use `User Input -> Shortcut Launched`.
+5. Add action `Device Actions -> Send Intent`.
+6. Set `Target` to `Activity`.
+7. Set `Action` to `io.agents.pokeclaw.RUN_TASK`.
+8. Set `Package` to `io.agents.pokeclaw`.
+9. Set `Class` to `io.agents.pokeclaw.automation.ExternalAutomationActivity`.
+10. Set `Extra 1` name to `token`.
+11. Set `Extra 1` value to the pairing token copied in step 2.
+12. Set `Extra 2` name to `task`.
+13. Set `Extra 2` value to the task text, for example `how much battery left`.
+14. Save the macro, then run MacroDroid's `Test macro`.
 
 Expected result: PokeClaw opens, records the task in the chatroom, runs the task through the normal harness, and shows the result. The intent does not bypass PokeClaw safety, permissions, or tool rules.
+
+Both entry points are exported to every app on the device, so the token is what proves the caller is allowed to use them. A request without it — or with a wrong one — is refused before anything happens, and six wrong attempts pause the entry point for 30 seconds, a pause that a correct token does not cut short. Reset the token from the same settings row to invalidate every app still holding the old one.
 
 For chat instead of task mode, use:
 
@@ -531,6 +536,7 @@ adb shell am broadcast \
 
 Supported extras:
 
+- `token` (required — the pairing token from `Settings -> Channels -> 入口 -> Pairing token`)
 - `task` / `task_b64`
 - `chat` / `chat_b64`
 - `request_id`

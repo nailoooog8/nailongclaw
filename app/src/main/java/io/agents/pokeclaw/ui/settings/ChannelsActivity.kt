@@ -10,6 +10,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.lifecycle.ViewModelProvider
 import io.agents.pokeclaw.R
+import io.agents.pokeclaw.automation.ExternalAutomationGuard
 import io.agents.pokeclaw.base.BaseActivity
 import io.agents.pokeclaw.ui.cds.CdsUi
 import io.agents.pokeclaw.utils.KVUtils
@@ -241,6 +242,28 @@ class ChannelsActivity : BaseActivity() {
             setLeadingIconColor(cds.textPrimary)
             setTrailingIconColor(cds.textMuted)
         }
+
+        // The token that gates the exported entry points above. Only useful
+        // once automation is on, so the row says so instead of offering a
+        // dialog that would mint a token for a feature that is switched off.
+        entryGroup.addMenuItem(
+            leadingIcon = android.R.drawable.ic_menu_manage,
+            title = getString(R.string.ext_automation_token_row),
+            onClick = { showExternalAutomationToken() },
+            showDivider = true
+        ).apply {
+            setTitleColor(cds.textPrimary)
+            setTrailingText(
+                if (KVUtils.isExternalAutomationEnabled()) {
+                    getString(R.string.ext_automation_token_set)
+                } else {
+                    getString(R.string.ext_automation_token_hidden)
+                }
+            )
+            setTrailingTextColor(cds.textSecondary)
+            setLeadingIconColor(cds.textPrimary)
+            setTrailingIconColor(cds.textMuted)
+        }
     }
 
     private fun lanTrailingText(): String =
@@ -322,6 +345,73 @@ class ChannelsActivity : BaseActivity() {
                         Toast.LENGTH_SHORT
                     ).show()
                 }
+            }
+        )
+    }
+
+    /**
+     * The pairing token an automation app has to send as the "token" extra.
+     * Without it every RUN_TASK / RUN_CHAT request is refused, because both
+     * entry points are exported to every app on the device.
+     *
+     * Shown in full, once, on purpose: the user has to copy it into another
+     * app, so masking it would only push them toward a screenshot. The row
+     * itself never displays it.
+     */
+    private fun showExternalAutomationToken() {
+        if (!KVUtils.isExternalAutomationEnabled()) {
+            Toast.makeText(this, R.string.ext_automation_token_needs_enabled, Toast.LENGTH_LONG).show()
+            return
+        }
+        // Minting can fail closed when the keystore refuses to encrypt; an
+        // empty token means there is nothing to show, and the save path has
+        // already surfaced why.
+        val token = ExternalAutomationGuard.getOrCreateToken()
+        if (token.isEmpty()) {
+            Toast.makeText(this, R.string.ext_automation_token_unavailable, Toast.LENGTH_LONG).show()
+            return
+        }
+
+        CdsDialog.show(
+            context = this,
+            title = getString(R.string.ext_automation_token_title),
+            content = CdsDialog.message(
+                this,
+                getString(R.string.ext_automation_token_message, token)
+            ),
+            confirmText = getString(R.string.ext_automation_copy_token),
+            cancelText = getString(R.string.common_cancel),
+            neutralText = getString(R.string.ext_automation_reset_token),
+            onConfirm = {
+                val clipboard = getSystemService(android.content.ClipboardManager::class.java)
+                clipboard?.setPrimaryClip(
+                    android.content.ClipData.newPlainText(
+                        getString(R.string.ext_automation_token_title),
+                        token
+                    )
+                )
+                Toast.makeText(this, R.string.ext_automation_token_copied, Toast.LENGTH_SHORT).show()
+            },
+            onNeutral = { confirmResetToken() },
+        )
+    }
+
+    private fun confirmResetToken() {
+        CdsDialog.show(
+            context = this,
+            title = getString(R.string.ext_automation_reset_title),
+            content = CdsDialog.message(this, getString(R.string.ext_automation_reset_message)),
+            confirmText = getString(R.string.ext_automation_reset_action),
+            cancelText = getString(R.string.common_cancel),
+            onConfirm = {
+                // A reset invalidates every caller still holding the old
+                // token, which is the point — but say so before doing it.
+                if (ExternalAutomationGuard.resetToken().isEmpty()) {
+                    Toast.makeText(this, R.string.ext_automation_token_unavailable, Toast.LENGTH_LONG).show()
+                    return@show
+                }
+                Toast.makeText(this, R.string.ext_automation_reset_done, Toast.LENGTH_SHORT).show()
+                renderAll()
             }
         )
     }

@@ -99,7 +99,8 @@ object BruteForceGuard {
      *
      * Uses MessageDigest.isEqual so the comparison time does not depend on how
      * many leading characters matched. Length still leaks, which is acceptable
-     * here because every secret compared is a fixed 6-digit PIN.
+     * for every secret compared here: channel PINs and the external-automation
+     * token are both fixed length.
      */
     fun constantTimeEquals(a: String, b: String): Boolean {
         return MessageDigest.isEqual(

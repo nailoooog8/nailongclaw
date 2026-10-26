@@ -29,6 +29,33 @@ object ExternalAutomationEntrypoint {
             return false
         }
 
+        // Authenticate before anything observable happens, and before the
+        // enabled-check below: an app without the token must not be able to
+        // learn whether the feature is on by watching which error comes back.
+        //
+        // The rejection still travels to the caller-named return_action, whose
+        // extras are limited to request_id / status / error / mode — so it
+        // leaks nothing the caller could not have broadcast at that app itself.
+        when (val verdict = ExternalAutomationGuard.verify(
+            presented = intent.getStringExtra(ExternalAutomationGuard.EXTRA_TOKEN),
+            callerPackage = request.returnPackage,
+        )) {
+            is ExternalAutomationGuard.Decision.Allow -> Unit
+            is ExternalAutomationGuard.Decision.Reject -> {
+                XLog.w(TAG, "Rejected external automation request: ${verdict.reason}")
+                ExternalAutomationContract.sendCallback(
+                    context = context,
+                    returnAction = request.returnAction,
+                    requestId = request.requestId,
+                    status = ExternalAutomationContract.STATUS_REJECTED,
+                    error = verdict.message,
+                    returnPackage = request.returnPackage,
+                    mode = request.mode,
+                )
+                return false
+            }
+        }
+
         if (!KVUtils.isExternalAutomationEnabled()) {
             XLog.w(TAG, "External automation rejected because the user setting is disabled")
             ExternalAutomationContract.sendCallback(

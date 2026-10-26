@@ -11,7 +11,8 @@
 > `f118251` 落下围栏本体与 MCP/日志/渠道透传那一半，
 > `5665cb9` 落下工具出口围栏、`send_file` 策略、脱敏、PIN 通道与 fail-closed 那一半，
 > `27ad881` 是与本轮无关的智能搜索卡片 UI。
-> R3-01 / R3-02 / R3-03 / R3-05 已修复；F3 的调用方认证部分缓解；
+> R3-01 / R3-02 / R3-03 / R3-05 已修复；F3 的调用方认证**已于 2026-10-26 以配对令牌落地**
+> （签名白名单仍未做，见 §6.5）；
 > F4/F5/F6/F7/F8/F9 与供应链项 R3-06~R3-10 见第 1.1 节状态列。
 
 ---
@@ -64,7 +65,7 @@
 |---|---|---|---|
 | F1 Telegram 白名单 | Critical·已修 | ✅ 保持修复 | `TelegramChannelHandler.kt:121-126` 优先 `from.id` |
 | F2 工具来源闸门 | High·已修 | ✅ 保持修复 | `ToolRiskPolicy.kt:96-117`：未分类默认 HIGH_IMPACT、`mcp_*` 一律高危 |
-| F3 导出自动化组件 | High·缓解 | ❌ **仍开放，且被 R3-01 放大** | `ExternalAutomationEntrypoint.kt:83-87`（仍无调用方校验）、`KVUtils.kt:260`（默认 false 是唯一防线） |
+| F3 导出自动化组件 | High·缓解 | ◐ **调用方校验已补 2026-10-26**（签名白名单仍未做） | `ExternalAutomationGuard.kt`（配对令牌：Crockford base32 定长 160bit、`putEncryptedString` 加密落盘、`BruteForceGuard` 锁定）、`ExternalAutomationEntrypoint.kt`（先验令牌再查开关）、`ui/settings/ChannelsActivity.kt`（显示/复制/重置）。**仍开放**：逐调用方签名白名单 / 自定义 signature 权限（会破坏 Tasker/MacroDroid 既有用法）；`KVUtils` 默认 false 仍是第一道防线 |
 | F4 memory_recall 无围栏 | High | ❌ 仍开放 | `MemoryRecallTool.kt:81-88` 裸拼接；围栏只在 `MemoryStore.briefing`（`MemoryStore.kt:714-717`） |
 | F5 LAN 明文凭据/PIN in query | High | ◐ **部分修复 2026-10-25** | `?pin=` 通道已移除（`ConfigServer.kt:158-180`）；控制台改发 `X-Config-PIN` 头并加 cleartext 警示条（`assets/web/index.html`）。**明文 HTTP 本身未改**：NSC 不能全局收紧，WeChat baseurl / QQ / Douyin 网关是用户可配的 http/ws（见 §6.3） |
 | F6 SecretBox 静默降级明文 | Medium | ✅ **已修复 2026-10-25** | `KVUtils.kt:64-104`：加密失败不写任何东西 + `consumeSecureWriteFailure()`；三个保存入口改为失败时报错而不是"已保存" |
@@ -343,3 +344,54 @@ phone/password/pin/code/token/key/query/prompt/subject/note…）判敏，**保�
    （fail-closed 方向，所以只是难用不是漏洞）；
 2. 原实现用 `InetAddress.getByName` 判私网地址——**这个检查本身就在解析域名**，
    而防 DNS rebinding 的前提就是不做解析。改成对字面量分段判断，全程离线。
+
+### 6.5 F3 — 配对令牌落地，导出入口不再是谁都能进（2026-10-26）
+
+F3 说的是两个导出入口（`ExternalAutomationReceiver` 与 `ExternalAutomationActivity`）
+都没有 `android:permission`，于是设备上任何应用都能启动任务。R3-01 修完之后，“启动之
+后能做什么”被收窄成只读天花板，但“谁能启动”一直是敞开的——本节补上这一半。
+
+| 改动 | 位置 |
+|---|---|
+| 新增 `ExternalAutomationGuard`：令牌生成 / 存储 / 校验 / 锁定 | `automation/ExternalAutomationGuard.kt` |
+| 入口在**任何可观测动作之前**验令牌，且在查“功能是否开启”之前 | `automation/ExternalAutomationEntrypoint.kt` |
+| 设置页显示 / 复制 / 重置令牌（HEAD 的设置面已 CDS 迁移，落在 ChannelsActivity 而非 SettingsActivity） | `ui/settings/ChannelsActivity.kt` |
+| 两个 debug 广播接收器从 main manifest 移到 debug source set，release APK 里不再有这两个导出组件 | `app/src/main/AndroidManifest.xml` → `app/src/debug/AndroidManifest.xml` |
+| 三语文案 | `res/values{,-zh,-ja}/strings.xml` |
+| 文档与用例 | README 的 MacroDroid 步骤与 extras 表；QA SEC18 扩展 + SEC19/20/21 |
+
+设计取舍，逐条记下来因为它们不是显而易见的：
+
+- **令牌走 `putEncryptedString`，和其他所有凭据同一条路。** 一把泄漏的令牌仍然买到只读
+  天花板里的**披露那一半**——屏幕内容、截图、通知文字——而那正是渠道闸门管不了的部分。
+  Keystore 拒加密时 fail-closed：返回空令牌、什么都不写，绝不留一把可读的令牌（F6 的教训）。
+- **Crockford base32、定长 32 字符。** 去掉 I/L/O/U 是因为这个令牌要人肉抄进 MacroDroid，
+  0/O 与 1/l 的混淆会变成一下午的工单；定长则是因为 `BruteForceGuard` 的常数时间比较
+  不隐藏长度，长度不变化的秘密没什么可泄漏。160 bit 也不是为了防在线爆破（那本来就不可行），
+  是为了让“锁定”退化成纵深防御而不是唯一防线。
+- **锁定按调用方自报的 `return_package` 键控，缺省用一个共享键。** 广播拿不到发送方身份：
+  `intent.package` 是发送方自己写的*目标*限制而不是发送方，而能真正归因的
+  `BroadcastReceiver.getSendingUid()` / `getSendingPackage()` 是隐藏系统 API，
+  `android-36.1` 的 `android.jar` 里没有它们，App 侧调不到。所以这条路径上不存在稳定的
+  调用方身份，这不是实现偷懒。这样做的结果是：自称一致的应用会被锁，而轮换身份的不会——
+  更关键的是**攻击者锁不掉用户自己那条正在工作的宏**。代价是一个可被暂停的便利功能，
+  方向是 fail-closed。真正能证明“是哪个应用”的只有签名，那属于下面“仍未做”那半。
+- **先验令牌，后查开关。** 否则没有令牌的应用可以靠“disabled”与“invalid token”两种错误
+  的差别，探出这个功能开没开。
+- **两个 debug 接收器从 main manifest 搬到 debug source set。** 它们本来就是 debug-only
+  （`adb shell am broadcast` 用），却声明在 main manifest 里，于是 release APK 也带着两个
+  `exported="true"` 的组件出厂，只靠各自Receiver 里的 `!BuildConfig.DEBUG` 早退拦着。
+  代码闸门是“唯一防线”的典型形态——R3-01 的启动页正是这么漏的：闸门在，标记没转发。
+  搬到 `app/src/debug/AndroidManifest.xml` 之后，release 构建里这两个组件**从来不曾存在**，
+  不依赖任何删除语义。已核对合并后的 manifest：debug 有 2 个，release 有 0 个，
+  而 `ExternalAutomationActivity` / `ExternalAutomationReceiver` 两个正式入口在 release 里照旧在位。
+
+  顺记一个坑：最初用 `app/src/release/AndroidManifest.xml` + `tools:node="remove"` 做这件事，
+  合并器只给了一条 warning——“was tagged ... to remove other declarations but no other
+  declaration present”——然后**什么都没删**，release 产物里两个 receiver 完好无损。
+  一条 warning 很容易在构建日志里被淹掉。结构正确的做法是让组件只在自己该在的 source set 里
+  声明，而不是在另一个变体里删它。
+
+**仍未做**（属新功能，不在本轮）：逐调用方签名白名单 / 自定义 signature 权限——那才是
+F3 的完整答案，但会破坏 Tasker/MacroDroid 的既有用法，需要先和用户确认迁移路径。
+`KVUtils` 默认 false 仍然是第一道防线，令牌是第二道。

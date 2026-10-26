@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug-only entry points.
+
+  These two receivers exist so `adb shell am broadcast` can drive a debug
+  build during QA. They are exported because adb is not an installed app
+  holding a permission — there is no way to make them reachable from a shell
+  and unreachable from another app.
+
+  They used to live in the main manifest, which meant they shipped inside the
+  release APK as exported components and were stopped only by a `!BuildConfig
+  .DEBUG` early return inside each receiver. A code gate is one bug away from
+  being the only thing standing between any installed app and a task-running
+  entry point — that is exactly how R3-01's splash door worked: the gate
+  existed, the marker just was not forwarded.
+
+  Declaring them here instead means a release build never had them at all.
+  Verified by QA case SEC21 (aapt2 dump xmltree on the release APK).
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!-- Trigger tasks via ADB broadcast. -->
+        <receiver
+            android:name=".debug.TaskTriggerReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="io.agents.pokeclaw.TASK" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Direct single-tool execution, for probing one tool in isolation. -->
+        <receiver
+            android:name=".debug.DebugTaskReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="io.agents.pokeclaw.DEBUG_TASK" />
+            </intent-filter>
+        </receiver>
+    </application>
+
+</manifest>
