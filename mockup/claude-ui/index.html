@@ -70,6 +70,14 @@
         定时
         <span class="schedules-badge" id="schedulesBadge" data-show="false"></span>
       </button>
+      <!-- 新功能引导：定时队列的一次性 teaching bubble。抽屉打开时出现，
+           「去看看」或点进定时行后不再出现；标志经 PokeClawChat 读写
+           SharedPreferences（localStorage 会被清，一次性引导不能存进
+           会被清掉的地方）。无桥的纯浏览器预览不显示。 -->
+      <div class="coach-mark" id="schedulesCoach" data-show="false">
+        <div class="coach-mark-text">定时任务住在这里——对 agent 说「每天早上七点半看我今天的日历」，到点它自己跑，排队、错过、取消都写在明面上。</div>
+        <button class="coach-mark-btn" id="schedulesCoachBtn" type="button">去看看</button>
+      </div>
       <!-- 主题：深浅 × 底色 × 强调色，三个维度合并在一个面板里。
            侧边栏只留这一个入口（原来的「深浅色」独立行已合并进面板，
            记忆库 / 技能管理快捷行移入设置面板的「功能」区，避免同一

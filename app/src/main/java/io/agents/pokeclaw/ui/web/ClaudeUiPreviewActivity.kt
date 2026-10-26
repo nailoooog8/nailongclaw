@@ -531,6 +531,27 @@ class ClaudeUiPreviewActivity : BaseActivity() {
         }
 
         /**
+         * JS → Kotlin: whether the one-time 定时 coach mark was dismissed.
+         *
+         * SharedPreferences, deliberately not the page's localStorage: a
+         * WebView storage clear must not resurrect a hint the user already
+         * acted on. Default false — "never shown" is the honest default for
+         * a new feature's first run.
+         */
+        @JavascriptInterface
+        fun readCoachMarkShown(): Boolean =
+            getSharedPreferences(COACH_PREFS, MODE_PRIVATE)
+                .getBoolean(COACH_KEY_SCHEDULES, false)
+
+        /** JS → Kotlin: the 定时 coach mark was dismissed. Write-once. */
+        @JavascriptInterface
+        fun markCoachMarkShown() {
+            getSharedPreferences(COACH_PREFS, MODE_PRIVATE).edit()
+                .putBoolean(COACH_KEY_SCHEDULES, true)
+                .apply()
+        }
+
+        /**
          * JS → Kotlin: the page's settings sheet opened or closed.
          *
          * Only used for BACK handling: while the sheet is up, BACK should
@@ -1222,6 +1243,13 @@ class ClaudeUiPreviewActivity : BaseActivity() {
         /** Schedule-page levels the page reports through `notifySchedulesView`. */
         private val SCHEDULES_LEVELS = setOf("closed", "list", "detail")
         private const val SCHEDULES_LEVEL_CLOSED = "closed"
+
+        /**
+         * One-time feature-discovery flags. Separate from the QA prefs: that
+         * file is a test harness's notebook, this one is the user's.
+         */
+        private const val COACH_PREFS = "claude_ui_coach"
+        private const val COACH_KEY_SCHEDULES = "schedules_seen"
 
         /**
          * Later than [PROBE_DELAY_MS] on purpose: the probe proves the page is

@@ -26,6 +26,14 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp" />
 
+            <!-- 最近更新：新功能的常驻说明。不做启动弹窗——社区共识是
+                 没人读 what's new 对话框，这里随「关于」可查。 -->
+            <io.agents.pokeclaw.widget.MenuGroup
+                android:id="@+id/whatsNewGroup"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp" />
+
             <io.agents.pokeclaw.widget.MenuGroup
                 android:id="@+id/supportGroup"
                 android:layout_width="match_parent"

@@ -62,8 +62,10 @@ class AboutActivity : BaseActivity() {
         toolbar.showBackButton(true) { finish() }
 
         val aboutGroup = findViewById<MenuGroup>(R.id.aboutGroup)
+        val whatsNewGroup = findViewById<MenuGroup>(R.id.whatsNewGroup)
         val supportGroup = findViewById<MenuGroup>(R.id.supportGroup)
         aboutGroup.applyCds(cds)
+        whatsNewGroup.applyCds(cds)
         supportGroup.applyCds(cds)
 
         aboutGroup.setTitle("PokeClaw")
@@ -92,6 +94,41 @@ class AboutActivity : BaseActivity() {
             setTrailingTextColor(cds.textSecondary)
             setLeadingIconColor(cds.textPrimary)
             setTrailingIconColor(cds.textMuted)
+        }
+
+        // 最近更新。三条新功能的常驻说明——刻意不做启动弹窗：社区共识是
+        // 没人读 what's new 对话框，这里随「关于」可查，行内文案说清
+        // 「它现在长什么样」，与一键 coach mark 各司其职。
+        whatsNewGroup.setTitle("最近更新")
+        listOf(
+            Triple(
+                android.R.drawable.ic_menu_recent_history,
+                "定时任务",
+                "到点自动跑；排队、错过、取消都写在明面上，侧栏「定时」里管",
+            ),
+            Triple(
+                android.R.drawable.ic_secure,
+                "确认卡分级",
+                "破坏性操作只能允许一次——卡面不再给不会被兑现的「始终允许」",
+            ),
+            Triple(
+                android.R.drawable.ic_menu_agenda,
+                "完成摘要",
+                "任务答案上方一行数字：耗时、步骤、工具、已建日程",
+            ),
+        ).forEachIndexed { index, (icon, title, desc) ->
+            whatsNewGroup.addMenuItem(
+                leadingIcon = icon,
+                title = title,
+                onClick = {},
+                showDivider = index < 2,
+            ).apply {
+                setTitleColor(cds.textPrimary)
+                setTrailingText(desc)
+                setTrailingTextColor(cds.textMuted)
+                setLeadingIconColor(cds.textPrimary)
+                setTrailingIconColor(cds.textMuted)
+            }
         }
 
         supportGroup.setTitle("支持")

@@ -1584,6 +1584,33 @@ body {
 }
 .schedules-badge[data-show="true"] { display: inline-flex; }
 
+/* 新功能引导 bubble：定时队列的一次性 teaching bubble（GitHub Primer
+   的 teaching-bubble 模式）。内联在抽屉里跟着行走，不做绝对定位数学；
+   出现到用户点「去看看」为止，之后不再来。 */
+.coach-mark {
+  display: none;
+  margin: 8px 4px 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: var(--cds-ring-hairline) solid var(--cds-border-strong);
+  background: var(--cds-surface-2);
+}
+.coach-mark[data-show="true"] { display: block; }
+.coach-mark-text {
+  font-size: 12px; line-height: 1.65;
+  color: var(--cds-text-secondary);
+}
+.coach-mark-btn {
+  margin-top: 8px;
+  padding: 4px 12px;
+  border: none;
+  border-radius: 999px;
+  background: var(--cds-fill-brand);
+  color: #fff;
+  font: inherit; font-size: 11.5px; font-weight: 500;
+  cursor: pointer;
+}
+
 /* 定时行 = 列表行，纪律同任务行（NNGroup：账本是扫描场景）。 */
 .schedule-card {
   display: block; width: 100%; text-align: left;

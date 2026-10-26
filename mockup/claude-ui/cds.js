@@ -882,6 +882,7 @@
   if (menuBtn) {
     menuBtn.addEventListener('click', function () {
       document.body.classList.add('nav-open');
+      maybeShowCoachMark();
     });
   }
   if (navScrim) {
@@ -890,6 +891,47 @@
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') closeNav();
   });
+
+  /* --------------------------------------------- 新功能引导（一次性）
+     定时队列的 teaching bubble：出现到用户点「去看看」或自己点进定时行
+     为止，之后不再来。标志经 PokeClawChat 存 SharedPreferences——
+     localStorage 会被清（WebView 存储清理、数据清除），一次性引导不能
+     存进一个会被清掉的地方。无桥（纯浏览器预览）时不显示：设计稿没有
+     「第一次使用」这回事。 */
+  var schedulesCoach = document.getElementById('schedulesCoach');
+  var schedulesCoachBtn = document.getElementById('schedulesCoachBtn');
+
+  function coachMarkSeen() {
+    var b = bridge();
+    if (!b || !b.readCoachMarkShown) return true;   // 无桥：不当第一次
+    try { return !!b.readCoachMarkShown(); }
+    catch (e) { console.warn('[cds] readCoachMarkShown failed:', e); return true; }
+  }
+
+  function dismissCoachMark() {
+    if (!schedulesCoach) return;
+    schedulesCoach.setAttribute('data-show', 'false');
+    var b = bridge();
+    if (b && b.markCoachMarkShown) {
+      try { b.markCoachMarkShown(); }
+      catch (e) { console.warn('[cds] markCoachMarkShown failed:', e); }
+    }
+  }
+
+  function maybeShowCoachMark() {
+    if (!schedulesCoach) return;
+    if (schedulesCoach.getAttribute('data-show') === 'true') return;
+    if (coachMarkSeen()) return;
+    schedulesCoach.setAttribute('data-show', 'true');
+  }
+
+  if (schedulesCoachBtn) {
+    schedulesCoachBtn.addEventListener('click', function () {
+      dismissCoachMark();
+      // 「去看看」不是纯关闭：把用户直接带去新功能，引导要落到地上。
+      openSchedulesView();
+    });
+  }
 
   /* --------------------------------------------- 设置面板
      Claude 的设置形态：从侧栏唤起的弹层 sheet。行点击经
@@ -2044,6 +2086,8 @@
   if (schedulesBtn) {
     schedulesBtn.addEventListener('click', function () {
       closeNav();
+      // 用户自己摸到了入口——引导的目的达成，同样不再出现。
+      dismissCoachMark();
       openSchedulesView();
     });
   }
@@ -2184,6 +2228,9 @@
   // 必须在主题初始化之后、且在首次读桥之前。addJavascriptInterface 在页面
   // 加载前就注入了，所以这里读到的一定是最终状态。
   if (hasNativeBridge()) enterLiveMode();
+  // 一次性引导的首评：桌面宽度侧栏常驻，加载后稍待即评；手机宽度抽屉
+  // 关着，这时显示也看不见，真正露面在抽屉打开时（menuBtn 回调里再评）。
+  setTimeout(maybeShowCoachMark, 1500);
   syncAutoGrow();
   requestAnimationFrame(function () { toBottom(false); });
 
