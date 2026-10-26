@@ -1454,6 +1454,168 @@ body {
 .tasks-empty-title { font-size: 13.5px; font-weight: 600; color: var(--cds-text-secondary); }
 .tasks-empty-desc { font-size: 12px; line-height: 1.7; color: var(--cds-text-muted); margin: 6px auto 0; max-width: 260px; }
 
+/* ---- 定时队列 ----
+   与任务账本同构：sheet 形态、令牌、列表行纪律全部沿用（行不是卡，
+   行间发丝线，无填充无圆角）。新构件四样：周期标、下次运行倒计时、
+   取消区（两步确认）、降级提示。状态色同样不新造记号：待运行=品牌色、
+   排队中=警告色、已错过=危险色、已触发/已取消走弱化。 */
+.schedules-scrim {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 60;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms ease;
+}
+.schedules-view {
+  position: fixed;
+  top: 0; bottom: 0; left: 50%;
+  width: 100%; max-width: 560px;
+  z-index: 70;
+  transform: translate(-50%, 12px);
+  background: var(--cds-surface-1);
+  display: flex; flex-direction: column;
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  transition: opacity 200ms ease, transform 240ms var(--cds-ease-swift),
+    visibility 0s linear 240ms;
+}
+.schedules-scrim[data-open="true"] { opacity: 1; pointer-events: auto; }
+.schedules-view[data-open="true"] {
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+  transform: translate(-50%, 0);
+  transition: opacity 200ms ease, transform 240ms var(--cds-ease-swift),
+    visibility 0s;
+}
+.schedules-topbar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 14px;
+  border-bottom: var(--cds-ring-hairline) solid var(--cds-border);
+  flex: none;
+}
+.schedules-title { font-weight: 600; font-size: 14.5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.schedules-body {
+  flex: 1; min-height: 0;
+  overflow-y: auto;
+  padding: 12px 12px 24px;
+}
+.schedules-body .group-label { margin: 14px 4px 6px; }
+
+/* 侧栏「定时」行的待运行计数。只数 live 任务（待运行 + 排队中）——
+   徽标是状态不是装饰，与任务徽标同规矩。 */
+.schedules-badge {
+  margin-left: auto;
+  min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: 999px;
+  background: var(--cds-fill-brand);
+  color: #fff;
+  font-size: 10.5px; font-weight: 600;
+  align-items: center; justify-content: center;
+  display: none;
+  box-shadow: 0 0 0 2px var(--cds-surface-0);
+}
+.schedules-badge[data-show="true"] { display: inline-flex; }
+
+/* 定时行 = 列表行，纪律同任务行（NNGroup：账本是扫描场景）。 */
+.schedule-card {
+  display: block; width: 100%; text-align: left;
+  padding: 11px 4px 12px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--cds-text-primary);
+  font: inherit; cursor: pointer;
+  transition: background-color 120ms var(--cds-ease-swift);
+}
+.schedule-card + .schedule-card { border-top: var(--cds-ring-hairline) solid var(--cds-border); }
+.schedule-card:hover { background: var(--cds-fill-ghost-hover); }
+.schedule-card:active { background: var(--cds-fill-ghost-selected); }
+.schedule-card-head { display: flex; align-items: center; gap: 8px; }
+.schedule-card-title {
+  flex: 1; min-width: 0;
+  font-size: 14px; font-weight: 600;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.schedule-card-meta {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  margin-top: 6px;
+  font-size: 12px; color: var(--cds-text-muted);
+}
+/* 排队原因 / 错过原因 / 上次运行结果：一行弱化文字，错误类染危险色。 */
+.schedule-card-next {
+  margin-top: 4px;
+  font-size: 12px; color: var(--cds-text-muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.schedule-card-next[data-kind="error"] {
+  color: color-mix(in srgb, var(--cds-fill-danger) 85%, var(--cds-text-primary));
+}
+/* 下次运行倒计时：等宽 tabular-nums，30s ticker 续算（data-fire 是未来
+   时刻，与任务行的 data-since 过去时刻同机制反向）。 */
+.schedule-next {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--cds-text-secondary);
+}
+.schedule-card .status-dot { box-shadow: none; }
+.schedule-state {
+  flex: none;
+  font-size: 11px; font-weight: 500;
+  color: var(--cds-text-secondary);
+  white-space: nowrap;
+}
+
+/* 精确闹钟降级提示：队列顶部一条诚实的话——任务仍然会跑，只是时间
+   可能漂。藏起来等于让用户以为 07:30 就是 07:30（BACKLOG P3）。 */
+.schedules-note {
+  margin: 2px 4px 10px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  border: var(--cds-ring-hairline) solid var(--cds-border);
+  background: var(--cds-fill-ghost-hover);
+  font-size: 11.5px; line-height: 1.6;
+  color: var(--cds-text-secondary);
+}
+
+/* 取消区：详情页唯一可写的地方。两步——初态一个出口，确认态把后果
+   写出来再给两个出口；默认不给「点了就撤」的一步路径。 */
+.schedule-cancel { margin-top: 16px; }
+.schedule-cancel-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px;
+  border: var(--cds-ring-hairline) solid var(--cds-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--cds-fill-danger);
+  font: inherit; font-size: 12.5px; font-weight: 500;
+  cursor: pointer;
+  transition: background-color 120ms var(--cds-ease-swift);
+}
+.schedule-cancel-btn:hover { background: var(--cds-fill-ghost-hover); }
+.schedule-cancel-confirm {
+  padding: 11px 12px;
+  border-radius: 10px;
+  border: var(--cds-ring-hairline) solid var(--cds-border);
+  background: var(--cds-fill-ghost-hover);
+}
+.schedule-cancel-confirm-text {
+  font-size: 12.5px; line-height: 1.6;
+  color: var(--cds-text-primary);
+}
+.schedule-cancel-actions {
+  display: flex; gap: 8px;
+  margin-top: 10px;
+}
+.schedule-cancel-actions .pill { flex: none; }
+.schedules-foot {
+  font-size: 11px; color: var(--cds-text-muted);
+  padding: 14px 4px 0; text-align: center;
+}
+
 /* ============================================================ 真实模式收敛
    接上真实任务流之后，设计稿里这些元素**没有数据也没有行为**：会话列表、
    搜索框、重命名与「更多」按钮、新建任务按钮。留着它们等于承诺一个点不动
@@ -1476,6 +1638,7 @@ body {
 [data-live="true"] #themePickerBtn { display: flex; }
 [data-live="true"] #settingsBtn { display: flex; }
 [data-live="true"] #tasksBtn { display: flex; }
+[data-live="true"] #schedulesBtn { display: flex; }
 [data-live="true"] .sidebar-head { border-bottom: none; }
 
 /* 顶栏图标按钮（重命名 / 更多）在真实模式下没有任何行为，

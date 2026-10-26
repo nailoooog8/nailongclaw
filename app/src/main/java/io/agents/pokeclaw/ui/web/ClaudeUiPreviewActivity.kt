@@ -48,7 +48,9 @@ import io.agents.pokeclaw.ui.settings.SettingsActivity
 import io.agents.pokeclaw.ui.settings.ThemeActivity
 import io.agents.pokeclaw.ui.settings.ToolsActivity
 import io.agents.pokeclaw.ui.settings.UserSkillsActivity
+import io.agents.pokeclaw.task.ScheduledTaskStore
 import io.agents.pokeclaw.task.TaskRecordStore
+import io.agents.pokeclaw.task.TaskScheduler
 import io.agents.pokeclaw.utils.KVUtils
 import io.agents.pokeclaw.utils.XLog
 import java.util.concurrent.Executors
@@ -105,6 +107,14 @@ class ClaudeUiPreviewActivity : BaseActivity() {
     @Volatile
     private var tasksLevel: String = TASKS_LEVEL_CLOSED
 
+    /**
+     * Schedule-page level mirrored from the page via `notifySchedulesView`.
+     * Same `@Volatile` discipline as [tasksLevel] — the write lands on the
+     * WebView's JavaScript thread while BACK reads it on MAIN.
+     */
+    @Volatile
+    private var schedulesLevel: String = SCHEDULES_LEVEL_CLOSED
+
     private val sink by lazy {
         WebChatSink(
             onRender = { messages -> publish(messages) },
@@ -120,6 +130,16 @@ class ClaudeUiPreviewActivity : BaseActivity() {
      */
     private val taskLedgerSink = WebTaskLedgerSink {
         runOnUiThread { publishTaskLedger() }
+    }
+
+    /**
+     * Live queue deltas → the schedule page. Same shape and reasoning as
+     * [taskLedgerSink]: the sink is a doorbell (fires on the writer's
+     * thread), the WebView push is a UI-thread operation — hence the hop
+     * through [runOnUiThread] here rather than inside the sink.
+     */
+    private val scheduleLedgerSink = WebScheduleLedgerSink {
+        runOnUiThread { publishScheduleLedger() }
     }
 
     private val taskFlowController by lazy {
@@ -386,6 +406,55 @@ class ClaudeUiPreviewActivity : BaseActivity() {
         fun readTaskDetail(id: String?): String = TaskLedgerBridge.readDetail(id)
 
         /**
+         * JS → Kotlin: the schedule queue's list, as JSON.
+         *
+         * The schedule page's read path, same seam shape as [readTaskList]:
+         * [ScheduleLedgerBridge] maps the queue and degrades to an honest
+         * empty array on a read failure — never to fabricated tasks.
+         */
+        @JavascriptInterface
+        fun readScheduleList(): String = ScheduleLedgerBridge.readList()
+
+        /** JS → Kotlin: one scheduled task's full intent, or `null`. */
+        @JavascriptInterface
+        fun readScheduleDetail(id: String?): String = ScheduleLedgerBridge.readDetail(id)
+
+        /**
+         * JS → Kotlin: cancel a live scheduled task — the two-step confirm's
+         * second step.
+         *
+         * Marks CANCELLED in the store *and* disarms the alarm: a cancel that
+         * left the alarm armed would fire a task the user was just told was
+         * cancelled. Returns false for an unknown or already-terminal id,
+         * which the page reports rather than hides.
+         */
+        @JavascriptInterface
+        fun cancelSchedule(id: String?): Boolean {
+            val wanted = id?.trim()
+            if (wanted.isNullOrEmpty()) {
+                XLog.e(TAG, "[chat] cancelSchedule('$id') ignored — no id")
+                return false
+            }
+            val cancelled = ScheduledTaskStore.cancel(wanted)
+            if (cancelled) TaskScheduler.disarm(this@ClaudeUiPreviewActivity, wanted)
+            XLog.e(TAG, "[chat] cancelSchedule($wanted) -> $cancelled")
+            return cancelled
+        }
+
+        /**
+         * JS → Kotlin: device-level schedule facts as JSON
+         * (`{"exactAlarms":true}`).
+         *
+         * When the OS refuses exact alarms the queue still arms — inexact —
+         * and the page must say so instead of letting a 07:30 brief silently
+         * drift (BACKLOG P3). The same helper arms the alarms, so the badge
+         * cannot disagree with the behaviour.
+         */
+        @JavascriptInterface
+        fun readSchedulePrefs(): String =
+            "{\"exactAlarms\":${TaskScheduler.canScheduleExactAlarms(this@ClaudeUiPreviewActivity)}}"
+
+        /**
          * JS → Kotlin: the task page's level — "closed" / "list" / "detail".
          *
          * Mirrored here so BACK can be answered synchronously off [tasksLevel];
@@ -404,6 +473,23 @@ class ClaudeUiPreviewActivity : BaseActivity() {
             }
             runOnUiThread { tasksLevel = normalized }
             XLog.e(TAG, "[chat] notifyTasksView($normalized)")
+        }
+
+        /**
+         * JS → Kotlin: the schedule page's level — "closed" / "list" / "detail".
+         *
+         * Mirror of [notifyTasksView] for the schedule sheet: BACK reads it
+         * off [schedulesLevel], so every transition must report.
+         */
+        @JavascriptInterface
+        fun notifySchedulesView(level: String?) {
+            val normalized = level?.trim()?.lowercase()
+            if (normalized == null || normalized !in SCHEDULES_LEVELS) {
+                XLog.e(TAG, "[chat] notifySchedulesView('$level') ignored — unknown level")
+                return
+            }
+            runOnUiThread { schedulesLevel = normalized }
+            XLog.e(TAG, "[chat] notifySchedulesView($normalized)")
         }
 
         /**
@@ -529,6 +615,27 @@ class ClaudeUiPreviewActivity : BaseActivity() {
             .replace("\u2029", "\\u2029")
         webView.post {
             webView.evaluateJavascript("window.__cds && window.__cds.renderTasks($json);", null)
+        }
+    }
+
+    /**
+     * Kotlin → JS: push the current queue to the schedule page.
+     *
+     * Full snapshot for the same reason as [publishTaskLedger] — the page
+     * rebuilds its list from what it is handed, and a missed delta has no
+     * recovery path. Fired on every queue change (armed / cancelled /
+     * queued / fired / outcome landed); the page ignores it while closed
+     * and re-reads on its next open.
+     */
+    private fun publishScheduleLedger() {
+        if (!::webView.isInitialized) return
+        // 同样的 U+2028/U+2029 纪律，理由见 publishTaskLedger：任务文本是
+        // 用户原话，一个断行符就能让整段 evaluateJavascript 静默变语法错误。
+        val json = ScheduleLedgerBridge.readList()
+            .replace("\u2028", "\\u2028")
+            .replace("\u2029", "\\u2029")
+        webView.post {
+            webView.evaluateJavascript("window.__cds && window.__cds.renderSchedules($json);", null)
         }
     }
 
@@ -736,11 +843,15 @@ class ClaudeUiPreviewActivity : BaseActivity() {
         // the sheet's own close handler reports the transition.
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                // 任务页优先：它和设置面板同为最上层全屏 sheet（z-index
-                // 70），且在文档里更靠后——同开时它在上。back 是「详情回
-                // 列表」还是「关页」由页面自己决定（tasksBack），Kotlin 只
-                // 在两层都没开时放行默认返回。
-                if (tasksLevel != TASKS_LEVEL_CLOSED) {
+                // 三个全屏 sheet 互为互斥（开一个就关其余两个），但 BACK 的
+                // 判据仍是各自的层级镜像，谁在上谁先应答。定时页与任务页
+                // 同代 z-index，顺序只影响可读性；「详情回列表」还是「关页」
+                // 由页面自己的 *Back() 决定，Kotlin 只负责转交。
+                if (schedulesLevel != SCHEDULES_LEVEL_CLOSED) {
+                    webView.evaluateJavascript(
+                        "window.__cds && window.__cds.schedulesBack();", null
+                    )
+                } else if (tasksLevel != TASKS_LEVEL_CLOSED) {
                     webView.evaluateJavascript(
                         "window.__cds && window.__cds.tasksBack();", null
                     )
@@ -777,6 +888,15 @@ class ClaudeUiPreviewActivity : BaseActivity() {
             }, RESTORE_DELAY_MS)
             XLog.e(TAG, "onCreate: opened with the task ledger requested")
         }
+        // 同样的深链纪律给定时队列：外部（或 QA）可以直接翻开定时页。
+        if (intent.getBooleanExtra(EXTRA_SHOW_SCHEDULES, false)) {
+            webView.postDelayed({
+                webView.evaluateJavascript(
+                    "window.__cds && window.__cds.openSchedulesView();", null
+                )
+            }, RESTORE_DELAY_MS)
+            XLog.e(TAG, "onCreate: opened with the schedule queue requested")
+        }
         // e, not i — see the XLog.setDEBUG note on the chrome client below. In a
         // release build XLog.i never reaches logcat, and QA runs release
         // packages, so an `i` here would make the checklist's "the page loaded
@@ -787,6 +907,11 @@ class ClaudeUiPreviewActivity : BaseActivity() {
         // 推送只更新侧栏徽标（renderTasks 的 closed 分支），开着时刷新列表
         // 或详情——两条路都由页面自己决定，这里只负责把变化送到。
         TaskRecordStore.addSink(taskLedgerSink)
+
+        // 队列变化 → 定时页推送。与账本 sink 同生命周期注册：页面关着时
+        // 推送只更新侧栏徽标（renderSchedules 的 closed 分支），开着时刷新
+        // 列表或详情。
+        ScheduledTaskStore.addSink(scheduleLedgerSink)
 
         // Registered at runtime rather than declared in the manifest: a
         // manifest receiver here would have to be exported to be reachable by
@@ -863,6 +988,10 @@ class ClaudeUiPreviewActivity : BaseActivity() {
                 "o.tasksOpen=String(!!document.querySelector('#tasksView[data-open=\"true\"]'));" +
                 "o.tasksLevel=String(window.__cds&&window.__cds.tasksLevel?window.__cds.tasksLevel():'');" +
                 "o.taskCards=document.querySelectorAll('.task-card').length;" +
+                // 定时页取证，与任务页同一套路（QA H67 的 ground truth）。
+                "o.schedulesOpen=String(!!document.querySelector('#schedulesView[data-open=\"true\"]'));" +
+                "o.schedulesLevel=String(window.__cds&&window.__cds.schedulesLevel?window.__cds.schedulesLevel():'');" +
+                "o.scheduleCards=document.querySelectorAll('.schedule-card').length;" +
                 "JSON.stringify(o);"
             )
         webView.evaluateJavascript(js) { value ->
@@ -935,6 +1064,7 @@ class ClaudeUiPreviewActivity : BaseActivity() {
         // 与 addSink 成对：sink 持的是 Activity 的 lambda（经 runOnUiThread
         // 碰 WebView），漏掉这一行会把一个已销毁的 Activity 泄漏给账本。
         TaskRecordStore.removeSink(taskLedgerSink)
+        ScheduledTaskStore.removeSink(scheduleLedgerSink)
         qaReceiver?.let {
             runCatching { unregisterReceiver(it) }
             qaReceiver = null
@@ -995,9 +1125,20 @@ class ClaudeUiPreviewActivity : BaseActivity() {
          */
         const val EXTRA_SHOW_TASKS = "show_tasks"
 
+        /**
+         * Set by an external caller (or QA): open this surface straight into
+         * the schedule queue page. Same deep-link discipline as
+         * [EXTRA_SHOW_TASKS].
+         */
+        const val EXTRA_SHOW_SCHEDULES = "show_schedules"
+
         /** Task-page levels the page reports through `notifyTasksView`. */
         private val TASKS_LEVELS = setOf("closed", "list", "detail")
         private const val TASKS_LEVEL_CLOSED = "closed"
+
+        /** Schedule-page levels the page reports through `notifySchedulesView`. */
+        private val SCHEDULES_LEVELS = setOf("closed", "list", "detail")
+        private const val SCHEDULES_LEVEL_CLOSED = "closed"
 
         /**
          * Later than [PROBE_DELAY_MS] on purpose: the probe proves the page is

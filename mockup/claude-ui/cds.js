@@ -858,9 +858,10 @@
 
   function openSettingsView() {
     if (!settingsView) return;
-    // 两个全屏 sheet 互斥：任务页开着时从侧栏摸到设置入口是可能的
+    // 三个全屏 sheet 互斥：任务页/定时页开着时从侧栏摸到设置入口是可能的
     // （侧栏在 sheet 之下但抽屉断点里侧栏浮在上面），不互斥就会叠层。
     closeTasksView();
+    closeSchedulesView();
     settingsView.setAttribute('data-open', 'true');
     if (settingsScrim) settingsScrim.setAttribute('data-open', 'true');
     if (window.PokeClawChat && window.PokeClawChat.notifySettingsView) {
@@ -1336,6 +1337,7 @@
   function openTasksView() {
     if (!tasksView) return;
     closeSettingsView();
+    closeSchedulesView();
     closeNav();
     tasksScrim.setAttribute('data-open', 'true');
     tasksView.setAttribute('data-open', 'true');
@@ -1455,6 +1457,485 @@
       var card = e.target && e.target.closest ? e.target.closest('.task-card') : null;
       if (!card) return;
       openTaskDetail(card.getAttribute('data-task-id'));
+    });
+  }
+
+  /* ------------------------------------------------------------ 定时队列
+     与任务账本同构的两级页：列表（schedule-card）与详情（意图 + 上次运行
+     结果），都在 #schedulesBody 里整表重建。数据两条来路，界限同样划在
+     「有没有桥」上：
+       · 有桥（真机）：PokeClawChat.readScheduleList() / readScheduleDetail(id)，
+         ScheduledTaskStore 是唯一事实源；[] = 空队列，显示空态。
+       · 无桥（纯浏览器预览）：SCHEDULE_SAMPLES 设计样例。
+
+     与任务页的唯一结构差异：这里有一个写操作——取消。取消的是「尚未
+     运行的意图」而不是账本记录（账本仍然只读），所以两步确认：一步
+     取消的误触成本是「用户以为取消了、其实还在跑」，比多点一次贵得多。
+     队列的诚实全靠状态词：QUEUED 不等同于运行中（在等前一个任务），
+     MISSED 是设备关机错过、不迟跑——这两个状态在卡片上都必须带原因。 */
+  var schedulesView = document.getElementById('schedulesView');
+  var schedulesScrim = document.getElementById('schedulesScrim');
+  var schedulesBody = document.getElementById('schedulesBody');
+  var schedulesTitle = document.getElementById('schedulesTitle');
+  var schedulesBackBtn = document.getElementById('schedulesBackBtn');
+  var schedulesBadge = document.getElementById('schedulesBadge');
+
+  /* 五态。glyph 纪律同任务页：扫读比辨色快，且不依赖颜色感知。 */
+  var SCHEDULE_STATES = {
+    SCHEDULED: { label: '待运行', dot: 'running', glyph: '' },
+    QUEUED:    { label: '排队中', dot: 'clay',   glyph: '' },
+    MISSED:    { label: '已错过', dot: 'error',  glyph: '✕' },
+    FIRED:     { label: '已触发', dot: 'ready',  glyph: '✓' },
+    CANCELLED: { label: '已取消', dot: 'muted',  glyph: '' }
+  };
+
+  function scheduleState(key) {
+    return SCHEDULE_STATES[key] || { label: key || '未知状态', dot: 'muted' };
+  }
+
+  /* 未来时刻的相对量，与 fmtElapsed（过去）互补。倒计时比绝对时间有
+     行动感——「还有 16 小时」是在回答「我还要管它吗」。 */
+  function fmtUntil(ts) {
+    var ms = ts - Date.now();
+    if (ms <= 0) return '即将运行';
+    var minutes = Math.floor(ms / 60000);
+    if (minutes < 1) return '不到 1 分钟';
+    if (minutes < 60) return minutes + ' 分钟';
+    var hours = Math.floor(minutes / 60);
+    if (hours < 24) return hours + ' 小时';
+    return Math.floor(hours / 24) + ' 天';
+  }
+
+  /* 设计样例（仅无桥预览）。故事线与任务页一致：妈妈的日历简报。 */
+  var SCHEDULE_SAMPLES = [
+    {
+      id: 'sample-daily-brief',
+      title: '总结我今天的日历和未读通知',
+      state: 'SCHEDULED',
+      repeat: '每天',
+      nextFireAt: Date.now() + 16 * 3600 * 1000,
+      createdAt: minutesAgo(60 * 24 * 9),
+      calendarAnchorHours: 12
+    },
+    {
+      id: 'sample-queued',
+      title: '给妈妈回个电话说发票的事',
+      state: 'QUEUED',
+      repeat: '单次',
+      createdAt: minutesAgo(26),
+      outcome: 'queued: another task was running when this fired'
+    },
+    {
+      id: 'sample-missed',
+      title: '晨间简报：今天的日程',
+      state: 'MISSED',
+      repeat: '每天',
+      createdAt: minutesAgo(60 * 30),
+      outcome: 'missed: the device was off at the scheduled time'
+    },
+    {
+      id: 'sample-fired',
+      title: '每周五下午汇总本周开销',
+      state: 'FIRED',
+      repeat: '每周',
+      createdAt: minutesAgo(60 * 24 * 8),
+      lastFiredAt: minutesAgo(180),
+      outcome: 'done: 3 笔开销已汇总，明细在任务账本'
+    }
+  ];
+
+  /* ------------------------------------------------------------ 桥读取
+     与任务页同一契约：null = 没有桥（预览模式），[] = 有桥、空队列。 */
+  function readSchedulesFromBridge() {
+    var b = bridge();
+    if (!b || !b.readScheduleList) return null;
+    try {
+      var raw = b.readScheduleList();
+      if (!raw) return [];
+      var arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) {
+      console.warn('[cds] readScheduleList failed:', e);
+      return [];
+    }
+  }
+
+  function readScheduleDetailFromBridge(id) {
+    var b = bridge();
+    if (!b || !b.readScheduleDetail) return null;
+    try {
+      var task = JSON.parse(b.readScheduleDetail(id) || 'null');
+      return task && typeof task === 'object' ? task : null;
+    } catch (e) {
+      console.warn('[cds] readScheduleDetail failed:', e);
+      return null;
+    }
+  }
+
+  /* 设备级事实：精确闹钟是否被允许。降级不是空态，是队列顶部一条
+     诚实的话——任务照跑，时间可能漂（BACKLOG P3）。 */
+  function readSchedulePrefs() {
+    var b = bridge();
+    if (!b || !b.readSchedulePrefs) return null;
+    try {
+      var p = JSON.parse(b.readSchedulePrefs() || 'null');
+      return p && typeof p === 'object' ? p : null;
+    } catch (e) {
+      console.warn('[cds] readSchedulePrefs failed:', e);
+      return null;
+    }
+  }
+
+  function schedulesDegraded() {
+    var p = readSchedulePrefs();
+    return !!(p && p.exactAlarms === false);
+  }
+
+  /* ------------------------------------------------------------ 徽标
+     只数 live 任务（待运行 + 排队中）。徽章是状态不是装饰。 */
+  function updateSchedulesBadge(tasks) {
+    if (!schedulesBadge) return;
+    var live = 0;
+    (tasks || []).forEach(function (t) {
+      if (t.state === 'SCHEDULED' || t.state === 'QUEUED') live += 1;
+    });
+    schedulesBadge.textContent = String(live);
+    schedulesBadge.setAttribute('data-show', live > 0 ? 'true' : 'false');
+  }
+
+  /* ------------------------------------------------------------ 列表级 */
+  function buildScheduleCard(t) {
+    var st = scheduleState(t.state);
+    var card = el('button', 'schedule-card');
+    card.type = 'button';
+    card.setAttribute('data-schedule-id', String(t.id == null ? '' : t.id));
+    card.innerHTML =
+      '<div class="schedule-card-head">' +
+        '<span class="status-dot"></span>' +
+        '<span class="schedule-card-title"></span>' +
+        '<span class="schedule-state"></span>' +
+      '</div>' +
+      '<div class="schedule-card-meta"></div>' +
+      '<div class="schedule-card-next"></div>';
+    card.querySelector('.status-dot').setAttribute('data-kind', st.dot);
+    card.querySelector('.schedule-card-title').textContent = t.title || '（无标题任务）';
+    var pill = card.querySelector('.schedule-state');
+    pill.setAttribute('data-state', String(t.state || ''));
+    pill.textContent = st.glyph ? st.glyph + ' ' + st.label : st.label;
+
+    var meta = card.querySelector('.schedule-card-meta');
+    meta.appendChild(document.createTextNode(t.repeat || '单次'));
+    meta.appendChild(document.createTextNode(' · '));
+    if (t.state === 'SCHEDULED' && t.nextFireAt) {
+      var next = el('span', 'schedule-next', '还有 ' + fmtUntil(t.nextFireAt));
+      next.setAttribute('data-fire', String(t.nextFireAt));   // ticker 按它续算
+      meta.appendChild(next);
+    } else if (t.state === 'QUEUED') {
+      // 排队不是运行中：说清楚它在等什么，否则用户会以为它已经跑挂了。
+      meta.appendChild(document.createTextNode('等待前一个任务结束'));
+    } else if (t.lastFiredAt) {
+      meta.appendChild(document.createTextNode(
+        fmtClock(t.lastFiredAt) + (t.state === 'MISSED' ? ' 错过' : ' 触发')
+      ));
+    } else {
+      meta.appendChild(document.createTextNode('设置于 ' + fmtClock(t.createdAt || Date.now())));
+    }
+
+    var tail = card.querySelector('.schedule-card-next');
+    if (t.outcome) {
+      // 排队/错过/上次运行的原因随行载荷走——没有它，QUEUED/MISSED
+      // 在设备上就只剩一个没有下文的标签。
+      tail.textContent = t.outcome;
+      if (t.state === 'MISSED') tail.setAttribute('data-kind', 'error');
+    } else if (t.calendarAnchorHours) {
+      tail.textContent = '触发时带入接下来 ' + t.calendarAnchorHours + ' 小时的日历';
+    } else {
+      tail.parentNode.removeChild(tail);
+    }
+    return card;
+  }
+
+  function buildSchedulesNote() {
+    var box = el('div', 'schedules-note');
+    box.textContent =
+      '系统没有授予「精确闹钟」权限：定时任务仍然会运行，但可能被系统延后——' +
+      '07:30 的简报迟到几分钟是正常的。要准时就到系统设置里给 PokeClaw 打开「闹钟和提醒」。';
+    return box;
+  }
+
+  function renderScheduleList(tasks, degraded) {
+    schedulesBody.textContent = '';
+    updateSchedulesBadge(tasks);
+    if (degraded) schedulesBody.appendChild(buildSchedulesNote());
+    if (!tasks.length) {
+      schedulesBody.appendChild(buildEmptyState(
+        '还没有定时任务',
+        '在聊天里说「每天早上七点半看我今天的日历」，任务就会落到这里——到点自动跑，排队、错过、取消都写在明面上。'
+      ));
+      return;
+    }
+    var frag = document.createDocumentFragment();
+    tasks.forEach(function (t) { frag.appendChild(buildScheduleCard(t)); });
+    schedulesBody.appendChild(frag);
+  }
+
+  /* ------------------------------------------------------------ 取消区
+     两步确认。初态一个出口；确认态把后果写成句子再给两个出口，
+     「再想想」回列表（不保留半确认状态）。成功取消后回列表看终态——
+     详情留着就是旧状态，那是在显示一个已经不存在的事实。 */
+  function buildCancelArea(id) {
+    var box = el('div', 'schedule-cancel');
+    var btn = el('button', 'schedule-cancel-btn', '取消这个任务');
+    btn.type = 'button';
+    btn.addEventListener('click', function () {
+      box.textContent = '';
+      var confirm = el('div', 'schedule-cancel-confirm');
+      confirm.innerHTML =
+        '<div class="schedule-cancel-confirm-text"></div>' +
+        '<div class="schedule-cancel-actions"></div>';
+      confirm.querySelector('.schedule-cancel-confirm-text').textContent =
+        '确认取消？这个任务不会再运行；已经跑过的记录不受影响。';
+      var actions = confirm.querySelector('.schedule-cancel-actions');
+      var yes = el('button', 'schedule-cancel-btn', '确认取消');
+      yes.type = 'button';
+      var no = el('button', 'pill cds-btn-squish', '再想想');
+      no.type = 'button';
+      yes.addEventListener('click', function () { doCancelSchedule(id, confirm); });
+      no.addEventListener('click', function () { loadScheduleList(); });
+      actions.appendChild(yes);
+      actions.appendChild(no);
+      box.appendChild(confirm);
+    });
+    box.appendChild(btn);
+    return box;
+  }
+
+  function doCancelSchedule(id, confirmBox) {
+    var b = bridge();
+    var text = confirmBox.querySelector('.schedule-cancel-confirm-text');
+    if (!b || !b.cancelSchedule) {
+      text.textContent = '预览模式：取消需要连接到 PokeClaw。';
+      return;
+    }
+    var ok = false;
+    try { ok = !!b.cancelSchedule(id); }
+    catch (e) { console.warn('[cds] cancelSchedule failed:', e); }
+    if (ok) {
+      loadScheduleList();
+    } else {
+      // 失败不假装成功：任务不存在、已跑完或已取消，都说出来。
+      text.textContent = '取消失败：这个任务不存在、已经跑完，或者已被取消。';
+    }
+  }
+
+  /* ------------------------------------------------------------ 详情级 */
+  function renderScheduleDetail(task) {
+    schedulesBody.textContent = '';
+    openScheduleId = task.id;
+    var st = scheduleState(task.state);
+
+    var wrap = el('div', 'schedule-detail');
+    wrap.innerHTML =
+      '<div class="task-detail-title"></div>' +
+      '<div class="task-detail-meta"></div>';
+    wrap.querySelector('.task-detail-title').textContent = task.title || '定时详情';
+
+    var meta = wrap.querySelector('.task-detail-meta');
+    var bits = [st.label, task.repeat || '单次'];
+    if (task.state === 'SCHEDULED') {
+      // 倒计时不进静态 bits——它挂在下面可续算的 span 上，30s 一刷。
+      if (!task.nextFireAt) bits.push('运行时间待定');
+    } else if (task.state === 'QUEUED') {
+      bits.push('前一个任务结束后自动补跑');
+    } else if (task.lastFiredAt) {
+      bits.push(fmtClock(task.lastFiredAt) + (task.state === 'MISSED' ? ' 错过' : ' 触发'));
+    }
+    bits.push('创建于 ' + fmtClock(task.createdAt || Date.now()));
+    if (task.calendarAnchorHours) {
+      bits.push('触发时带入 ' + task.calendarAnchorHours + ' 小时日历');
+    }
+    bits.forEach(function (bit, i) {
+      if (i > 0) meta.appendChild(document.createTextNode(' · '));
+      meta.appendChild(document.createTextNode(bit));
+    });
+    if (task.state === 'SCHEDULED' && task.nextFireAt) {
+      // 倒计时挂可续算的 span，ticker 每 30s 刷（data-fire 是未来时刻）。
+      var span = el('span', 'schedule-next', '还有 ' + fmtUntil(task.nextFireAt));
+      span.setAttribute('data-fire', String(task.nextFireAt));
+      meta.appendChild(document.createTextNode(' · '));
+      meta.appendChild(span);
+    }
+
+    if (task.prompt) {
+      var prompt = el('div', 'task-detail-prompt');
+      prompt.textContent = task.prompt;
+      wrap.appendChild(prompt);
+    }
+
+    // 上次运行/排队/错过原因：复用任务页终态载荷块（console 块 + 标签），
+    // 一个页面两种盒子就够，不新造第三种。
+    if (task.outcome) {
+      var label = task.state === 'QUEUED' ? '排队原因'
+        : task.state === 'MISSED' ? '错过原因' : '上次运行';
+      var kind = task.state === 'MISSED' ? 'task-detail-error' : 'task-detail-answer';
+      wrap.appendChild(buildDetailBlock(label, task.outcome, kind, task.state === 'MISSED' ? '✕' : '✓'));
+    }
+
+    if (task.state === 'SCHEDULED' || task.state === 'QUEUED') {
+      wrap.appendChild(buildCancelArea(task.id));
+    }
+    wrap.appendChild(el('p', 'schedules-foot', '任务账本只读；这里取消的是尚未运行的意图，历史记录不受影响。'));
+
+    schedulesBody.appendChild(wrap);
+    schedulesTitle.textContent = task.title || '定时详情';
+    schedulesBackBtn.setAttribute('aria-label', '返回列表');
+    setSchedulesLevel('detail');
+  }
+
+  function renderScheduleDetailMissing() {
+    schedulesBody.textContent = '';
+    schedulesBody.appendChild(buildEmptyState(
+      '定时任务不存在或已被清理',
+      '队列里找不到这条记录。它可能来自一次已经清除的应用数据。'
+    ));
+    schedulesTitle.textContent = '定时详情';
+    schedulesBackBtn.setAttribute('aria-label', '返回列表');
+    setSchedulesLevel('detail');
+  }
+
+  /* ------------------------------------------------------------ 开关与层级
+     与任务页同一机制：每次过渡都经 notifySchedulesView 报给 Kotlin，
+     Android BACK 的处理完全读这个镜像状态。 */
+  var schedulesLevel = 'closed';
+  var openScheduleId = null;
+
+  function setSchedulesLevel(level) {
+    schedulesLevel = level;
+    var b = bridge();
+    if (b && b.notifySchedulesView) {
+      try { b.notifySchedulesView(level); }
+      catch (e) { console.warn('[cds] notifySchedulesView failed:', e); }
+    }
+  }
+
+  function loadScheduleList() {
+    var tasks = readSchedulesFromBridge();
+    if (tasks === null) tasks = SCHEDULE_SAMPLES;   // 无桥：设计样例
+    var degraded = schedulesDegraded();
+    openScheduleId = null;
+    schedulesTitle.textContent = '定时';
+    schedulesBackBtn.setAttribute('aria-label', '关闭');
+    renderScheduleList(tasks, degraded);
+    setSchedulesLevel('list');
+    startSchedulesTicker();
+  }
+
+  function openSchedulesView() {
+    if (!schedulesView) return;
+    closeSettingsView();
+    closeTasksView();
+    closeNav();
+    schedulesScrim.setAttribute('data-open', 'true');
+    schedulesView.setAttribute('data-open', 'true');
+    loadScheduleList();
+  }
+
+  function closeSchedulesView() {
+    if (!schedulesView) return;
+    schedulesScrim.setAttribute('data-open', 'false');
+    schedulesView.setAttribute('data-open', 'false');
+    stopSchedulesTicker();
+    openScheduleId = null;
+    setSchedulesLevel('closed');
+  }
+
+  function openScheduleDetail(id) {
+    var task = readScheduleDetailFromBridge(id);
+    if (!task) {
+      var b = bridge();
+      if (!b || !b.readScheduleDetail) {
+        for (var i = 0; i < SCHEDULE_SAMPLES.length; i++) {
+          if (SCHEDULE_SAMPLES[i].id === id) { task = SCHEDULE_SAMPLES[i]; break; }
+        }
+      }
+    }
+    if (!task) { renderScheduleDetailMissing(); return; }
+    renderScheduleDetail(task);
+  }
+
+  /* Kotlin BACK 键的页面侧答复：detail → 回列表，list → 关页。 */
+  function schedulesBack() {
+    if (schedulesLevel === 'detail') { loadScheduleList(); return true; }
+    if (schedulesLevel === 'list') { closeSchedulesView(); return true; }
+    return false;
+  }
+
+  /* ------------------------------------------------------------ 倒计时 ticker
+     「还有 N 小时」按 nextFireAt 现算，30s 一次。只认 data-fire（待运行
+     行/详情才有），终态行的时间是静态文本，不会被刷掉。 */
+  var schedulesTimer = null;
+
+  function startSchedulesTicker() {
+    if (schedulesTimer) return;
+    schedulesTimer = setInterval(tickSchedulesNext, 30000);
+  }
+
+  function stopSchedulesTicker() {
+    if (schedulesTimer) { clearInterval(schedulesTimer); schedulesTimer = null; }
+  }
+
+  function tickSchedulesNext() {
+    var nodes = schedulesBody.querySelectorAll('.schedule-next[data-fire]');
+    for (var i = 0; i < nodes.length; i++) {
+      var fire = parseInt(nodes[i].getAttribute('data-fire'), 10);
+      if (!isNaN(fire)) nodes[i].textContent = '还有 ' + fmtUntil(fire);
+    }
+  }
+
+  /* ------------------------------------------------------------ Kotlin 推送
+     ScheduleSink 落地后由它调用。关着时只更新徽标；开着详情时若当前任务
+     被推送更新就重读详情（取消/触发后状态变了），不在队列里就回列表。 */
+  function renderSchedules(payload) {
+    var tasks = payload;
+    if (typeof payload === 'string') {
+      try { tasks = JSON.parse(payload || '[]'); }
+      catch (e) { console.warn('[cds] renderSchedules: bad json', e); return; }
+    }
+    if (!Array.isArray(tasks)) { console.warn('[cds] renderSchedules: not an array'); return; }
+    updateSchedulesBadge(tasks);
+    if (schedulesLevel === 'closed') return;
+    if (schedulesLevel === 'detail') {
+      var stillThere = tasks.some(function (t) { return String(t.id) === String(openScheduleId); });
+      if (stillThere) {
+        var fresh = readScheduleDetailFromBridge(openScheduleId);
+        if (fresh) renderScheduleDetail(fresh);
+      } else {
+        loadScheduleList();
+      }
+      return;
+    }
+    renderScheduleList(tasks, schedulesDegraded());
+  }
+
+  /* ------------------------------------------------------------ 接线 */
+  var schedulesBtn = document.getElementById('schedulesBtn');
+  if (schedulesBtn) {
+    schedulesBtn.addEventListener('click', function () {
+      closeNav();
+      openSchedulesView();
+    });
+  }
+  if (schedulesScrim) {
+    schedulesScrim.addEventListener('click', closeSchedulesView);
+  }
+  if (schedulesBackBtn) {
+    schedulesBackBtn.addEventListener('click', schedulesBack);
+  }
+  if (schedulesBody) {
+    schedulesBody.addEventListener('click', function (e) {
+      var card = e.target && e.target.closest ? e.target.closest('.schedule-card') : null;
+      if (!card) return;
+      openScheduleDetail(card.getAttribute('data-schedule-id'));
     });
   }
 
@@ -1610,6 +2091,11 @@
     tasksLevel: function () { return tasksLevel; },
     renderTasks: renderTasks,
     renderTaskDetail: renderTaskDetailPush,
+    openSchedulesView: openSchedulesView,
+    closeSchedulesView: closeSchedulesView,
+    schedulesBack: schedulesBack,
+    schedulesLevel: function () { return schedulesLevel; },
+    renderSchedules: renderSchedules,
     rateLimit: triggerBackoff,
     resetRateLimit: function () {
       clearInterval(backoff.timer); backoff.timer = null;

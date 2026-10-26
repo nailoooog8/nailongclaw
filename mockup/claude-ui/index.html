@@ -63,6 +63,13 @@
         任务
         <span class="tasks-badge" id="tasksBadge" data-show="false"></span>
       </button>
+      <!-- 定时队列入口。与任务账本并列：账本记「跑过什么」，这里管
+           「将要跑什么」——待运行/排队中/已错过/已取消，可两步取消。 -->
+      <button class="row-btn" id="schedulesBtn" type="button">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        定时
+        <span class="schedules-badge" id="schedulesBadge" data-show="false"></span>
+      </button>
       <!-- 主题：深浅 × 底色 × 强调色，三个维度合并在一个面板里。
            侧边栏只留这一个入口（原来的「深浅色」独立行已合并进面板，
            记忆库 / 技能管理快捷行移入设置面板的「功能」区，避免同一
@@ -223,6 +230,24 @@
          「一轮任务」计，整表重建比维护两套 DOM 便宜，且不会出现某一级
          忘了隐藏。空态也画在这里。 -->
     <div class="tasks-body scroller" id="tasksBody"></div>
+  </section>
+
+  <!-- ============================= 定时队列 =============================
+       与任务账本同构的弹层 sheet：列表（schedule-card）+ 详情（意图与上次
+       运行结果）。数据经 PokeClawChat.readScheduleList / readScheduleDetail
+       桥读取，ScheduledTaskStore 是唯一事实源；取消经 cancelSchedule 两步
+       确认（任务页只读，但「尚未运行的意图」可以撤）。纯浏览器打开时显示
+       设计样例。 -->
+  <div class="schedules-scrim" id="schedulesScrim"></div>
+  <section class="schedules-view" id="schedulesView" data-open="false" role="dialog" aria-label="定时">
+    <header class="schedules-topbar">
+      <button class="icon-btn" id="schedulesBackBtn" type="button" aria-label="返回">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="schedules-title" id="schedulesTitle">定时</div>
+    </header>
+    <!-- 列表与详情两级都在这个容器里换画，与任务页同一个取舍。 -->
+    <div class="schedules-body scroller" id="schedulesBody"></div>
   </section>
 
   <!-- ============================= 主区 ============================= -->

@@ -32,6 +32,19 @@ object TaskScheduler {
     const val ACTION_FIRE = "io.agents.pokeclaw.SCHEDULED_TASK_FIRE"
     const val EXTRA_TASK_ID = "scheduled_task_id"
 
+    /**
+     * Whether the OS will honour an exact alarm right now. Extracted so the
+     * schedule page's degradation badge ([ClaudeUiPreviewActivity]'s
+     * readSchedulePrefs) and [arm] cannot disagree — one implementation,
+     * one answer.
+     */
+    @JvmStatic
+    fun canScheduleExactAlarms(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true
+        val am = context.getSystemService(Context.ALARM_SERVICE) as? AlarmManager ?: return false
+        return am.canScheduleExactAlarms()
+    }
+
     /** Arm (or re-arm) the alarm for one live task. */
     @JvmStatic
     fun arm(context: Context, task: ScheduledTask) {
@@ -40,7 +53,7 @@ object TaskScheduler {
             return
         }
         val pi = firePendingIntent(context, task.id)
-        val canExact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || am.canScheduleExactAlarms()
+        val canExact = canScheduleExactAlarms(context)
         if (canExact) {
             am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, task.fireAtMillis, pi)
         } else {
