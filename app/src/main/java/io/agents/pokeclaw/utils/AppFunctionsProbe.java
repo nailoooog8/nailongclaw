@@ -3,6 +3,7 @@
 
 package io.agents.pokeclaw.utils;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Build;
@@ -35,7 +36,14 @@ public final class AppFunctionsProbe {
     private AppFunctionsProbe() {
     }
 
-    /** One-line human-readable availability report for the model and QA. */
+    /**
+     * One-line human-readable availability report for the model and QA.
+     *
+     * The WrongConstant suppression is deliberate: "app_function" is the
+     * platform service name and there is no public Context constant for it —
+     * the literal is the only way to ask, and the call is already guarded.
+     */
+    @SuppressLint("WrongConstant")
     public static String probe(Context ctx) {
         if (Build.VERSION.SDK_INT < 36) {
             return "AppFunctions: unavailable — requires Android 16 (API 36), this device runs API "
