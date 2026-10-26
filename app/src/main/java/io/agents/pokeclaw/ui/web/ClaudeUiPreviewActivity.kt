@@ -49,6 +49,7 @@ import io.agents.pokeclaw.ui.settings.ThemeActivity
 import io.agents.pokeclaw.ui.settings.ToolsActivity
 import io.agents.pokeclaw.ui.settings.UserSkillsActivity
 import io.agents.pokeclaw.task.ScheduledTaskStore
+import io.agents.pokeclaw.task.TaskRecord
 import io.agents.pokeclaw.task.TaskRecordStore
 import io.agents.pokeclaw.task.TaskScheduler
 import io.agents.pokeclaw.utils.KVUtils
@@ -127,9 +128,46 @@ class ClaudeUiPreviewActivity : BaseActivity() {
      * any thread (the ledger is written from the UI thread and the agent
      * thread), and the WebView push is a UI-thread operation — hence the
      * hop through [runOnUiThread] here rather than inside the sink.
+     *
+     * The record that changed rides along so this surface can also put
+     * completion chips on the answer turn — see [noteCompletionChips] for
+     * why the attribution is safe and [publish] for why the chips wait for
+     * the feed rebuild.
      */
-    private val taskLedgerSink = WebTaskLedgerSink {
-        runOnUiThread { publishTaskLedger() }
+    private val taskLedgerSink = WebTaskLedgerSink { record ->
+        runOnUiThread {
+            publishTaskLedger()
+            noteCompletionChips(record)
+        }
+    }
+
+    /**
+     * Chips waiting for the feed rebuild that carries their answer.
+     *
+     * Main-thread only: set and drained inside [runOnUiThread] blocks, never
+     * read from BACK or a sink thread.
+     */
+    private var pendingCompletionChips: TaskRecord? = null
+
+    /**
+     * Remember that [record] completed, so its chips can ride the next feed
+     * rebuild.
+     *
+     * Two guards, both load-bearing:
+     * - COMPLETED only — a cancelled or blocked task publishes no answer
+     *   turn to hang chips on, and a failed one already carries its error.
+     * - [WebChatSink.taskRunning] is the single-concurrency attribution:
+     *   the app runs one task at a time, so a record completing while this
+     *   feed has a task running *is* that task. A channel task finishing
+     *   while this surface is idle leaves the feed alone — its answer went
+     *   to its channel, not to this thread. (It also excludes the
+     *   direct-tool path, which sets taskRunning = false: one tool call,
+     *   one answer, nothing to summarise.)
+     */
+    private fun noteCompletionChips(record: TaskRecord) {
+        if (record.status != TaskRecord.Status.COMPLETED) return
+        if (!sink.taskRunning) return
+        pendingCompletionChips = record
     }
 
     /**
@@ -561,7 +599,44 @@ class ClaudeUiPreviewActivity : BaseActivity() {
         // throws, the error surfaces via the console bridge instead.
         webView.post {
             webView.evaluateJavascript("window.__cds && window.__cds.renderLiveRaw($json);", null)
+            // 完成 chips 必须搭这一班车：renderLiveRaw 先清空 feed 再重建，
+            // 任何更早的时刻挂上去的 chips 都会被那次清空抹掉。时序上账本
+            // sink 的 runOnUiThread 先入队、feed 重建后入队，所以 chips 在
+            // 这里、在重建之后紧接着落，才落在答案那一回合上。
+            drainPendingCompletionChips()
         }
+    }
+
+    /**
+     * Kotlin → JS: put the completion chip row on the answer turn.
+     *
+     * Pure projection of the ledger record via [TaskRecordChips] — the page
+     * renders what it is handed and invents nothing. An empty list is not
+     * sent at all rather than sent as an empty row.
+     */
+    private fun publishTaskChips(record: TaskRecord) {
+        if (!::webView.isInitialized) return
+        val chips = TaskRecordChips.of(record)
+        if (chips.isEmpty()) return
+        val json = buildString {
+            append('[')
+            chips.forEachIndexed { i, chip ->
+                if (i > 0) append(',')
+                append("{\"label\":"); appendJsonString(chip.label)
+                append(",\"value\":"); appendJsonString(chip.value)
+                append('}')
+            }
+            append(']')
+        }
+        webView.post {
+            webView.evaluateJavascript("window.__cds && window.__cds.renderTaskChips($json);", null)
+        }
+    }
+
+    private fun drainPendingCompletionChips() {
+        val record = pendingCompletionChips ?: return
+        pendingCompletionChips = null
+        publishTaskChips(record)
     }
 
     /**

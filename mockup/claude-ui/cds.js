@@ -1172,6 +1172,46 @@
   }
 
   /* ------------------------------------------------------------ 列表级 */
+  /* 过滤三段：全部 / 进行中 / 已结束。客户端过滤——桥的载荷不变，过滤
+     只是「看哪一部分」的选择，不是新的数据面（ChatGPT Scheduled 的
+     All/Active/Paused 是同一思路）。lastTasksPayload 记住未过滤的
+     全集，切段时按它重画，徽标也永远数全集——徽章是状态不是装饰。 */
+  var tasksFilter = 'all';
+  var lastTasksPayload = [];
+
+  var TASKS_FILTERS = [
+    { key: 'all', label: '全部' },
+    { key: 'active', label: '进行中' },
+    { key: 'done', label: '已结束' }
+  ];
+
+  function taskMatchesFilter(t) {
+    if (tasksFilter === 'active') {
+      return t.state === 'RUNNING' || t.state === 'WAITING_CONFIRM';
+    }
+    if (tasksFilter === 'done') {
+      return t.state !== 'RUNNING' && t.state !== 'WAITING_CONFIRM';
+    }
+    return true;
+  }
+
+  function buildTasksFilter() {
+    var row = el('div', 'tasks-filter');
+    TASKS_FILTERS.forEach(function (f) {
+      var btn = el('button', 'tasks-filter-opt', f.label);
+      btn.type = 'button';
+      btn.setAttribute('data-filter', f.key);
+      btn.setAttribute('aria-pressed', tasksFilter === f.key ? 'true' : 'false');
+      btn.addEventListener('click', function () {
+        if (tasksFilter === f.key) return;
+        tasksFilter = f.key;
+        renderTaskList(lastTasksPayload);
+      });
+      row.appendChild(btn);
+    });
+    return row;
+  }
+
   function buildTaskCard(t) {
     var st = taskState(t.state);
     var card = el('button', 'task-card');
@@ -1231,6 +1271,7 @@
   }
 
   function renderTaskList(tasks) {
+    lastTasksPayload = tasks || [];
     tasksBody.textContent = '';
     updateTasksBadge(tasks);
     if (!tasks.length) {
@@ -1240,8 +1281,18 @@
       ));
       return;
     }
+    tasksBody.appendChild(buildTasksFilter());
+    var shown = tasks.filter(taskMatchesFilter);
+    if (!shown.length) {
+      // 有全集但当前段为空：说清楚是筛选问题，不是数据没了。
+      tasksBody.appendChild(buildEmptyState(
+        '没有符合当前筛选的任务',
+        '换个筛选条件，或回到「全部」看看。'
+      ));
+      return;
+    }
     var frag = document.createDocumentFragment();
-    tasks.forEach(function (t) { frag.appendChild(buildTaskCard(t)); });
+    shown.forEach(function (t) { frag.appendChild(buildTaskCard(t)); });
     tasksBody.appendChild(frag);
   }
 
@@ -1332,6 +1383,10 @@
       wrap.appendChild(buildEmptyState('这条任务还没有步骤记录', '步骤随任务执行逐条落账。刚发起或已被清理的任务可能暂时没有。'));
     }
     wrap.appendChild(el('p', 'tasks-foot', '只读视图：确认与操作在聊天线程里进行。'));
+    // 终态语义脚注（Claude 官方文案中文化）：「完成」只表示这次运行正常
+    // 收尾，不表示目标达成——步骤账本才是证据。没有这句，一个 FAILED
+    // 的 answer 和一个 COMPLETED 的 answer 在用户眼里一样重。
+    wrap.appendChild(el('p', 'tasks-foot', '状态只表示这次运行如何结束，不代表任务目标是否达成——细节在步骤账本里。'));
 
     tasksBody.appendChild(wrap);
     tasksTitle.textContent = task.title || '任务详情';
@@ -1479,6 +1534,30 @@
         String(task.id) === String(openTaskId)) {
       renderTaskDetail(task);
     }
+  }
+
+  /* ------------------------------------------------------------ 完成 chips
+     任务答案回合顶部的一行数字（耗时/步骤/工具/已建日程）。Kotlin 在 feed
+     重建之后紧接着调用（chips 搭重建那一班车，晚一步就会被 renderLiveRaw
+     的清空抹掉，见 ClaudeUiPreviewActivity.publish 的注释）——所以这里
+     只需把行挂到最后一个助手回合上。没有助手回合就不挂：那是没有答案
+     可摘要的路径，挂上去就是张冠李戴。 */
+  function renderTaskChips(chips) {
+    if (!chips || !chips.length) return;
+    var turns = document.querySelectorAll('#feed .turn-assistant');
+    if (!turns.length) return;
+    turns[turns.length - 1].appendChild(buildTaskChips(chips));
+  }
+
+  function buildTaskChips(chips) {
+    var row = el('div', 'task-chips');
+    chips.forEach(function (c) {
+      var chip = el('span', 'task-chip');
+      chip.appendChild(el('span', 'task-chip-label', c.label));
+      chip.appendChild(el('span', 'task-chip-value', c.value));
+      row.appendChild(chip);
+    });
+    return row;
   }
 
   /* ------------------------------------------------------------ 接线 */
@@ -2134,6 +2213,7 @@
     tasksLevel: function () { return tasksLevel; },
     renderTasks: renderTasks,
     renderTaskDetail: renderTaskDetailPush,
+    renderTaskChips: renderTaskChips,
     openSchedulesView: openSchedulesView,
     closeSchedulesView: closeSchedulesView,
     schedulesBack: schedulesBack,

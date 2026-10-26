@@ -1323,6 +1323,45 @@ body {
 }
 .tasks-body .group-label { margin: 14px 4px 6px; }
 
+/* 任务页过滤三段：全部 / 进行中 / 已结束。客户端过滤，桥载荷不变。
+   选中态用描边加深 + 极淡填充——不用品牌色填充，那会让筛选器比它
+   筛选的内容还吵。 */
+.tasks-filter { display: flex; gap: 6px; margin: 2px 4px 10px; }
+.tasks-filter-opt {
+  padding: 4px 12px;
+  border: var(--cds-ring-hairline) solid var(--cds-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--cds-text-muted);
+  font: inherit; font-size: 12px;
+  cursor: pointer;
+  transition: background-color 120ms var(--cds-ease-swift), color 120ms var(--cds-ease-swift);
+}
+.tasks-filter-opt:hover { background: var(--cds-fill-ghost-hover); }
+.tasks-filter-opt[aria-pressed="true"] {
+  color: var(--cds-text-primary);
+  border-color: var(--cds-border-strong);
+  background: var(--cds-fill-ghost-selected);
+}
+
+/* 完成 chips：任务故事的一行数字（耗时/步骤/工具/已建日程）。形态借
+   Open WebUI 的 completed/total 计数与 lobe 任务卡的三芯片行——它是
+   摘要不是导航，点不进任何地方。 */
+.task-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 2px; }
+.task-chip {
+  display: inline-flex; align-items: baseline; gap: 5px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: var(--cds-ring-hairline) solid var(--cds-border);
+  font-size: 11px;
+  color: var(--cds-text-muted);
+}
+.task-chip-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--cds-text-secondary);
+}
+
 /* 侧栏「任务」行的待处理计数。只在有真实数据时亮（data-show），
    无桥预览与空账本都不显示 —— 徽标是状态不是装饰。表面色描边同
    Setproduct 的 single fix：让数字从侧栏底面上脱出来。 */

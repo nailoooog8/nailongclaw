@@ -52,4 +52,20 @@ class WebTaskLedgerSinkTest {
         )
         assertEquals(1, rings)
     }
+
+    @Test
+    fun `the changed record is handed to the owner untouched`() {
+        // owner 要靠它判断「刚终态的这个任务是不是本界面正在跑的那个」——
+        // 完成 chips 的归属全靠这一个传参（单并发保证下不会错）。
+        val seen = mutableListOf<TaskRecord>()
+        val sink = WebTaskLedgerSink { seen.add(it) }
+        val first = TaskRecord(
+            id = "t1", taskText = "a", channel = Channel.LOCAL,
+            originActivity = null, createdAt = 1L, updatedAt = 1L,
+        )
+        val second = first.copy(id = "t2", status = TaskRecord.Status.COMPLETED)
+        sink.onTaskRecordAdded(first)
+        sink.onTaskRecordUpdated(second)
+        assertEquals(listOf(first, second), seen)
+    }
 }
