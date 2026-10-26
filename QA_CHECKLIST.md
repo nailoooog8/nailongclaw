@@ -926,8 +926,10 @@ When in doubt, rerun the smaller bundle first, then expand only if something dri
   - ✅ **点击中止成立（C 运行）**：红 FAB 点击 → `onStopAllTasks` → `ActiveTaskShellController.stopAllTasks` → `appViewModel.stopTask` → `TaskOrchestrator.cancelCurrentTask`。任务被真正掐断（未再产出答案），typing indicator 无残留，界面停在「工具卡在、答案不在」的干净中止态。
   - ⚠️ **纠正此前两个错误判断**：①「窗口太短」不成立——红色态稳定持续约 26–30s，不是几百毫秒；②此前 4 次阴性**本次未能复现**，状态确实渲染到了 UI。最可能的漏采原因：红色态在**发送后约 32–36s**（本地模型加载 + 首轮推理完成、第一个工具调用发生）才出现，只覆盖工具执行段；若采样窗口与发送时刻错开、或轮询在头 30s 的忙窗口里反复拿到失败 dump（见 Device Notes），就会整段错过。10-23 白天的阴性结果保留记录，但不再作为依据。
   - 📌 **红色不覆盖任务全程，两种任务永远不会有红色**：发送后到首个工具调用前约 30s 是 `awaitingReply` 相位（FAB 显示「等待」/MoreHoriz，`ChatScreen.kt:1088`）；Tier 1 直连工具任务（电池类等，`DirectDeviceDataGuard.deterministicToolCall` 命中后走 `executeDirectToolTask`，`TaskFlowController.kt:146-150, 269-294`）**设计上就不置 taskRunning**，2s 内结束、无中止需求。测 F2 必须用 agent-loop 多轮任务。
-- [ ] **F3. Floating button during task [BLOCKED — 2026-10-23 复验：悬浮球根本不存在，不是「这次没采到」]**: while task runs in another app → floating circle shows pill with step/tokens + "Tap to stop"
-  - ❌ **判据在现版本上不可达，且不是采样问题**：悬浮窗窗口从未被创建过。设备侧两次运行 + 代码侧全链路定位，结论一致。
+- [ ] **F3. Floating button during task [代码已修复 2026-10-26，待真机]**: while task runs in another app → floating circle shows pill with step/tokens + "Tap to stop"
+  - ✅ **已接线（2026-10-26）**：`FloatingCircleManager.ensureShowing()` 改为自足——`appRef` 为空时回退 `ClawApplication.instance`，无 `SYSTEM_ALERT_WINDOW` 时记日志返回而不是让 EasyFloat 抛，并 post 到主线程（任务可能从渠道轮询线程进来）。`AppViewModel.showFloatingCircle()`（零调用方的死函数）删除，`onFloatClick` / `onStopTask` 改到 `AppViewModel` 的 `init` 块无条件接线——点击行为是 pill 固有的，不再依赖某个可能没有调用方的入口。窗口由任务路径自带：orchestrator 在技能路 / 首个工具调用 / round>1 时调 `ensureShowing()`。
+  - 📌 **范围决策（2026-10-26 定）**：入口 = 任务开始路径（`ensureShowing()`），不设常驻 IDLE 球、不加设置开关——`setIdleState()` 本来就 hide，聊天页前台也 hide，「球随任务出现、随结束消失」就是现设计的语义。权限：不新增引导流程，未授权时静默跳过并记日志；授权后下一次任务开始即出现（无需重启）。聊天页前台：维持现状（`ComposeChatActivity.onCreate` 无任务时 hide；任务进行中点球可停任务，与 README 的 tap-to-stop 描述一致）。
+  - **待真机**：按下方 📌 配方发任务 → `dumpsys window windows` 应出现第二个（非 type=1）pokeclaw 窗口 → 截屏应见 `colorBrandPrimary` 像素。
   - **代码侧根因（决定性）**：`AppViewModel.showFloatingCircle()`（`AppViewModel.kt:146-162`）是**全仓库唯一**给 `FloatingCircleManager` 传 Application 引用的地方，而它**零调用方**（`grep -rn showFloatingCircle` 只命中定义本身）。于是：
     1. `show()` 只被 `showFloatingCircle()` 调用 → 从未执行 → `appRef`（`FloatingCircleManager.kt:64`）永远是 `null`，`EasyFloat.with(...)` 从未被调用；
     2. `TaskOrchestrator` 在 agent loop 里调的是 `FloatingCircleManager.ensureShowing()`（`TaskOrchestrator.kt:367`）→ 该函数第一件事就是 `val app = appRef`，为 null 时走 `XLog.w("ensureShowing: no appRef, cannot re-show")` 直接返回（`FloatingCircleManager.kt:183-189`）。
@@ -939,22 +941,23 @@ When in doubt, rerun the smaller bundle first, then expand only if something dri
   - ⚠️ **这条运行的前台切换已查明与 agent 导航无关，只用于 overlay 计数**：该次任务的工具卡是 `打开应用 → Failed to open app: com.android.camera2. Make sure the app is installed`（设备上装的是 `com.android.camera`，无 `camera2`；`OpenAppTool.resolveAppName` 把 "camera" 映射到了不存在的 `com.android.camera2`），紧接着 `系统按键 → Pressed Back button`。所以 18:39:53 前台变成 `com.android.settings` **不是 agent 打开了别的应用**，最可能是 Back 让聊天页出栈后系统回落到上一任务（ Settings 是 18:19 那次运行留下的）。该进程随后在 18:39:54 被 **LOW_MEMORY** 杀掉（`dumpsys activity exit-info io.agents.pokeclaw`：`reason=3 (LOW_MEMORY) rss=2.8GB`，本地模型 2.6GB）。因此这条运行**只用「overlay 窗口计数」这一项**（45 次采样全程为 0，与因果无关），**不用作「任务跑在别的应用里」的证据**。上一条（真机证据一）不受影响——它的工具卡是 `Opened app: com.android.settings`（成功），前台切换发生在进程存活期间，归因无歧义。
   - 📌 **复现此条所需的任务文本配方**（与 F2 同源，另加两条约束）：必须同时满足 ①不含 `DirectDeviceDataGuard.deterministicToolCall` 的英文关键词（battery / wifi / bluetooth / storage / notif / installed apps / temperature / clipboard…），否则走 `executeDirectToolTask` 直连路、不置 taskRunning；②含 ` and ` / ` then ` / ` after `，否则被 `PipelineRouter.route()` 的 Tier 1 正则截走（`PipelineRouter.kt:48-56`：复合任务直接跳过 Tier 1）。本次用 `Open com.android.settings and then scroll to the bottom of the page`。
   - 📌 **采样必须走悬浮窗自己的窗口**：`uiautomator dump` 只给活动窗口，pill 是 overlay；且本机 release 包看不到应用日志（§Device Notes），所以只能靠 `dumpsys window` 数窗口 + 截屏取色，不能靠 OCR 小字（H24 的教训）。
-  - 📌 **要单独立项的范围决策**：把悬浮球接上需要决定入口（谁调 `showFloatingCircle()`）、权限引导（`SYSTEM_ALERT_WINDOW` 本机已 allow，但新装机没有）、以及 pill 在聊天页前台时是否隐藏（`ComposeChatActivity.onCreate:127` 现在会 hide 掉它）。**这不是 QA 缺陷修复，是功能接线**，动手前应先定批准语义。
-- [ ] **F4. Floating button stop [BLOCKED — 2026-10-23：没有球可点；且点击回调也是空实现]**: tap floating button during task → task cancels
+  - 📌 **范围决策已定（2026-10-26）**：入口取任务开始路径；权限未授权时静默跳过（授权后下次任务即出现）；聊天页前台维持 hide-if-idle。**这不是 QA 缺陷修复，是功能接线**——接线已完成，剩余只有真机执行。
+- [ ] **F4. Floating button stop [代码已修复 2026-10-26，待真机]**: tap floating button during task → task cancels
+  - ✅ **两个断点都已修（2026-10-26）**：① 窗口存在性同 F3（`ensureShowing()` 自足化）；② 点击回调不再依赖零调用方的 `showFloatingCircle()`——`onStopTask` 在 `AppViewModel` 的 `init` 块里接到 `stopTask()`（→ `TaskOrchestrator.cancelCurrentTask()`），与 F2 的 FAB 路径收敛于同一处。
   - ❌ **两个独立的断点，任意一个都足以让本条失效**：
     1. 窗口不存在（同 F3 根因：`showFloatingCircle()` 零调用方 → `appRef` 为 null → `ensureShowing()` 直接返回）；
     2. **即使窗口被创建出来，点它也不会中止任务**：点击回调走 `onStopTask()`（`FloatingCircleManager.kt:119-124`），而 `var onStopTask: () -> Unit = {}`（`FloatingCircleManager.kt:506`）的默认值是空 lambda，唯一给它赋值的地方还是 `AppViewModel.kt:153`——同样零调用方。所以现状是「点下去什么都不发生」。
   - **代码侧已核实的预期路径**（供接线后回归用）：`FloatingCircleManager.onStopTask` → `AppViewModel.stopTask()` → `TaskOrchestrator.cancelCurrentTask()`（`TaskOrchestrator.kt:178-189`：`markStopping()` + `agentService.cancel()` + `ForegroundService.updateTaskStatus("Stopping task...")`）。**它与 F2 的 FAB 路径最终收敛到同一个 `cancelCurrentTask()`**（FAB 走 `ActiveTaskShellController.stopAllTasks()` → `appViewModel.stopTask()`，`ActiveTaskShellController.kt:58-63`），差别只在 FAB 额外停掉 AutoReply 监听并立刻 `ForegroundService.resetToIdle()`。
   - **取消后的复位链路也已核实**：`TaskOrchestrator.onComplete` 识别到取消类答案（`agent_task_cancel` / `agent_task_cancelled` / `channel_msg_task_cancelled`）→ `TaskEvent.Cancelled` + `ForegroundService.resetToIdle` + `FloatingCircleManager.setErrorState()`（`TaskOrchestrator.kt:447-468`），pill 转 ERROR 态 5s 后自动回 IDLE 并 hide。这条链路本身是完整的，坏的只是「怎么让窗口出现」和「点了谁去调」。
   - **本条无法真机判定**：没有可点的目标。判据中的「task cancels」已由 F2 的 C 运行在同一 `cancelCurrentTask()` 上验过（4s 内 FAB 回位、之后 4 分钟无答案），但**「从悬浮球触发」这一环在本版本上不可达**。
-- [x] **F5. Second task works [PARTIAL PASS — 2026-10-23 真机：任务 2/3 均被接受，会话锁正常释放；悬浮球一项随 F3/F4 阻塞]**: complete task 1 → start task 2 → floating button, top bar, stop button all work
+- [x] **F5. Second task works [PARTIAL PASS — 2026-10-23 真机：任务 2/3 均被接受，会话锁正常释放；悬浮球一项 2026-10-26 接线后待真机复验]**: complete task 1 → start task 2 → floating button, top bar, stop button all work
   - **判据拆开逐项对**（原文把三个不同的东西混成一句，而 F1 已经证明「top bar 没有运行中指示」是旧 UI 描述）：
     | 分项 | 结论 | 依据 |
     |---|---|---|
     | 任务 2 能被接受（无 "Another task is still running"） | ✅ PASS | 见下方三次运行 |
     | FAB 停止控件在任务 2 上工作 | ✅ PASS | 任务 3 发送后 33s 见红（18:36:38），持续约 34s，18:37:12 随答案回「发送」 |
     | 会话锁 / LLM session 已释放 | ✅ PASS | agent-loop 任务 3 正常加载模型并跑完 |
-    | floating button | ⛔ 阻塞 | 随 F3/F4：窗口不存在 |
+    | floating button | ⏳ 待真机 | 2026-10-26 接线（`ensureShowing()` 自足化 + 回调无条件接线），复验随 F3/F4 |
     | top bar 运行中指示 | ✅ 已由 F1 关闭 | `ChatTopBar` 无该元素，唯一中止控件是 FAB |
   - ✅ **真机三次连续运行（同一进程，设备 `10AG4J1THX00524` / V2502DA / release 39）**：
     | # | 发送时刻 | 任务 | 类型 | 结果 |
@@ -1080,7 +1083,7 @@ When in doubt, rerun the smaller bundle first, then expand only if something dri
     |---|---|---|
     | `TaskOrchestrator.onComplete` | 任务完成 → 回发起点 | ✅ **本次修复** |
     | `TaskOrchestrator` watchdog 超时 | `GLOBAL_ACTION_HOME` 回桌面 | ❌ 不动（回桌面 ≠ 回某页） |
-    | `AppViewModel.bringAppToForeground` | 浮动球点击 → 拉前台 | ❌ 不动（用户主动行为；且 `showFloatingCircle()` **零调用方**，是死代码） |
+    | `AppViewModel.bringAppToForeground` | 浮动球点击 → 拉前台 | ✅ 已接线（2026-10-26）：回调在 `AppViewModel` 的 `init` 块无条件赋值，`showFloatingCircle()` 死函数已删除，入口改为 orchestrator 的 `ensureShowing()` |
     | `ForegroundService` 通知 PendingIntent | 点通知 → 打开主界面 | ❌ 不动（通知就该指主界面） |
   - ✅ **修复方式**：`TaskSessionState` 新增 `originActivity: String?`（存**类名字符串**，不存 Activity 引用 —— 任务可能比界面活得久，存引用会泄漏）。`TaskFlowController` 传入 `activity.javaClass.name`；`onComplete` 优先回该 Activity。
   - ⚠️ **降级路径在 `returnTargetComponent()` 里，不能靠调用方自觉**：类名解析失败（旧版本残留类名、类已删除、非 Activity）→ 回落到聊天页。绝不能在完成回调里抛异常 —— 任务已经结束，抛了也只会被日志记一笔。
@@ -1322,13 +1325,27 @@ When in doubt, rerun the smaller bundle first, then expand only if something dri
 
 - [ ] **H60. 任务账本双写落盘 [RELEASE-OK]**: 发一个多步任务（含至少一次工具调用）→ `adb pull` `task_records.json` → 记录含 `channel`（LOCAL/EXTERNAL/**SCHEDULED** 如实，定时任务那条必须是 SCHEDULED 而非 LOCAL）、`originActivity`（发起页类名；定时任务为 null）、步骤（ToolResult/Progress 为步，ToolAction 与 Finish 不为步）、终态与 answer/error。`am force-stop` 后重进 → 任务页/账本里上一条 RUNNING 记录变为 FAILED（"Interrupted…"），不出现永远运行中的僵尸记录。直连工具任务（如截图）也有自己的记录。
 - [ ] **H61. calendar_read 的三条诚实路径 [RELEASE-OK]**: 未授日历权限时调用 → 错误明说去 系统设置→应用→PokeClaw→权限 开「读取日历」，不假装空日历；授权后 → 返回接下来 24h 事件（重复日程按 Instances 展开、全天事件如实标注），结果在 `<<<UNTRUSTED:calendar>>>` 围栏内；无日历账户/空日程 → 明确说「No events…」。
-- [ ] **H62. 三级风险与破坏性无始终允许 [RELEASE-OK]**: 远程渠道行为不变（make_call/system_key 仍拒，web_search/calendar_read 仍放行）。MCP 确认卡（echo 服务器套路，H27）上破坏性档请求**不出现**「始终允许」按钮（卡面为部二迁移面；若旧卡面仍出三钮，点「始终允许」→ 等待中的任务页记录显示 ALLOW_ONCE 而非记入放行集，下一次调用重新询问——Gate 侧降级兜底）。
+- [ ] **H62. 三级风险与破坏性无「始终允许」 [RELEASE-OK]**（2026-10-26 随部二卡面改写，原判据保留）：远程渠道行为不变（make_call/system_key 仍拒，web_search/calendar_read 仍放行）。MCP 确认卡（echo 服务器套路，H27）上破坏性档请求**不出现**「始终允许」——卡面只剩「允许一次 / 本次拒绝」两颗钮，卡头有「破坏性」徽标，卡内有后果说明，卡底有 60 秒倒计时（每秒递减，到点按拒绝处理，与 coordinator 超时同源）。原生聊天页（外部 task 契约路径）的 CdsDialog 同样两颗钮，正文多一行「⚠ 破坏性操作，不可撤销：只能允许这一次」。旧卡面三钮路径已不存在；若复现三钮即为回归。判定不认 App 自己的提示：以 uiautomator dump 的按钮文字节点为准。
 - [ ] **H63. 定时任务三件套 [RELEASE-OK]**: `schedule_task`（delay_minutes）→ `scheduled_tasks.json` 出现 SCHEDULED 记录且闹钟已设（`adb shell dumpsys alarm | grep pokeclaw`）；到点触发 → 通知 + 任务入账本（originActivity=null, **channel=SCHEDULED**——`adb pull task_records.json` 核对，不是 LOCAL）；触发时正有任务在跑 → 记录转 QUEUED 且 outcome 写「queued: another task was running」，前任务结束后自动补跑；重启设备错过单次 → 记录转 MISSED 不迟跑，周期任务重新对准下一档；`cancel_scheduled_task` 按 id 取消并撤闹钟；带 `calendar_anchor_hours` 的任务触发时提示词含围栏日历摘要。
 - [ ] **H65. 定时任务的只读天花板 [RELEASE-OK]**: 排一个任务文本为「给我妈打电话说她发票的事」的 `schedule_task`（delay_minutes 取 2 便于等待）→ 到点后 logcat 出现 `Refused 'make_call' for source=Scheduled risk=DESTRUCTIVE`，**没有拨号界面、没有通话记录**，通知里的结果是模型如实说明「这部分需要你在 PokeClaw 里亲自跑」而不是假装打了；`system_key`、`send_message`、`input_text`、`schedule_task`（WRITE 档，即定时任务不能再排定时任务）各验一次。反向：排「看我今天日历和未读通知，总结一下」→ 正常完成且通知里有总结，证明天花板没把观察类工具一起挡掉。这是 H63 的安全半边，**H63 跑通后必须单独跑这一条**。
 - [ ] **H66. calendar_create 落进真实日历 [RELEASE-OK]**: 授「读取日历」+「添加和修改日程」后让 agent「明天下午3点和山姆吃饭，一小时，建个日程」→ 回显含标题、`MM-dd HH:mm–HH:mm`、日历名与事件 id，系统日历 App 里核对该事件确实存在且时间/时长/日历都对。反向三条：只授读取权限 → 错误明说缺 WRITE_CALENDAR 并指路系统设置页；设备无日历账户 → 明说 no writable calendar 且日历里不出现任何东西；`duration_minutes` 传 0 或 999999 → 拒绝且不创建（不是钳制后建一个用户没要的事件）。`all_day` 传 UTC 零点 → 事件落在正确那一天（回显打的是 UTC 日期，错传本地零点会在这里现形）。
 - [ ] **H64. WAITING_CONFIRM 停车状态 [LLM-CLOUD]**: MCP 确认卡出现期间 → 账本/任务页该任务状态为 WAITING_CONFIRM 且步骤含「⏳ Waiting for user confirmation」；用户裁决（允许/拒绝/超时）→ 回 RUNNING 并记「Confirmation <OUTCOME>」；卡上等待时看门狗超时 → 任务直接 FAILED，后续裁决不再改状态。
 
 > **评审修复（2026-10-25，open-code-review 全量过审后）**：①`read_conversation` 滚动读历史时按趟收集、旧趟前插——修掉「滚动后消息按屏倒序」的 High 缺陷；遍历不再 `recycle()` 已入结果集的节点（API 28–32 上访问已回收节点会抛异常）。②`reply_via_notification` 成功后只取消被回复的那一条通知（新增 `ClawNotificationListener.dismissNotification`），不再清掉同 app 其他未读。③自动回复快速路径从 MessagingStyle 通知的 `EXTRA_MESSAGES` 提取最近会话作上下文（零 UI 找回上下文，H53 的 trace 多一行 `context=…`）。④`SendMessageTool` 发送验证的静默等待保底 500ms（防安静清空输入框时误报未发送）。⑤`MemoryStore.restoreSuperseded` 改为「恢复即裁决」：复活条目按新写入口径顶替活跃矛盾者（直系配对行为不变，A→B→C 链恢复 A 不再留下 A、C 双活，新增单测 `restoring through a chain supersedes the live tail`）。⑥删除根目录 29 个 QA uiautomator dump 并在 .gitignore 加 `/*.xml` 防再犯。全部修复后 364/364 单测绿。
+
+### 2026-10-26 — 部二 UI 线：定时队列 / 确认卡分级 / 完成 chips / 引导（代码就绪，真机待验）
+
+> 单测已绿（全量 **572/572**：新增 `ScheduleLedgerBridgeTest` 11 例、`ScheduledTaskStoreSinkTest` 10 例、`ConfirmationButtonsTest` 3 例、`TaskRecordChipsTest` 5 例，`WebTaskLedgerSinkTest` 补 1 例）。以下为真机验收条目。取证套路沿用任务页：`adb shell am broadcast -a io.agents.pokeclaw.DUMP_DOM` 后读 logcat 的 `domDump:` 行（已含 `schedulesOpen` / `schedulesLevel` / `scheduleCards`）；侧栏行与卡面按钮用 uiautomator dump 的文字节点，不认截图。定时任务的排定沿用 H63 的 agent 路径，或 H27 的 skill 触发套路（零 LLM、确定性）。
+
+- [ ] **H67. 定时队列五态、倒计时与两步取消 [RELEASE-OK] [LLM-CLOUD]**: 排三个任务（其一 `repeat_minutes=15` 且 `calendar_anchor_hours=6`）→ 侧栏出现「定时」行（uiautomator 文字节点；`data-live` 白名单漏了会整行不可见——这条就是查它的），行尾徽标数 live 任务。打开队列：三张行卡，周期说人话（「每 15 分钟」「单次」），待运行行有「还有 N 分钟」倒计时且 30s 后续算；`DUMP_DOM` → `schedulesOpen=true` / `schedulesLevel=list` / `scheduleCards=3`。到点触发一个 → 通知 + 入账本（H63 判据），队列里单次转「已触发」、周期回「待运行」且倒计时重瞄。触发时正有任务在跑 → 行转「排队中」且行内 outcome 明说在等前一个任务。**取消（两步）**：进行情 →「取消这个任务」→ 卡内变「确认取消？这个任务不会再运行」+ 确认/再想想 → 确认后回列表该行变「已取消」，`adb pull scheduled_tasks.json` 核对 `status=CANCELLED`，`dumpsys alarm | grep pokeclaw` 该 id 闹钟已撤；第二步点「再想想」→ 回列表且任务仍 SCHEDULED（不留半确认状态）。点进行情后 coach mark 不再出现（H71 的副作用一并记）。
+
+- [ ] **H68. 完成 chips、任务页过滤与终态脚注 [RELEASE-OK] [LLM-CLOUD]**: 跑一个多步任务（至少两次工具调用，含一次成功的 `calendar_create` 或 `memory_recall`）→ 完成答案回合顶部出现 chips 行：「耗时 N」「步骤 N」「工具 N」，成功的 `calendar_create` 再加「已建日程 N」；数值与 `adb pull` 的 `task_records.json` 对得上。反向：只授读取权限时 `calendar_create` 失败 → chips **不出现**「已建日程」（数结果不数尝试）。任务页打开 → 列表顶部三段 全部/进行中/已结束；「进行中」只列 RUNNING/WAITING_CONFIRM，「已结束」只列终态；**侧栏徽标始终数全集，不被筛选影响**；筛选出空时有「没有符合当前筛选的任务」空态而非白屏。任务详情底部两行脚注（只读声明 + 「状态只表示这次运行如何结束，不代表任务目标是否达成」）。渠道任务在界面空闲时完成 → 聊天流不出现 chips（归属判据：chips 只挂本界面跑过的任务）。
+
+- [ ] **H69. Web 确认卡真机点击（破坏性档两钮）[RELEASE-OK]**: H27 登记过「JS 侧按钮未在真机上点过」——本条补上。echo 服务器套路（H27 的 skill 触发，零 LLM）触发 `mcp_*` 调用 → Web 聊天页出现确认卡：工具名 + 「破坏性」徽标 + 参数预览 + 后果说明 + 60s 倒计时（每秒递减）；按钮只有「允许一次 / 本次拒绝」两颗。点「允许一次」→ 按钮即时禁用 → 服务端收到调用（H27 的服务端日志判据）→ 聊天里留下 ✓ 记录、账本该任务回 RUNNING 并记 `Confirmation ALLOW_ONCE`。点「本次拒绝」→ 服务端零调用 + 模型收到可执行理由。60s 超时那条真机不验（代价同 H27），由 `McpConfirmationCoordinatorTest` 钉住。
+
+- [ ] **H70. 精确闹钟降级提示 [RELEASE-OK]**: `adb shell appops set io.agents.pokeclaw SCHEDULE_EXACT_ALARM ignore`（或系统设置里关「闹钟和提醒」）→ 排一个任务 → 打开定时队列：**顶部出现降级提示条**（「系统没有授予『精确闹钟』权限……07:30 的简报迟到几分钟是正常的」），任务行照常显示（不空态、不报错、倒计时照算）。`appops set ... allow` 恢复 → 重开队列提示条消失、`scheduleCards` 不变。判据：提示条文字节点 + `appops get` 状态，不认截图。这条补的是 BACKLOG P3「静默降级」的旧账。
+
+- [ ] **H71. 一次性 coach mark [RELEASE-OK]**: 全新安装（或 `pm clear` 后）首进主界面 → 打开侧栏抽屉 → 定时行下方出现 teaching bubble（「定时任务住在这里……」+「去看看」）。点「去看看」→ bubble 消失、直接进入定时队列；`adb shell run-as` 不适用（release），改判：杀进程重进 → bubble **不再出现**（SharedPreferences 标志）。直接点「定时」行（不点 bubble）→ 同样不再出现。无 bridge 的纯浏览器预览不显示 bubble（设计稿没有「第一次使用」）。
 ## CI. Emulator Smoke Harness
 The runner itself is code. When it reports red for a reason that has nothing to do with
 the app, it burns triage time and trains everyone to ignore the matrix — which is worse
