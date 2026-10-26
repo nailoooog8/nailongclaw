@@ -11,6 +11,7 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import io.agents.pokeclaw.utils.XLog
 import java.io.File
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * Durable store of scheduled tasks — the timer half of the scheduling pair
@@ -25,6 +26,9 @@ import java.io.File
  * fires while another runs is *queued with a visible status*, never silently
  * dropped and never run concurrently. [drain] is pure policy — who may fire
  * next — so the queue order is unit-testable without Android types.
+ *
+ * Every write point tells the [ScheduleSink]s, outside the lock — the
+ * schedule page reads the list, the sinks are what makes it live.
  */
 object ScheduledTaskStore {
 
@@ -40,6 +44,8 @@ object ScheduledTaskStore {
 
     @Volatile
     private var cache: MutableList<ScheduledTask>? = null
+
+    private val sinks = CopyOnWriteArrayList<ScheduleSink>()
 
     /** Test seams, same pattern as TaskRecordStore. */
     @VisibleForTesting
@@ -67,27 +73,36 @@ object ScheduledTaskStore {
 
     /** Record a new scheduled task; false (and no write) on a duplicate id. */
     @JvmStatic
-    fun schedule(task: ScheduledTask): Boolean = synchronized(lock) {
-        val tasks = loadLocked()
-        if (tasks.any { it.id == task.id }) {
-            XLog.w(TAG, "schedule: '${task.id}' already exists — refusing to overwrite")
-            return false
+    fun schedule(task: ScheduledTask): Boolean {
+        val added = synchronized(lock) {
+            val tasks = loadLocked()
+            if (tasks.any { it.id == task.id }) {
+                XLog.w(TAG, "schedule: '${task.id}' already exists — refusing to overwrite")
+                return false
+            }
+            tasks.add(task)
+            persistLocked()
+            true
         }
-        tasks.add(task)
-        persistLocked()
-        true
+        if (added) notifyChanged(task)
+        return added
     }
 
     /** Cancel a live task; false if unknown or already terminal. */
     @JvmStatic
-    fun cancel(id: String): Boolean = synchronized(lock) {
-        val tasks = loadLocked()
-        val idx = tasks.indexOfFirst { it.id == id }
-        if (idx < 0) return false
-        if (!tasks[idx].isLive) return false
-        tasks[idx] = tasks[idx].copy(status = ScheduledTask.Status.CANCELLED)
-        persistLocked()
-        true
+    fun cancel(id: String): Boolean {
+        val cancelled = synchronized(lock) {
+            val tasks = loadLocked()
+            val idx = tasks.indexOfFirst { it.id == id }
+            if (idx < 0) return false
+            if (!tasks[idx].isLive) return false
+            val next = tasks[idx].copy(status = ScheduledTask.Status.CANCELLED)
+            tasks[idx] = next
+            persistLocked()
+            next
+        }
+        notifyChanged(cancelled)
+        return true
     }
 
     /**
@@ -95,11 +110,15 @@ object ScheduledTaskStore {
      * Returns the queued task or null if it was not live.
      */
     @JvmStatic
-    fun markQueued(id: String): ScheduledTask? = mutateLive(id, from = ScheduledTask.Status.SCHEDULED) {
-        it.copy(
-            status = ScheduledTask.Status.QUEUED,
-            lastOutcome = QUEUED_OUTCOME,
-        )
+    fun markQueued(id: String): ScheduledTask? {
+        val updated = mutateLive(id, from = ScheduledTask.Status.SCHEDULED) {
+            it.copy(
+                status = ScheduledTask.Status.QUEUED,
+                lastOutcome = QUEUED_OUTCOME,
+            )
+        }
+        if (updated != null) notifyChanged(updated)
+        return updated
     }
 
     /**
@@ -108,29 +127,39 @@ object ScheduledTaskStore {
      * occurrence computed from [now] — the caller re-arms the alarm.
      */
     @JvmStatic
-    fun markFired(id: String): ScheduledTask? = mutateLive(id, from = null) {
-        if (it.repeatIntervalMillis != null) {
-            it.copy(
-                fireAtMillis = it.nextOccurrenceAfter(clock()),
-                lastFiredAt = clock(),
-            )
-        } else {
-            it.copy(
-                status = ScheduledTask.Status.FIRED,
-                lastFiredAt = clock(),
-            )
+    fun markFired(id: String): ScheduledTask? {
+        val updated = mutateLive(id, from = null) {
+            if (it.repeatIntervalMillis != null) {
+                it.copy(
+                    fireAtMillis = it.nextOccurrenceAfter(clock()),
+                    lastFiredAt = clock(),
+                )
+            } else {
+                it.copy(
+                    status = ScheduledTask.Status.FIRED,
+                    lastFiredAt = clock(),
+                )
+            }
         }
+        if (updated != null) notifyChanged(updated)
+        return updated
     }
 
     /** How the run ended — visible in list_scheduled_tasks and the task page. */
     @JvmStatic
-    fun recordOutcome(id: String, outcome: String): ScheduledTask? = synchronized(lock) {
-        val tasks = loadLocked()
-        val idx = tasks.indexOfFirst { it.id == id }
-        if (idx < 0) return null
-        tasks[idx] = tasks[idx].copy(lastOutcome = outcome.take(300))
-        persistLocked()
-        tasks[idx]
+    fun recordOutcome(id: String, outcome: String): ScheduledTask? {
+        // synchronized 块内的 return null 是函数级返回，故 updated 必非空。
+        val updated = synchronized(lock) {
+            val tasks = loadLocked()
+            val idx = tasks.indexOfFirst { it.id == id }
+            if (idx < 0) return null
+            val next = tasks[idx].copy(lastOutcome = outcome.take(300))
+            tasks[idx] = next
+            persistLocked()
+            next
+        }
+        notifyChanged(updated)
+        return updated
     }
 
     /**
@@ -140,23 +169,27 @@ object ScheduledTaskStore {
      * live tasks the caller must re-arm.
      */
     @JvmStatic
-    fun reconcileAfterReboot(): List<ScheduledTask> = synchronized(lock) {
-        val tasks = loadLocked()
-        val now = clock()
-        var changed = false
-        for (i in tasks.indices) {
-            val task = tasks[i]
-            if (!task.isLive || task.fireAtMillis > now) continue
-            tasks[i] = if (task.repeatIntervalMillis != null) {
-                task.copy(fireAtMillis = task.nextOccurrenceAfter(now))
-            } else {
-                XLog.i(TAG, "reconcile: '${task.id}' missed its window while the device was off")
-                task.copy(status = ScheduledTask.Status.MISSED, lastOutcome = MISSED_OUTCOME)
+    fun reconcileAfterReboot(): List<ScheduledTask> {
+        val (live, changed) = synchronized(lock) {
+            val tasks = loadLocked()
+            val now = clock()
+            val moved = mutableListOf<ScheduledTask>()
+            for (i in tasks.indices) {
+                val task = tasks[i]
+                if (!task.isLive || task.fireAtMillis > now) continue
+                tasks[i] = if (task.repeatIntervalMillis != null) {
+                    task.copy(fireAtMillis = task.nextOccurrenceAfter(now))
+                } else {
+                    XLog.i(TAG, "reconcile: '${task.id}' missed its window while the device was off")
+                    task.copy(status = ScheduledTask.Status.MISSED, lastOutcome = MISSED_OUTCOME)
+                }
+                moved.add(tasks[i])
             }
-            changed = true
+            if (moved.isNotEmpty()) persistLocked()
+            Pair(tasks.filter { it.isLive }, moved)
         }
-        if (changed) persistLocked()
-        tasks.filter { it.isLive }
+        for (task in changed) notifyChanged(task)
+        return live
     }
 
     /** What a queued task's outcome says — the queue's honest wording. */
@@ -205,6 +238,34 @@ object ScheduledTaskStore {
         loadLocked()
             .filter { it.status == ScheduledTask.Status.QUEUED }
             .minByOrNull { it.lastFiredAt ?: it.createdAt }
+    }
+
+    // ── Sinks ─────────────────────────────────────────────────────────────────
+
+    @JvmStatic
+    fun addSink(sink: ScheduleSink) {
+        sinks.add(sink)
+    }
+
+    @JvmStatic
+    fun removeSink(sink: ScheduleSink) {
+        sinks.remove(sink)
+    }
+
+    /**
+     * Tell the sinks the queue moved. Fired outside the lock (a sink may
+     * re-enter [list]) and guarded per sink — one broken surface must not
+     * break the write path that is mid-notify. Same contract as
+     * [TaskRecordStore]'s notify.
+     */
+    private fun notifyChanged(task: ScheduledTask) {
+        for (sink in sinks) {
+            try {
+                sink.onScheduleChanged(task)
+            } catch (e: Exception) {
+                XLog.e(TAG, "sink failed onScheduleChanged for '${task.id}'", e)
+            }
+        }
     }
 
     // ── Storage ───────────────────────────────────────────────────────────────
