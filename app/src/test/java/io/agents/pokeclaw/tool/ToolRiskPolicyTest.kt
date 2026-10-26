@@ -191,4 +191,64 @@ class ToolRiskPolicyTest {
         assertTrue(reason.contains("External Automation"))
         assertTrue(reason.contains("PokeClaw app"))
     }
+
+    // ---- Scheduled tasks (M4) ----
+
+    @Test
+    fun `scheduled tasks are held to the read only ceiling`() {
+        // The alarm fires with nobody in front of the screen, so a fired task
+        // gets the same ceiling as any other unwatched source — not the local
+        // tier it used to inherit. The scary half: unattended, a scheduled
+        // task can no longer dial, type, or press the key that approves
+        // system dialogs.
+        val acting = listOf(
+            "make_call", "system_key", // DESTRUCTIVE
+            "send_message", "input_text", "clipboard", "send_file",
+            "memory_save", "kb_write", "schedule_task", // WRITE
+        )
+        for (name in acting) {
+            assertTrue(
+                "$name must be blocked for Channel.SCHEDULED",
+                ToolRiskPolicy.isBlockedForChannel(name, Channel.SCHEDULED),
+            )
+        }
+        // The useful half: a 07:30 brief can still observe and answer, and the
+        // answer reaches the user as a notification.
+        val observing = listOf(
+            "calendar_read", "get_notifications", "web_search",
+            "get_screen_info", "take_screenshot", "memory_recall",
+            "list_scheduled_tasks",
+        )
+        for (name in observing) {
+            assertFalse(
+                "$name must stay available to Channel.SCHEDULED",
+                ToolRiskPolicy.isBlockedForChannel(name, Channel.SCHEDULED),
+            )
+        }
+    }
+
+    @Test
+    fun `a scheduled task does not inherit the local tier`() {
+        // The regression this guards: the alarm used to fire its task as
+        // Channel.LOCAL, which handed an unattended run every tool. Same task
+        // text, same moment, opposite outcome depending only on the label.
+        assertFalse(ToolRiskPolicy.isBlockedForChannel("make_call", Channel.LOCAL))
+        assertTrue(ToolRiskPolicy.isBlockedForChannel("make_call", Channel.SCHEDULED))
+        // Fail closed unattended: a tool nobody has classified yet is refused.
+        assertTrue(ToolRiskPolicy.isBlockedForChannel("some_future_tool", Channel.SCHEDULED))
+    }
+
+    @Test
+    fun `scheduled block reason asks for a human instead of pointing at the app`() {
+        // "Run this from the PokeClaw app instead" is the right advice for a
+        // Telegram task and the wrong one at 03:00 — the user is asleep. The
+        // model needs a reason it can repeat to them honestly.
+        val reason = ToolRiskPolicy.blockReason("make_call", Channel.SCHEDULED)
+        assertTrue(reason.contains("make_call"))
+        assertTrue(reason.contains("scheduled"))
+        assertTrue(reason.contains("observe"))
+        assertTrue(reason.contains("Tell the user"))
+        // It must not read as a transient tool error the loop should retry.
+        assertFalse(reason.contains("Run this from the PokeClaw app instead"))
+    }
 }

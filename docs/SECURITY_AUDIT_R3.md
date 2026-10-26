@@ -247,6 +247,28 @@ QA_CHECKLIST **SEC12–SEC18**，尚未真机执行。
 **是否给这两条也打标需要先确认 QA 流程有没有依赖 adb 任务拿 LOCAL 等级**——这会改变
 SEC 用例的预期，故本轮未动。
 
+**第三扇门（2026-10-26 补记，release 路径，非 debug）**：R3-01 修的是"外部广播被记成
+LOCAL"，本轮审计因此把"哪些任务会被记成 LOCAL"当成了已结项。实际上同一天落地的 M4
+定时任务（`f118251`）里，`ScheduleDispatcher.fireNow` 用 `channel = Channel.LOCAL`
+启动每一个到点任务——闹钟响时没有人在屏幕前，却拿到了交互式本地等级的全量工具。
+`ToolRiskPolicy.isBlockedForChannel` 第一行就是 `if (channel == null || channel ==
+Channel.LOCAL) return false`，而确认卡只对 `mcp_` 前缀生效（`ToolRegistry.kt:143`），
+所以 `make_call` / `system_key` 这类第一方破坏性工具在本地任务上**本来就没有人工闸**。
+两者相乘：排一个"07:30 看我日历，迟到了就给对方打电话"的任务，到点后模型调
+`system_key(key="enter")` 会直接按下那个批准系统对话框的键，无人见证。
+
+已修复：新增 `Channel.SCHEDULED`，`fireNow` 对账本和 orchestrator 都传它。该值不是
+LOCAL，于是 `isBlockedForChannel` 现有的 `riskOf(name) != READ_ONLY` 直接给出只读
+天花板——逻辑一行未改，改的是"这个任务是什么来源"这个事实。`blockReason` 为 SCHEDULED
+单独写了一档措辞：不说"去 app 里跑"（用户在三点钟是睡着的），而要求模型如实告知"这部分
+需要你在时亲自跑"。单测 487 → 491，QA 新增 H65。
+
+教训与上一条相同但更贵：**"修复一个洞"不等于"扫过所有同型洞"**。R3-01 的表项写的是
+`ExternalAutomationEntrypoint` 硬编码 LOCAL 这一处代码，而真正的类别是"无人值守的来源
+被贴上交互式标签"。下一次审这类问题，枚举入口比枚举代码行更可靠——本仓共有 4 个
+`startTask` 调用方（UI、外部自动化、定时、debug），逐个问一句"这个调用发生时有人看着屏幕吗"，
+比读任何单个文件都快。定时任务这一路，本轮审计问晚了整整一天。
+
 ### 6.2 R3-02 / R3-03 / F4 同型 / R3-05 — 一个围栏实现，全部内容出口
 
 新增 `agent/ContextFence.kt`：唯一的 `wrap()` / `sanitize()` 实现（幂等、`@JvmStatic`

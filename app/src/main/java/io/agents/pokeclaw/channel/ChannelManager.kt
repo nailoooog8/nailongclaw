@@ -37,6 +37,28 @@ enum class Channel(val displayName: String) {
      * automation callback broadcast instead.
      */
     EXTERNAL("External Automation"),
+
+    /**
+     * A task fired by the app's own alarm
+     * ([io.agents.pokeclaw.task.ScheduleDispatcher]).
+     *
+     * Also deliberately *not* [LOCAL], for the same reason as [EXTERNAL]: the
+     * alarm goes off with nobody in front of the screen, so the unrestricted
+     * local tier is the wrong one to hand it. A scheduled task therefore gets
+     * the READ_ONLY ceiling in [io.agents.pokeclaw.tool.ToolRiskPolicy] — it
+     * may observe and answer, and the answer is delivered as a notification.
+     * Anything that acts on the world is refused with the reason, and the
+     * model is expected to say so rather than pretend it did the thing.
+     *
+     * This used to be recorded as LOCAL, which gave every fired task full
+     * local tool privileges — including the tools that dial, type, and press
+     * the key that approves system dialogs, at an hour nobody chose to be
+     * awake for.
+     *
+     * There is no handler for it in [ChannelManager.handlers]; outbound sends
+     * are no-ops, and the result travels as a notification instead.
+     */
+    SCHEDULED("Scheduled"),
 }
 
 object ChannelManager {

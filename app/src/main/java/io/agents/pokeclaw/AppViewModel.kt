@@ -62,7 +62,9 @@ class AppViewModel : ViewModel() {
          * Where the task came from. Defaults to [Channel.LOCAL] — the app's own
          * UI. An external-automation task passes [Channel.EXTERNAL] so
          * ToolRiskPolicy gates it like any other unwatched source instead of
-         * silently inheriting the local tier (R3-01).
+         * silently inheriting the local tier (R3-01). A task fired by the
+         * alarm passes [Channel.SCHEDULED] — unwatched for the same reason, and
+         * therefore held to the READ_ONLY ceiling.
          */
         channel: Channel = Channel.LOCAL,
         onEvent: (TaskEvent) -> Unit,

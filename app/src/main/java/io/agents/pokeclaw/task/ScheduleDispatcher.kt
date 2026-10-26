@@ -36,10 +36,15 @@ import io.agents.pokeclaw.utils.XLog
  *
  * ## Provenance
  *
- * A fired task enters [TaskRecordStore] like any other task: channel LOCAL
- * (it runs in this app, with this app's privileges — see the open security
- * question in BACKLOG about whether "scheduled" deserves its own gating),
- * originActivity null (no screen started it).
+ * A fired task enters [TaskRecordStore] like any other task: channel
+ * [Channel.SCHEDULED] — *not* LOCAL, because the alarm goes off with nobody in
+ * front of the screen, which is the same reason [Channel.EXTERNAL] is not
+ * LOCAL. That single choice is what puts the READ_ONLY ceiling in
+ * [io.agents.pokeclaw.tool.ToolRiskPolicy] between a fired task and the tools
+ * that dial, type, and press the key that approves system dialogs. A scheduled
+ * brief can read the calendar and answer; it cannot act, and the refusal says
+ * so to the model in words it can repeat to the user. originActivity is null
+ * (no screen started it).
  *
  * ## Calendar anchor
  *
@@ -120,7 +125,7 @@ object ScheduleDispatcher {
         TaskRecordStore.start(
             id = recordId,
             taskText = fired.taskText,
-            channel = Channel.LOCAL,
+            channel = Channel.SCHEDULED,
             originActivity = null,
         )
 
@@ -136,7 +141,7 @@ object ScheduleDispatcher {
                 task = prompt,
                 taskId = recordId,
                 originActivity = null,
-                channel = Channel.LOCAL,
+                channel = Channel.SCHEDULED,
             ) { event ->
                 TaskRecordStore.onEvent(recordId, event)
                 if (event is TaskEvent.Completed || event is TaskEvent.Failed ||

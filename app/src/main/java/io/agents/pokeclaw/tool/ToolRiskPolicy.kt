@@ -174,6 +174,11 @@ object ToolRiskPolicy {
      * user turned the feature on: a broadcast still has nobody watching the
      * screen, and "enabled by the user" is not the same statement as "the user
      * is asking for this" (R3-01).
+     *
+     * [Channel.SCHEDULED] is the same rule from the other direction: the alarm
+     * fires unattended, so a scheduled task gets the READ_ONLY ceiling rather
+     * than the local tier it used to inherit. A 07:30 brief can read the
+     * calendar and answer; it cannot dial, type, or send.
      */
     fun isBlockedForChannel(toolName: String, channel: Channel?): Boolean {
         if (channel == null || channel == Channel.LOCAL) return false
@@ -186,6 +191,16 @@ object ToolRiskPolicy {
      * transcript instead of looking like a transient tool error.
      */
     fun blockReason(toolName: String, channel: Channel?): String {
+        // A scheduled task has no "run it from the app instead" to offer — the
+        // user is asleep, and the honest answer is that this needs a human.
+        if (channel == Channel.SCHEDULED) {
+            return "Tool '$toolName' is blocked for scheduled tasks. A scheduled task " +
+                "runs with nobody watching the screen, so it may only observe " +
+                "(read-only tools) — anything that acts on the world is refused. " +
+                "Tell the user this part needs to be run from the PokeClaw app " +
+                "while they are present, and answer what you can from what you " +
+                "observed."
+        }
         val source = channel?.displayName ?: "Local"
         return "Tool '$toolName' is blocked for tasks arriving from $source. " +
             "It can act on the phone irreversibly (send, dial, type, unlock), and a " +

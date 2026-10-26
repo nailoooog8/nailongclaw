@@ -212,6 +212,24 @@ class TaskRecordStoreTest {
     }
 
     @Test
+    fun `a scheduled task's channel round-trips instead of dropping the record`() {
+        // The alarm fires as Channel.SCHEDULED now. If the ledger could not
+        // read that name back it would skip the record under the
+        // unreadable-channel rule above, and every scheduled task would
+        // vanish from the task page — the one place its outcome is visible.
+        assertNotNull(TaskRecordStore.start("s1", "morning brief", Channel.SCHEDULED, null))
+        TaskRecordStore.onEvent("s1", TaskEvent.Completed("2 meetings today"))
+
+        assertEquals(Channel.SCHEDULED, TaskRecordStore.get("s1")!!.channel)
+        TaskRecordStore.invalidate()
+        val reloaded = TaskRecordStore.list().single()
+        assertEquals("s1", reloaded.id)
+        assertEquals(Channel.SCHEDULED, reloaded.channel)
+        // No screen started it, and the page shows that honestly.
+        assertNull(reloaded.originActivity)
+    }
+
+    @Test
     fun `the ledger trims to the cap but never evicts a live record`() {
         // MAX+4 tasks: the first four are terminal and oldest; the last one
         // is still running — eviction must take history, never the live task.
