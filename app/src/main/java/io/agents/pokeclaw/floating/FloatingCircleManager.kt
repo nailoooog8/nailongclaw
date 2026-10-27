@@ -7,6 +7,7 @@ import android.app.Application
 import android.content.res.Resources
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
@@ -14,6 +15,7 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.annotation.DrawableRes
 import com.blankj.utilcode.util.ThreadUtils
+import io.agents.pokeclaw.ClawApplication
 import io.agents.pokeclaw.R
 import io.agents.pokeclaw.channel.Channel
 import io.agents.pokeclaw.utils.XLog
@@ -182,15 +184,25 @@ object FloatingCircleManager {
     /**
      * Ensure the floating window is showing. If it was dismissed (e.g. by
      * ComposeChatActivity.onCreate), re-show it so task status is visible.
+     *
+     * This is the only entry the task path uses — [io.agents.pokeclaw.TaskOrchestrator]
+     * calls it when a task starts, on whatever thread the task arrived on (a
+     * channel poller, the alarm, the UI). So it is self-sufficient: it resolves
+     * its own Application reference, refuses without SYSTEM_ALERT_WINDOW
+     * instead of letting EasyFloat throw, and marshals onto the main thread,
+     * where window operations belong.
      */
     fun ensureShowing() {
-        if (!isShowing && EasyFloat.getFloatView(FLOAT_TAG) == null) {
-            val app = appRef
-            if (app != null) {
-                XLog.i("FloatingCircle", "ensureShowing: re-showing dismissed float")
+        if (isShowing || EasyFloat.getFloatView(FLOAT_TAG) != null) return
+        val app = appRef ?: ClawApplication.instance
+        if (!Settings.canDrawOverlays(app)) {
+            XLog.w("FloatingCircle", "ensureShowing: SYSTEM_ALERT_WINDOW not granted — no floating pill")
+            return
+        }
+        mainHandler.post {
+            if (!isShowing && EasyFloat.getFloatView(FLOAT_TAG) == null) {
+                XLog.i("FloatingCircle", "ensureShowing: showing float")
                 show(app)
-            } else {
-                XLog.w("FloatingCircle", "ensureShowing: no appRef, cannot re-show")
             }
         }
     }

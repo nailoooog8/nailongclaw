@@ -17,6 +17,7 @@ import io.agents.pokeclaw.channel.ChannelManager
 import io.agents.pokeclaw.floating.FloatingCircleManager
 import io.agents.pokeclaw.service.ClawAccessibilityService
 import io.agents.pokeclaw.service.ForegroundService
+import io.agents.pokeclaw.task.TaskRecordStore
 import io.agents.pokeclaw.tool.ToolResult
 import io.agents.pokeclaw.utils.XLog
 
@@ -78,6 +79,19 @@ class TaskOrchestrator(
     val taskSessionStore = TaskSessionStore()
     private var currentWatchdog: TaskWatchdog? = null
 
+    /**
+     * Ledger id of the task this orchestrator is driving, or null.
+     *
+     * Every task that passes through here gets a durable record in
+     * [TaskRecordStore] — that is what closes the M1 boundary where channel
+     * tasks (Telegram/Discord/WeChat/QQ/Douyin, which arrive through
+     * [io.agents.pokeclaw.channel.ChannelSetup] with no UI callback at all)
+     * ran to completion without leaving a trace on the task page. The id is
+     * the session's messageID: one record per task, and a skill that falls
+     * back to the agent loop keeps the record it already opened.
+     */
+    private var ledgerRecordId: String? = null
+
     private fun armWatchdog(channel: Channel, messageID: String): TaskWatchdog {
         currentWatchdog?.disarm()
         val watchdog = TaskWatchdog(
@@ -99,7 +113,7 @@ class TaskOrchestrator(
             val targetChannel = session.channel ?: channel
             val targetMsgId = session.messageId.ifEmpty { messageID }
             android.os.Handler(android.os.Looper.getMainLooper()).post {
-                taskEventCallback?.invoke(TaskEvent.Failed(reason))
+                emit(TaskEvent.Failed(reason))
                 ChannelManager.sendMessage(targetChannel, "✗ $reason", targetMsgId)
                 ChannelManager.flushMessages(targetChannel)
                 FloatingCircleManager.setErrorState(reason)
@@ -188,7 +202,88 @@ class TaskOrchestrator(
         var data = if (success) result.data else result.error
         if (data != null && data.length > 300) data = data.substring(0, 300) + "..."
         val displayName = io.agents.pokeclaw.tool.ToolRegistry.getInstance().getDisplayName(toolName)
-        taskEventCallback?.invoke(TaskEvent.ToolResult(displayName, success, data ?: ""))
+        emit(TaskEvent.ToolResult(displayName, success, data ?: ""))
+    }
+
+    /**
+     * One event, two ledgers.
+     *
+     * The UI callback the Activity registered renders it into the chat
+     * transcript; the durable task record folds it into the task page. The
+     * write lives here — in the orchestrator's event emission — because this
+     * is the one place every task passes through, whichever door it came in
+     * by. The old write point (TaskFlowController) only ever saw the app's
+     * own UI tasks, so remote-channel tasks left no record at all.
+     */
+    private fun emit(event: TaskEvent) {
+        ledgerOnEvent(event)
+        taskEventCallback?.invoke(event)
+    }
+
+    /**
+     * Fold [event] into the current task's ledger record, best-effort.
+     *
+     * A terminal record is closed: the orchestrator has paths that can emit
+     * after a task ended (a tool result racing the completion callback), and
+     * those are not part of the task's story. Once closed, the id is dropped
+     * too — leaving it set would make the next task's `ledgerRecordId !=
+     * messageID` check compare against this task's leftover.
+     */
+    private fun ledgerOnEvent(event: TaskEvent) {
+        val id = ledgerRecordId ?: return
+        try {
+            if (TaskRecordStore.get(id)?.isTerminal == true) {
+                ledgerRecordId = null
+                return
+            }
+            val updated = TaskRecordStore.onEvent(id, event)
+            if (updated?.isTerminal == true) ledgerRecordId = null
+        } catch (e: Exception) {
+            // The transcript stays the source of truth for the conversation;
+            // a ledger hiccup must not eat the task's rendering.
+            XLog.w(TAG, "ledger write failed for '$id'", e)
+        }
+    }
+
+    /**
+     * Adopt or open the ledger record for a task that is starting.
+     *
+     * Adopting is the normal case: [io.agents.pokeclaw.AppViewModel.startTask]
+     * opens the record at its entry point, before any gate can refuse the
+     * task, so by the time a task reaches here the record already exists.
+     * The orchestrator only creates one itself for the paths that call
+     * `startNewTask` directly and never pass through that entry point —
+     * [io.agents.pokeclaw.channel.ChannelSetup] among them.
+     *
+     * [taskText] is what the task page calls the task, which is not always
+     * the prompt: a scheduled task runs a built envelope (calendar anchor,
+     * fence, delivery instructions) and passes its original request instead.
+     */
+    private fun startLedgerRecord(id: String, taskText: String, channel: Channel, originActivity: String?) {
+        if (TaskRecordStore.get(id) != null) {
+            // Already opened at the entry point. Adopting it keeps this
+            // task's events on its own record.
+            ledgerRecordId = id
+            return
+        }
+        val record = try {
+            TaskRecordStore.start(id = id, taskText = taskText, channel = channel, originActivity = originActivity)
+        } catch (e: Exception) {
+            XLog.w(TAG, "ledger start failed for '$id'", e)
+            null
+        }
+        if (record == null) {
+            // A genuine collision: some other task already owns this id, and
+            // TaskRecordStore refused to overwrite it. Adopting anyway would
+            // fold this task's whole event stream into that record — and if
+            // it is terminal, every event would be silently dropped, leaving
+            // this task invisible on the task page while it runs normally.
+            // Better to record nothing than to corrupt someone else's.
+            XLog.w(TAG, "ledger id '$id' already taken — this task will not appear on the task page")
+            ledgerRecordId = null
+            return
+        }
+        ledgerRecordId = record.id
     }
 
     // ==================== Task Execution ====================
@@ -208,6 +303,14 @@ class TaskOrchestrator(
 
     /**
      * Start a new task. Routes through the 3-tier pipeline.
+     *
+     * Whatever the route, the task is recorded in the ledger here — this is
+     * the single write point, so a task that arrives on a channel with no UI
+     * attached is as visible on the task page as one typed into the app.
+     *
+     * @param ledgerTaskText what the ledger record calls the task; defaults
+     *   to [task]. A scheduled task's prompt is the built envelope, so it
+     *   passes the user's original request instead.
      */
     fun startNewTask(
         channel: Channel,
@@ -216,6 +319,7 @@ class TaskOrchestrator(
         agentPromptOverride: String? = null,
         isFallback: Boolean = false,
         originActivity: String? = null,
+        ledgerTaskText: String? = null,
     ) {
         currentWatchdog?.disarm()
         currentWatchdog = null
@@ -224,19 +328,27 @@ class TaskOrchestrator(
         if (!isTaskRunning()) {
             if (!tryAcquireTask(messageID, channel, task, originActivity)) {
                 XLog.w(TAG, "Failed to acquire task lock for: $task")
-                taskEventCallback?.invoke(TaskEvent.Failed("Another task is running"))
+                emit(TaskEvent.Failed("Another task is running"))
                 return
             }
+            startLedgerRecord(messageID, ledgerTaskText ?: task, channel, originActivity)
         } else {
             val current = taskSessionStore.snapshot()
             if (current.messageId == messageID && current.channel == channel) {
                 taskSessionStore.updateTaskText(task)
+                // ChannelSetup acquires the lock before calling in, so this
+                // branch is where a channel task's record is born. A skill
+                // falling back to the agent loop re-enters with the same
+                // messageID and already has its record.
+                if (ledgerRecordId != messageID) {
+                    startLedgerRecord(messageID, ledgerTaskText ?: task, channel, originActivity)
+                }
             } else {
                 XLog.w(
                     TAG,
                     "Rejecting new task while another task is still active: current=${current.messageId}/${current.channel} new=$messageID/$channel"
                 )
-                taskEventCallback?.invoke(TaskEvent.Failed("Another task is still running. Stop it first."))
+                emit(TaskEvent.Failed("Another task is still running. Stop it first."))
                 ChannelManager.sendMessage(channel, "Another task is still running. Stop it first.", messageID)
                 return
             }
@@ -253,7 +365,7 @@ class TaskOrchestrator(
                 XLog.i(TAG, "onComplete: rounds=0, totalTokens=0, model=direct, answer=${route.description}")
                 val session = releaseTask()
                 if (session.isRunning) {
-                    taskEventCallback?.invoke(TaskEvent.Completed(route.description))
+                    emit(TaskEvent.Completed(route.description))
                     ChannelManager.sendMessage(channel, "✓ ${route.description}", messageID)
                     ForegroundService.resetToIdle(ClawApplication.instance)
                     FloatingCircleManager.setSuccessState(route.description)
@@ -271,19 +383,19 @@ class TaskOrchestrator(
                         if (!toolResult.isSuccess) {
                             val error = toolResult.error ?: "Unknown error"
                             XLog.w(TAG, "Tier 1 tool failed: $error")
-                            taskEventCallback?.invoke(TaskEvent.Completed("Failed: ${route.description}"))
+                            emit(TaskEvent.Completed("Failed: ${route.description}"))
                             ChannelManager.sendMessage(channel, "✗ ${route.description}: $error", messageID)
                             "Failed: ${route.description}: $error"
                         } else {
                             success = true
-                            taskEventCallback?.invoke(TaskEvent.Completed(route.description))
+                            emit(TaskEvent.Completed(route.description))
                             ChannelManager.sendMessage(channel, "✓ ${route.description}", messageID)
                             route.description
                         }
                     } catch (e: Exception) {
                         val message = e.message ?: "Unknown error"
                         XLog.e(TAG, "Tier 1 tool crashed: ${route.toolName}", e)
-                        taskEventCallback?.invoke(TaskEvent.Failed(message))
+                        emit(TaskEvent.Failed(message))
                         ChannelManager.sendMessage(channel, "✗ ${route.description}: $message", messageID)
                         "Failed: ${route.description}: $message"
                     } finally {
@@ -319,14 +431,14 @@ class TaskOrchestrator(
                                 route.params,
                                 onProgress = { step, total, desc ->
                                     watchdog.recordProgress()
-                                    taskEventCallback?.invoke(TaskEvent.Progress(step, "Step $step/$total: $desc"))
+                                    emit(TaskEvent.Progress(step, "Step $step/$total: $desc"))
                                     ForegroundService.updateTaskStatus(ClawApplication.instance, desc)
                                 },
                                 onToolCall = { toolName ->
                                     watchdog.recordProgress()
                                     val displayName =
                                         io.agents.pokeclaw.tool.ToolRegistry.getInstance().getDisplayName(toolName)
-                                    taskEventCallback?.invoke(TaskEvent.ToolAction(displayName))
+                                    emit(TaskEvent.ToolAction(displayName))
                                 },
                                 onToolResult = { toolName, result ->
                                     watchdog.recordProgress()
@@ -338,7 +450,7 @@ class TaskOrchestrator(
                                 val session = releaseTask()
                                 if (session.isRunning) {
                                     ChannelManager.sendMessage(channel, skillResult.message, messageID)
-                                    taskEventCallback?.invoke(TaskEvent.Completed(skillResult.message))
+                                    emit(TaskEvent.Completed(skillResult.message))
                                     FloatingCircleManager.setSuccessState(skillResult.message)
                                     ForegroundService.resetToIdle(ClawApplication.instance)
                                     onTaskFinished()
@@ -348,7 +460,7 @@ class TaskOrchestrator(
                                 val fallbackGoal = skill.fallbackGoal
                                     .let { g -> route.params.entries.fold(g) { acc, (k, v) -> acc.replace("{$k}", v) } }
                                 XLog.i(TAG, "Skill ${skill.id} failed, falling back to agent loop: $fallbackGoal")
-                                taskEventCallback?.invoke(TaskEvent.ToolAction("Retrying with AI agent"))
+                                emit(TaskEvent.ToolAction("Retrying with AI agent"))
                                 startNewTask(channel, fallbackGoal, messageID, isFallback = true)
                             }
                         }, "skill-executor").start()
@@ -371,7 +483,7 @@ class TaskOrchestrator(
                 XLog.e(TAG, "Failed to initialize AgentService", e)
                 releaseTask()
                 ForegroundService.resetToIdle(ClawApplication.instance)
-                taskEventCallback?.invoke(TaskEvent.Failed("AI service not ready"))
+                emit(TaskEvent.Failed("AI service not ready"))
                 ChannelManager.sendMessage(channel, ClawApplication.instance.getString(R.string.channel_msg_service_not_ready), messageID)
                 return
             }
@@ -398,7 +510,7 @@ class TaskOrchestrator(
                 if (round > 1) {
                     FloatingCircleManager.ensureShowing()
                     FloatingCircleManager.setRunningState(round, channel)
-                    taskEventCallback?.invoke(TaskEvent.LoopStart(round))
+                    emit(TaskEvent.LoopStart(round))
                     if (ForegroundService.isRunning()) {
                         ForegroundService.updateTaskStatus(ClawApplication.instance, "Step $round")
                     }
@@ -413,7 +525,7 @@ class TaskOrchestrator(
                     formattedCost = status.formattedCost,
                     tokenState = status.state
                 )
-                taskEventCallback?.invoke(TaskEvent.TokenUpdate(
+                emit(TaskEvent.TokenUpdate(
                     step = status.step,
                     formattedTokens = status.formattedTokens,
                     formattedCost = status.formattedCost,
@@ -425,7 +537,7 @@ class TaskOrchestrator(
                 watchdog.recordProgress()
                 if (content.isNotEmpty()) {
                     roundBuffer.append(content)
-                    taskEventCallback?.invoke(TaskEvent.Thinking(content))
+                    emit(TaskEvent.Thinking(content))
                 }
             }
 
@@ -442,7 +554,7 @@ class TaskOrchestrator(
                 }
                 if (toolName.isNotEmpty()) {
                     val displayName = io.agents.pokeclaw.tool.ToolRegistry.getInstance().getDisplayName(toolName)
-                    taskEventCallback?.invoke(TaskEvent.ToolAction(displayName))
+                    emit(TaskEvent.ToolAction(displayName))
                     ForegroundService.updateTaskStatus(ClawApplication.instance, "$displayName...")
                     FloatingCircleManager.updateTaskAction(displayName)
                 }
@@ -481,7 +593,7 @@ class TaskOrchestrator(
                         XLog.d(TAG, "Task already released, ignoring cancel completion")
                         return
                     }
-                    taskEventCallback?.invoke(TaskEvent.Cancelled)
+                    emit(TaskEvent.Cancelled)
                     ForegroundService.resetToIdle(ClawApplication.instance)
                     flushRoundBuffer()
                     if (cancelledSession.channel != null && cancelledSession.messageId.isNotEmpty()) {
@@ -506,7 +618,7 @@ class TaskOrchestrator(
                     XLog.d(TAG, "Task already released, ignoring completion")
                     return
                 }
-                taskEventCallback?.invoke(TaskEvent.Completed(answer, modelName))
+                emit(TaskEvent.Completed(answer, modelName))
                 ForegroundService.resetToIdle(ClawApplication.instance)
                 flushRoundBuffer()
                 ChannelManager.flushMessages(completedSession.channel ?: channel)
@@ -543,7 +655,7 @@ class TaskOrchestrator(
                     XLog.d(TAG, "Task already released, ignoring error")
                     return
                 }
-                taskEventCallback?.invoke(TaskEvent.Failed(error.message ?: "Unknown error"))
+                emit(TaskEvent.Failed(error.message ?: "Unknown error"))
                 ForegroundService.resetToIdle(ClawApplication.instance)
                 flushRoundBuffer()
                 val failedChannel = failedSession.channel ?: channel
@@ -567,7 +679,7 @@ class TaskOrchestrator(
                     XLog.d(TAG, "Task already released, ignoring blocked event")
                     return
                 }
-                taskEventCallback?.invoke(TaskEvent.Blocked)
+                emit(TaskEvent.Blocked)
                 flushRoundBuffer()
                 val blockedChannel = blockedSession.channel ?: channel
                 val blockedMessageId = blockedSession.messageId.ifEmpty { messageID }

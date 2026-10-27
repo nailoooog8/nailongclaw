@@ -135,7 +135,12 @@ class TaskFlowController(
 
     /**
      * Ledger id of the task this controller is currently driving, or null.
-     * The ledger half of the dual-write — see [ledgerOnEvent].
+     *
+     * The orchestrator owns the ledger for every task it runs — one write
+     * point, so channel tasks are recorded too. This controller keeps the id
+     * only for the two writes the orchestrator cannot make: the direct-tool
+     * path below (which never reaches the orchestrator) and the start-failure
+     * catch in [sendTask]. See [ledgerOnEvent].
      */
     private var ledgerRecordId: String? = null
 
@@ -262,12 +267,11 @@ class TaskFlowController(
         sink.append(ChatMessage(ChatMessage.Role.ASSISTANT, ChatSink.TYPING_INDICATOR))
 
         val taskId = "task_${System.currentTimeMillis()}"
-        TaskRecordStore.start(
-            id = taskId,
-            taskText = text,
-            channel = channel,
-            originActivity = activity.javaClass.name,
-        )
+        // The ledger record is opened by the orchestrator when it accepts the
+        // task — one write point for every entry, including channels that
+        // never see this controller. This controller only writes the ledger
+        // itself for the direct-tool path below, which bypasses the
+        // orchestrator entirely.
         ledgerRecordId = taskId
 
         executor.submit {
@@ -306,6 +310,8 @@ class TaskFlowController(
 
         // Direct-tool tasks are real tasks too: one step, one answer, and a
         // record in the ledger so the task page does not silently omit them.
+        // This path never reaches the orchestrator, so it keeps the ledger
+        // write the orchestrator owns everywhere else.
         val recordId = "direct_${System.currentTimeMillis()}"
         TaskRecordStore.start(
             id = recordId,
@@ -462,7 +468,6 @@ class TaskFlowController(
 
     private fun handleTaskEvent(event: TaskEvent) {
         try {
-            ledgerOnEvent(event)
             when (event) {
                 is TaskEvent.Completed -> {
                     publishAssistantResponse(event.answer, event.modelName)
@@ -586,11 +591,12 @@ class TaskFlowController(
     }
 
     /**
-     * The ledger half of the dual-write: every event this controller renders
-     * into the chat transcript is also folded into the durable task record,
-     * so the task page and the conversation tell the same story about one
-     * task. See [TaskRecordStore] for the M1 boundary — only tasks that pass
-     * through this controller are recorded.
+     * Write one event into the durable task record, for the paths this
+     * controller drives itself — the direct-tool task (one step, one answer,
+     * no orchestrator) and a [sendTask] that threw before the orchestrator
+     * could report anything. Tasks that run through the orchestrator are
+     * recorded there, on every event, so remote-channel tasks are on the task
+     * page like any other.
      */
     private fun ledgerOnEvent(event: TaskEvent) {
         val id = ledgerRecordId ?: return

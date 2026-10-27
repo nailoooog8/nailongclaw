@@ -64,8 +64,10 @@ object ToolRegistry {
         register(MemoryForgetTool())
         // Web information retrieval — knowledge questions without touching the UI
         register(WebSearchTool())
-        // Device calendar read — schedule questions without opening the app
+        // Device calendar — schedule questions without opening the app,
+        // and the write tool that puts an event on it
         register(io.agents.pokeclaw.agent.calendar.CalendarReadTool())
+        register(io.agents.pokeclaw.agent.calendar.CalendarCreateTool())
         // Scheduled tasks — durable timers, honest queue, calendar anchor
         register(ScheduleTaskTool())
         register(ListScheduledTasksTool())

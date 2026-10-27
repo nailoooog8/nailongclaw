@@ -76,7 +76,7 @@ class PipelineRouter(private val context: Context) {
         // Tier 1.5: Skill trigger matching (deterministic, 0 LLM calls)
         val matchedSkill = SkillRegistry.findByTrigger(task)
         if (matchedSkill != null) {
-            val params = extractSkillParams(task, matchedSkill.triggerPatterns)
+            val params = SkillRegistry.extractParams(matchedSkill, task)
             XLog.i(TAG, "Tier 1.5 skill match: ${matchedSkill.id} params=$params")
             return Route.Skill(matchedSkill.id, params, matchedSkill.description)
         }
@@ -106,24 +106,6 @@ class PipelineRouter(private val context: Context) {
         val result = ToolRegistry.getInstance().executeTool(toolName, params)
         XLog.i(TAG, "Executed tool: $toolName → ${if (result.isSuccess) "success" else result.error}")
         return result
-    }
-
-    /**
-     * Extract parameter values from a task string using trigger patterns.
-     * E.g., "search for cat videos" + pattern "search for {query}" → {"query": "cat videos"}
-     */
-    private fun extractSkillParams(task: String, patterns: List<String>): Map<String, String> {
-        val lower = task.lowercase()
-        for (pattern in patterns) {
-            val paramNames = Regex("\\{(\\w+)\\}").findAll(pattern).map { it.groupValues[1] }.toList()
-            val regexStr = pattern.lowercase()
-                .replace(Regex("\\{\\w+\\}"), "(.+)")
-            val match = Regex(regexStr).find(lower)
-            if (match != null && match.groupValues.size > 1) {
-                return paramNames.zip(match.groupValues.drop(1)).toMap()
-            }
-        }
-        return emptyMap()
     }
 
     companion object {

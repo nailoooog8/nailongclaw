@@ -15,10 +15,31 @@ object SkillRegistry {
     private val skills = mutableMapOf<String, Skill>()
 
     /**
+     * Trigger patterns compiled at registration (F7), keyed by skill id and
+     * dropped wherever the skill itself is dropped, so matching never
+     * compiles a pattern at route time.
+     */
+    private val compiledTriggers = mutableMapOf<String, List<SkillTrigger>>()
+
+    /**
      * Register a skill. Replaces existing skill with same ID.
+     *
+     * Trigger patterns are compiled here, once, and refused when they are
+     * dangerous (see [SkillTrigger.compile]) — a recipe with one bad
+     * trigger keeps its other triggers and logs why the bad one went.
      */
     fun register(skill: Skill) {
         skills[skill.id] = skill
+        compiledTriggers[skill.id] = skill.triggerPatterns.mapNotNull { pattern ->
+            SkillTrigger.compile(pattern) ?: run {
+                XLog.w(
+                    TAG,
+                    "Skill '${skill.id}': trigger refused (over ${SkillTrigger.MAX_LENGTH} chars, " +
+                        "nested quantifier, or invalid regex): $pattern"
+                )
+                null
+            }
+        }
         XLog.d(TAG, "Registered skill: ${skill.id} (${skill.name})")
     }
 
@@ -26,10 +47,15 @@ object SkillRegistry {
 
     fun unregister(id: String) {
         skills.remove(id)
+        compiledTriggers.remove(id)
     }
 
     fun unregisterBySource(source: SkillSource) {
-        skills.values.filter { it.source == source }.forEach { skills.remove(it.id) }
+        val ids = skills.values.filter { it.source == source }.map { it.id }
+        ids.forEach {
+            skills.remove(it)
+            compiledTriggers.remove(it)
+        }
     }
 
     fun getAll(): List<Skill> = skills.values.toList()
@@ -53,17 +79,25 @@ object SkillRegistry {
             return null
         }
         return skills.values.find { skill ->
-            skill.triggerPatterns.any { pattern ->
-                try {
-                    val regex = pattern.lowercase()
-                        .replace(Regex("\\{\\w+\\}"), "(.+)")
-                    Regex(regex).containsMatchIn(lower)
-                } catch (e: Exception) {
-                    XLog.w(TAG, "Invalid trigger pattern: $pattern", e)
-                    false
-                }
-            }
+            compiledTriggers[skill.id]?.any { it.matches(lower) } == true
         }
+    }
+
+    /**
+     * Parameter values for [skill] out of [task], from the first trigger
+     * that both matches and carries `{placeholder}`s — the same
+     * first-match-wins rule the router used to run inline over the raw
+     * patterns. Empty when no trigger yields parameters, which is the
+     * honest answer for a skill matched by a plain-phrase trigger.
+     */
+    fun extractParams(skill: Skill, task: String): Map<String, String> {
+        val lower = task.lowercase()
+        val triggers = compiledTriggers[skill.id] ?: return emptyMap()
+        for (trigger in triggers) {
+            val params = trigger.params(lower)
+            if (params != null) return params
+        }
+        return emptyMap()
     }
 
     /**
@@ -85,5 +119,8 @@ object SkillRegistry {
         XLog.i(TAG, "Loaded ${skills.size} built-in skills")
     }
 
-    fun clear() = skills.clear()
+    fun clear() {
+        skills.clear()
+        compiledTriggers.clear()
+    }
 }

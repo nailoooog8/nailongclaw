@@ -16,6 +16,7 @@ import io.agents.pokeclaw.channel.ChannelSetup
 import io.agents.pokeclaw.service.ForegroundService
 import io.agents.pokeclaw.floating.FloatingCircleManager
 import io.agents.pokeclaw.server.ConfigServerManager
+import io.agents.pokeclaw.task.TaskRecordStore
 import io.agents.pokeclaw.utils.KVUtils
 import io.agents.pokeclaw.utils.XLog
 
@@ -67,12 +68,39 @@ class AppViewModel : ViewModel() {
          * therefore held to the READ_ONLY ceiling.
          */
         channel: Channel = Channel.LOCAL,
+        /**
+         * What the ledger record should call this task, when the prompt and
+         * the user-facing request differ. Defaults to [task] — a task typed
+         * in the app is its own display text. A scheduled task passes its
+         * original request, because the prompt it runs with is the built
+         * envelope (calendar anchor + fence + delivery instructions).
+         */
+        ledgerTaskText: String? = null,
         onEvent: (TaskEvent) -> Unit,
     ) {
+        // Open the ledger record before any gate. The user is told the task
+        // started the moment this is called, so the record has to exist
+        // before anything can refuse it — otherwise a task rejected by the
+        // LLM-config check, an onBeforeTask throw, or a task-lock race runs
+        // to completion with no trace on the task page. The orchestrator
+        // adopts this record rather than creating a second one.
+        try {
+            TaskRecordStore.start(
+                id = taskId,
+                taskText = ledgerTaskText ?: task,
+                channel = channel,
+                originActivity = originActivity,
+            )
+        } catch (e: Exception) {
+            XLog.w(TAG, "ledger start failed for '$taskId'", e)
+        }
         onBeforeTask?.invoke()
         taskOrchestrator.taskEventCallback = onEvent
         if (!updateAgentConfig()) {
             onEvent(TaskEvent.Failed("AI service not ready"))
+            // Close the record the entry point opened, so it reads FAILED
+            // instead of sitting RUNNING forever.
+            TaskRecordStore.onEvent(taskId, TaskEvent.Failed("AI service not ready"))
             return
         }
         taskOrchestrator.startNewTask(
@@ -81,6 +109,7 @@ class AppViewModel : ViewModel() {
             taskId,
             agentPromptOverride = agentPromptOverride,
             originActivity = originActivity,
+            ledgerTaskText = ledgerTaskText,
         )
     }
 
@@ -155,23 +184,21 @@ class AppViewModel : ViewModel() {
         wakeLock = null
     }
 
-    /**
-     * Show the circular floating window
-     */
-    fun showFloatingCircle() {
-        try {
-            FloatingCircleManager.show(ClawApplication.instance)
-            FloatingCircleManager.onFloatClick = {
-                XLog.d(TAG, "Floating circle clicked")
-                bringAppToForeground()
-            }
-            FloatingCircleManager.onStopTask = {
-                XLog.i(TAG, "Stop task requested from floating pill")
-                stopTask()
-                bringAppToForeground()
-            }
-        } catch (e: Exception) {
-            XLog.e(TAG, "Failed to show floating circle: ${e.message}")
+    init {
+        // The pill's tap behaviour is intrinsic to the pill, not to whoever
+        // happens to create the window: the task path brings the float up on
+        // its own (FloatingCircleManager.ensureShowing), so the callbacks are
+        // wired once here, at construction, and stay live for the process.
+        // Wiring them inside a show entry point instead is what left the pill
+        // unclickable once that entry point had no callers.
+        FloatingCircleManager.onFloatClick = {
+            XLog.d(TAG, "Floating circle clicked")
+            bringAppToForeground()
+        }
+        FloatingCircleManager.onStopTask = {
+            XLog.i(TAG, "Stop task requested from floating pill")
+            stopTask()
+            bringAppToForeground()
         }
     }
 

@@ -122,13 +122,6 @@ object ScheduleDispatcher {
         val recordId = "sched_${fired.id}_${System.currentTimeMillis()}"
         val prompt = buildPrompt(context, fired)
 
-        TaskRecordStore.start(
-            id = recordId,
-            taskText = fired.taskText,
-            channel = Channel.SCHEDULED,
-            originActivity = null,
-        )
-
         notify(
             context,
             NOTIFY_OUTCOME_BASE + recordId.hashCode() % 1000,
@@ -142,8 +135,11 @@ object ScheduleDispatcher {
                 taskId = recordId,
                 originActivity = null,
                 channel = Channel.SCHEDULED,
+                // The record must name the user's request, not the envelope
+                // the task runs with (calendar anchor + fence + delivery
+                // instructions) — the orchestrator opens the record itself.
+                ledgerTaskText = fired.taskText,
             ) { event ->
-                TaskRecordStore.onEvent(recordId, event)
                 if (event is TaskEvent.Completed || event is TaskEvent.Failed ||
                     event is TaskEvent.Cancelled || event is TaskEvent.Blocked
                 ) {

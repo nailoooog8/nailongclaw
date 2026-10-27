@@ -41,7 +41,7 @@
 | **R3-03** | Medium | 注入"存储化"面扩大：`kb_read`/MCP 工具返回值仍无围栏（与 F4 同型） | ✅ **已修复 2026-10-25**（见 §6.2） |
 | **R3-04** | Medium | `send_file` 是任意绝对路径读取外发原语 | ✅ **已修复 2026-10-25**（见 §6.4） |
 | **R3-05** | Low（需动态验证） | 自动回复链把收到的消息内容喂 LLM 后直接发送，无确认无围栏 | ◐ 部分缓解（系统提示加数据条款，见 §6.2） |
-| **R3-06** | **High**（供应链） | Gradle wrapper 从腾讯镜像下载，无 `distributionSha256Sum`、无依赖校验 | 未修复 |
+| **R3-06** | **High**（供应链） | Gradle wrapper 从腾讯镜像下载，无 `distributionSha256Sum`、无依赖校验 | ✅ **已修复 2026-10-26**（哈希落地；依赖校验仍无，见 §供应链单元） |
 | **R3-07** | Medium（CI） | `cla.yml` 用 `pull_request_target` 向 tag-pinned 第三方 action 交付宽权限 token + PAT | 未修复 |
 | **R3-08** | Medium | 更新检查绑定个人账号仓库，浏览器跳转型更新无哈希展示 | 未修复 |
 | **R3-09** | Medium（本机面） | `local.properties` 明文存放发布签名口令（未入库） | 未修复 |
@@ -66,10 +66,10 @@
 | F1 Telegram 白名单 | Critical·已修 | ✅ 保持修复 | `TelegramChannelHandler.kt:121-126` 优先 `from.id` |
 | F2 工具来源闸门 | High·已修 | ✅ 保持修复 | `ToolRiskPolicy.kt:96-117`：未分类默认 HIGH_IMPACT、`mcp_*` 一律高危 |
 | F3 导出自动化组件 | High·缓解 | ◐ **调用方校验已补 2026-10-26**（签名白名单仍未做） | `ExternalAutomationGuard.kt`（配对令牌：Crockford base32 定长 160bit、`putEncryptedString` 加密落盘、`BruteForceGuard` 锁定）、`ExternalAutomationEntrypoint.kt`（先验令牌再查开关）、`ui/settings/ChannelsActivity.kt`（显示/复制/重置）。**仍开放**：逐调用方签名白名单 / 自定义 signature 权限（会破坏 Tasker/MacroDroid 既有用法）；`KVUtils` 默认 false 仍是第一道防线 |
-| F4 memory_recall 无围栏 | High | ❌ 仍开放 | `MemoryRecallTool.kt:81-88` 裸拼接；围栏只在 `MemoryStore.briefing`（`MemoryStore.kt:714-717`） |
+| F4 memory_recall 无围栏 | High | ✅ **已修复 2026-10-25**（§6.2；本行漏更新） | `MemoryRecallTool.kt:89/94` 逐条 sanitize 后整体 wrap；与 briefing / kb / MCP 共用唯一 `ContextFence` 实现 |
 | F5 LAN 明文凭据/PIN in query | High | ◐ **部分修复 2026-10-25** | `?pin=` 通道已移除（`ConfigServer.kt:158-180`）；控制台改发 `X-Config-PIN` 头并加 cleartext 警示条（`assets/web/index.html`）。**明文 HTTP 本身未改**：NSC 不能全局收紧，WeChat baseurl / QQ / Douyin 网关是用户可配的 http/ws（见 §6.3） |
 | F6 SecretBox 静默降级明文 | Medium | ✅ **已修复 2026-10-25** | `KVUtils.kt:64-104`：加密失败不写任何东西 + `consumeSecureWriteFailure()`；三个保存入口改为失败时报错而不是"已保存" |
-| F7 技能触发 ReDoS | Medium | ❌ 仍开放 | `SkillRegistry.kt:59-60` 每次 `Regex(...)` 重编译 |
+| F7 技能触发 ReDoS | Medium | ✅ **已修复 2026-10-26** | 注册时编译进 `SkillTrigger`（`agent/skill/SkillTrigger.kt`）：长度上限 200、嵌套量词拒、非法正则拒；`PipelineRouter.extractSkillParams` 删除，改走 `SkillRegistry.extractParams` |
 | F8 参数落盘+调试报告 | Medium | ✅ **已修复 2026-10-25** | `ToolRegistry.kt:166` 改走 `redactParams`；新增 `HeaderMask`（curl / header 块 / 响应头 / 报告打包共用）；`ClawApplication.kt:61` 的 debug 默认开启保留，但不再因此泄漏 key |
 | F9 空 Host fail-open | Low | ✅ **已修复 2026-10-25** | 规则抽到 `server/HostPolicy.kt`，空 Host 返回 `false`；顺带修掉 `::1` 被 `substringBefore(':')` 切空的 bug，并去掉 `InetAddress.getByName`（该检查本就不该解析域名） |
 | F10 WebActivity 死代码 | Info | ➖ 仍无调用方 | 全仓检索仅自身定义与内部 `start()` |
@@ -135,7 +135,7 @@ F4（`memory_recall` 无围栏）仍未修，且同型缺口又多了两处：
 
 ### 供应链单元（子代理完成，证据已复核）
 
-- **R3-06**：`gradle/wrapper/gradle-wrapper.properties:4` 指向 `mirrors.cloud.tencent.com`，无 `distributionSha256Sum`，无 `verification-metadata.xml`/lockfile。镜像侧投毒 = 每台构建机任意代码执行（可顺手偷 `local.properties` 签名口令）。
+- **R3-06**：`gradle/wrapper/gradle-wrapper.properties:4` 指向 `mirrors.cloud.tencent.com`，无 `distributionSha256Sum`，无 `verification-metadata.xml`/lockfile。镜像侧投毒 = 每台构建机任意代码执行（可顺手偷 `local.properties` 签名口令）。**修复 2026-10-26**：补 `distributionSha256Sum=17f277867f…c6e43`（services.gradle.org 官方值）。已流式下载腾讯镜像文件逐字节比对，sha256 与官方一致——故保留镜像取下载速度，由哈希而非对镜像的信任把关；release CI 与开发机走同一条 wrapper，同一哈希同时覆盖。**残余**：依赖侧仍无 `verification-metadata.xml`/lockfile（Gradle 依赖校验未启用）。
 - **R3-07**：`.github/workflows/cla.yml:34-52` — `pull_request_target` + `permissions: actions/contents/pull-requests: write` + PAT 交给 `contributor-assistant/github-action@v2.6.1`（tag-pinned）。**限定**：无 PR checkout，非经典 RCE；风险在 action 仓库/tag 被换。全仓 6 个 workflow 的第三方 action 均 tag-pinned 无一 SHA-pinned。
 - **R3-08**：`UpdateChecker.java:123-124` 仅跳浏览器，无哈希展示；发布身份是个人账号 `nailoooog8/PokeClaw`（`app/build.gradle.kts:122-126`），HTTPS+系统 CA 已挡 MITM，残留"仓库身份劫持"。
 - **R3-09**：`local.properties:2-6` 明文发布 keystore 三件套口令（未入库，本机任意进程可读）。
@@ -182,7 +182,7 @@ F4（`memory_recall` 无围栏）仍未修，且同型缺口又多了两处：
 | ~~**P0**~~ ✅ | R3-02 + F4 同型 + R3-03 | 统一 `ContextFence` 出口，覆盖 web_search / memory / KB / MCP / 通知 / 会话（§6.2） |
 | **P1** | F5 | ~~cleartext 收敛为按域例外~~（PIN 通道已移除，见 §6.3）；**残余**：TLS 自签 + 指纹固定，以及 cleartext 的按域收敛（受用户可配 http 端点约束） |
 | ~~**P1**~~ ✅ | F8 | 参数日志按键名脱敏；HTTP 日志 header 块复用同一脱敏函数；报告打包前正则清洗（§6.3） |
-| **P1** | R3-06 | Gradle wrapper 加 `distributionSha256Sum` 并回官方源 |
+| ~~**P1**~~ ✅ | R3-06 | Gradle wrapper 加 `distributionSha256Sum` 并回官方源——哈希已补（镜像经逐字节验证与官方一致，保留镜像；官方值本身即完整性锚） |
 | **P2** | F6, F9, R3-04, R3-07 | ~~fail-closed 化~~ ✅ + send_file 白名单 ✅（§6.4）；**残余**：R3-07 CI action SHA 化 |
 | **P3** | F7, R3-05 残余, R3-08, R3-09, R3-10 | 收敛项 |
 

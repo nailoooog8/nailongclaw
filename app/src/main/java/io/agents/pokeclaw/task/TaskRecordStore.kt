@@ -25,14 +25,24 @@ import java.util.concurrent.CopyOnWriteArrayList
  *
  * ## Write path (M1 scope)
  *
- * [io.agents.pokeclaw.ui.chat.TaskFlowController] creates a record when a
- * task is actually accepted (past the gates, right before the orchestrator
- * starts) and forwards every [TaskEvent] it renders into [onEvent] — the
- * dual-write: one event stream, two ledgers (the chat transcript for the
- * conversation, this file for the task page). Tasks that arrive straight on
- * a remote channel bypass that controller today and so are not yet recorded
- * here; that boundary is deliberate and moves only when the orchestrator
- * grows a ledger hook of its own.
+ * Two halves, deliberately split by what each can see:
+ *
+ * - **Opening** happens at the entry choke point,
+ *   [io.agents.pokeclaw.AppViewModel.startTask], *before* any gate runs. The
+ *   user is told the task started the moment that is called, so the record
+ *   must already exist when something refuses it — a task rejected by the
+ *   LLM-config check, an `onBeforeTask` throw, or a task-lock race would
+ *   otherwise run to completion with no trace here.
+ * - **Folding** happens in [io.agents.pokeclaw.TaskOrchestrator], which is the
+ *   one place every task passes through, so channel tasks (Telegram/Discord/
+ *   WeChat/QQ/Douyin) are recorded like tasks typed into the app. It adopts
+ *   the record the entry point opened rather than creating a second one, and
+ *   creates one itself only for callers that reach `startNewTask` directly
+ *   ([io.agents.pokeclaw.channel.ChannelSetup] among them).
+ *
+ * One event stream, two ledgers: the chat transcript for the conversation,
+ * this file for the task page. The one path that keeps its own write is the
+ * UI's direct-tool task, which runs a tool without the orchestrator at all.
  *
  * ## Durability rules
  *
@@ -204,7 +214,7 @@ object TaskRecordStore {
      * just appeared. RUNNING → WAITING_CONFIRM plus a NOTE step, so the task
      * page can show the six-card "waiting for you" state. Best-effort by
      * contract: never throws, never invents a record — if nothing is active
-     * (remote-channel tasks are outside the M1 boundary) it is a no-op.
+     * it is a no-op.
      */
     @JvmStatic
     fun noteWaitingConfirm(toolName: String) {
