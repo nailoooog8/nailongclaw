@@ -253,7 +253,7 @@ button:focus,
 .base-row:focus,
 .swatch-row:focus,
 .send:focus,
-.new-task:focus,
+.new-chat:focus,
 .jump:focus {
   outline: none;
 }
@@ -581,7 +581,7 @@ body {
 
 /* 界面 chrome 保持无衬线（侧边栏、按钮、输入框）——
    衬线只用在「内容」区，二者对比才不显得平 */
-.sidebar, .topbar, .composer, .pill, .new-task, .session, .row-btn, .icon-btn,
+.sidebar, .topbar, .composer, .pill, .new-chat, .session, .row-btn, .icon-btn,
 .search, .hint, .chip, .tool-head, .code-head, .status-row, .pop-item {
   font-family: var(--font-sans-fallbacks);
 }
@@ -615,7 +615,7 @@ body {
 }
 .brand-sub { font-size: 11px; color: var(--cds-text-muted); font-weight: 400; margin-top: 1px; }
 
-.new-task {
+.new-chat {
   width: 100%; margin-top: 8px;
   display: flex; align-items: center; gap: 8px;
   padding: 9px 11px;
@@ -626,7 +626,7 @@ body {
   font: inherit; font-size: 13.5px;
   transition: background-color 150ms var(--cds-ease-swift);
 }
-.new-task:hover { background: var(--cds-fill-secondary-hover); }
+.new-chat:hover { background: var(--cds-fill-secondary-hover); }
 
 .search {
   margin: 2px 12px 10px;
@@ -660,6 +660,88 @@ body {
 .session:active { background: var(--cds-fill-ghost-selected); transform: scale(0.98); }
 .session[aria-current="true"] { background: var(--cds-fill-ghost-selected); font-weight: 550; }
 .session-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 会话行的重命名 / 删除。默认隐形，行 hover 或键盘聚焦时才露面——一列常驻
+   的垃圾桶会让列表看起来像回收站。放在 .session-row 里而不是塞进 .session
+   按钮内部：按钮嵌按钮是无效 HTML，内层点击还会被外层按钮吞掉。 */
+.session-row {
+  display: flex; align-items: center; gap: 2px;
+  margin-bottom: 1px; border-radius: var(--cds-radius);
+  transition: background-color 150ms var(--cds-ease-swift);
+}
+.session-row:hover { background: var(--cds-fill-ghost-hover); }
+.session-row[data-current="true"] { background: var(--cds-fill-ghost-selected); }
+.session-row[data-current="true"] .session-title { font-weight: 550; }
+.session-row .session { flex: 1; min-width: 0; margin-bottom: 0; }
+.session-row .session:hover { background: transparent; }
+.session-act {
+  display: flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; flex: none;
+  border: none; border-radius: 6px; cursor: pointer;
+  background: transparent; color: var(--cds-text-muted);
+  opacity: 0;
+  transition: opacity 120ms ease, background-color 150ms var(--cds-ease-swift),
+              color 150ms ease;
+}
+.session-row:hover .session-act,
+.session-act:focus { opacity: 1; }
+.session-act:hover { background: var(--cds-fill-secondary); color: var(--cds-text-primary); }
+.session-act[data-act="delete"]:hover { background: var(--cds-fill-secondary); color: var(--cds-fill-danger); }
+.sessions-empty {
+  padding: 14px 10px; font-size: 12.5px; line-height: 1.55;
+  color: var(--cds-text-muted);
+}
+
+/* ---- 会话重命名 / 删除对话框 ----
+   居中卡片，不用 .tasks-view 那种整页 sheet：这里要回答的只是一个名字或
+   一次确认，占满一屏会把「删的是哪一条」挤出视线。 */
+.dialog-scrim {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 80;
+  opacity: 0; pointer-events: none;
+  transition: opacity 200ms ease;
+}
+.dialog-scrim[data-open="true"] { opacity: 1; pointer-events: auto; }
+.dialog {
+  position: fixed; top: 50%; left: 50%;
+  width: calc(100% - 48px); max-width: 340px;
+  z-index: 90;
+  transform: translate(-50%, -50%) scale(0.97);
+  background: var(--cds-surface-popover, var(--cds-surface-1));
+  border: var(--cds-ring-hairline) solid var(--cds-border);
+  border-radius: var(--cds-radius-composer, 14px);
+  box-shadow: var(--cds-shadow-lg, var(--cds-shadow-md));
+  padding: 18px;
+  opacity: 0; pointer-events: none; visibility: hidden;
+  transition: opacity 180ms ease, transform 200ms var(--cds-ease-swift), visibility 0s;
+}
+.dialog[data-open="true"] {
+  opacity: 1; pointer-events: auto; visibility: visible;
+  transform: translate(-50%, -50%) scale(1);
+}
+.dialog-title { font-size: 14.5px; font-weight: 600; color: var(--cds-text-primary); }
+.dialog-body {
+  margin-top: 7px; font-size: 12.5px; line-height: 1.55;
+  color: var(--cds-text-muted);
+}
+.dialog-input {
+  display: block; width: 100%; margin-top: 12px;
+  padding: 8px 10px;
+  border: var(--cds-ring-hairline) solid var(--cds-border);
+  border-radius: var(--cds-radius);
+  background: var(--cds-alpha-1);
+  color: var(--cds-text-primary);
+  font: inherit; font-size: 13.5px;
+  outline: none;
+}
+.dialog-input:focus { box-shadow: var(--cds-focus-shadow); }
+.dialog-actions {
+  display: flex; justify-content: flex-end; gap: 8px;
+  margin-top: 16px;
+}
+.dialog-actions .pill { cursor: pointer; }
+.dialog-actions .pill[data-variant="danger"] { color: var(--cds-fill-danger); }
 
 .sidebar-foot { border-top: var(--cds-ring-hairline) solid var(--cds-border); padding: 8px; }
 .row-btn {
@@ -1708,30 +1790,20 @@ body {
   padding: 14px 4px 0; text-align: center;
 }
 
-/* ============================================================ 真实模式收敛
-   接上真实任务流之后，设计稿里这些元素**没有数据也没有行为**：会话列表、
-   搜索框、重命名与「更多」按钮、新建任务按钮。留着它们等于承诺一个点不动
-   的功能，所以藏掉。
+  /* ============================================================ 真实模式收敛
+     接上真实任务流之后，设计稿里这些元素**没有数据也没有行为**：顶栏的
+     重命名 / 「更多」按钮、composer 的模型 popover。留着它们等于承诺一个
+     点不动的功能，所以藏掉。
 
-   由 <html data-live="true"> 驱动 —— cds.js 在检测到 Kotlin 桥时设置该属性。
-   纯浏览器打开设计稿时属性不存在，整套侧边栏照常显示，评审时看到的仍是
-   完整设计。用 CSS 而不是删元素，正是为了保住「一份 HTML 两种用途」。
+     由 <html data-live="true"> 驱动 —— cds.js 在检测到 Kotlin 桥时设置该属性。
+     纯浏览器打开设计稿时属性不存在，整套侧边栏照常显示，评审时看到的仍是
+     完整设计。用 CSS 而不是删元素，正是为了保住「一份 HTML 两种用途」。
 
-   侧边栏脚部只剩两个活入口：#themePickerBtn（主题，含深浅/底色/强调色
-   三个维度）与 #settingsBtn（设置面板）。旧的「深浅色」独立行和记忆库 /
-   技能管理快捷行已合并进这两个入口，相应规则一并移除。 */
-[data-live="true"] .sessions,
-[data-live="true"] .search,
-[data-live="true"] .new-task,
-[data-live="true"] .sidebar-foot > .row-btn {
-  display: none;
-}
-
-[data-live="true"] #themePickerBtn { display: flex; }
-[data-live="true"] #settingsBtn { display: flex; }
-[data-live="true"] #tasksBtn { display: flex; }
-[data-live="true"] #schedulesBtn { display: flex; }
-[data-live="true"] .sidebar-head { border-bottom: none; }
+     会话列表（.sessions）、搜索框（.search）与「新建对话」（.new-chat）曾
+     在这一节里被藏掉——那时它们背后没有数据。2026-10-27 起这个面有了真的
+     会话模型（PokeClawChat.newChat / listConversations / openConversation /
+     renameConversation / deleteConversation），三者都由 cds.js 渲染真实账本，
+     所以不再隐藏。 */
 
 /* 顶栏图标按钮（重命名 / 更多）在真实模式下没有任何行为，
    而它们长得就像能点。点不动的控件比没有控件更糟，直接藏掉。
@@ -1740,6 +1812,17 @@ body {
    用属性选择器定位而不是加 class，避免动 index.html 的结构 ——
    那份 HTML 同时是纯浏览器里的设计稿，改结构会影响评审效果。 */
 [data-live="true"] .topbar > .icon-btn { display: none; }
+
+/* composer 的模型 popover 同上：可选模型的真实集合在原生「模型与任务」页，
+   这里再列三个示例行就是第二个会说谎的来源。live 模式下整个藏掉，
+   #modelBtn 改为打开那一页（cds.js 里接线）。 */
+[data-live="true"] #modelPop { display: none; }
+
+[data-live="true"] #themePickerBtn { display: flex; }
+[data-live="true"] #settingsBtn { display: flex; }
+[data-live="true"] #tasksBtn { display: flex; }
+[data-live="true"] #schedulesBtn { display: flex; }
+[data-live="true"] .sidebar-head { border-bottom: none; }
 
 @media (max-width: 760px) {
   [data-live="true"] #menuBtn { display: flex; }

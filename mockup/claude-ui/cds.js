@@ -394,34 +394,44 @@
      抄 useClaudeRovingFocus.ts：方向键在组内移动，Home/End 首尾，
      Tab 立即交还全局焦点流（防键盘死循环），tabIndex 动态 0 / -1。 */
   function rovingFocus(container, itemSelector) {
-    var items = Array.prototype.slice.call(container.querySelectorAll(itemSelector));
-    if (!items.length) return;
+    if (!container) return;
     var cur = 0;
 
-    items.forEach(function (el, i) {
-      el.tabIndex = i === 0 ? 0 : -1;
-      el.addEventListener('click', function () { cur = i; apply(); });
-    });
+    // items 每次现查，不用启动时的快照：会话列表是整表重建的
+    // （renderSessionList 每次换画），快照会在重建后继续对已经移除的
+    // 元素算下标，方向键就失灵。
+    function items() {
+      return Array.prototype.slice.call(container.querySelectorAll(itemSelector));
+    }
 
     function apply() {
-      items.forEach(function (el, i) { el.tabIndex = i === cur ? 0 : -1; });
-      items[cur].focus({ preventScroll: true });
+      var list = items();
+      list.forEach(function (el, i) { el.tabIndex = i === cur ? 0 : -1; });
+      if (list[cur]) list[cur].focus({ preventScroll: true });
     }
+
+    container.addEventListener('click', function (e) {
+      var hit = e.target.closest(itemSelector);
+      if (!hit || !container.contains(hit)) return;
+      cur = items().indexOf(hit);
+      apply();
+    });
 
     container.addEventListener('keydown', function (e) {
       if (e.key === 'Tab') return;               // 关键：不拦截 Tab
-      var i = items.indexOf(document.activeElement);
+      var list = items();
+      var i = list.indexOf(document.activeElement);
       if (i < 0) return;
       var next = -1;
       switch (e.key) {
         case 'ArrowDown': case 'ArrowRight': next = i + 1; break;
         case 'ArrowUp':   case 'ArrowLeft':  next = i - 1; break;
         case 'Home': case 'PageUp':            next = 0; break;
-        case 'End':  case 'PageDown':          next = items.length - 1; break;
+        case 'End':  case 'PageDown':          next = list.length - 1; break;
         default: return;
       }
       e.preventDefault();
-      cur = (next + items.length) % items.length; // loop 回绕
+      cur = (next + list.length) % list.length; // loop 回绕
       apply();
     });
   }
@@ -504,22 +514,36 @@
   });
 
   // 模型切换器
-  var modelPopEntry = registerPopover('modelWrap', 'modelPop', 'modelBtn');
-  // 模型行点击：换模型 + 更新 pill 标签（原逻辑，迁到管理器里）
-  var modelPop = modelPopEntry ? modelPopEntry.pop : null;
-  var modelBtn = modelPopEntry ? modelPopEntry.btn : null;
-  if (modelPop && modelBtn) {
-    modelPop.addEventListener('click', function (e) {
-      var item = e.target.closest('.pop-item');
-      if (!item) return;
-      modelPop.querySelectorAll('.pop-item').forEach(function (b) {
-        b.setAttribute('aria-checked', String(b === item));
-        b.style.background = b === item ? 'var(--cds-fill-ghost-selected)' : '';
-      });
-      var label = modelBtn.querySelector('.pill-label');
-      if (label) label.textContent = item.dataset.label;
-      closeAllPopovers();
+  var modelBtn = document.getElementById('modelBtn');
+  if (modelBtn && hasNativeBridge()) {
+    /* 有桥（真机）时不注册 popover，pill 改为打开原生「模型与任务」页。
+       可选模型的真实集合在 LlmConfigActivity 里，这里再列三个示例行就是
+       第二个会说谎的来源——原先点它们只改本地 label，模型根本没换，而顶栏
+       pill 又是另一段写死的文本，于是「切换模型了顶部还显示本地模型」。
+       与设置面板每一行配置的行为一致：页面纯呈现，配置只在原生一处。 */
+    modelBtn.setAttribute('aria-haspopup', 'false');
+    modelBtn.addEventListener('click', function () {
+      var b = bridge();
+      if (b && typeof b.openSettingsPage === 'function') b.openSettingsPage('model');
     });
+  } else {
+    // 纯浏览器预览：没有桥，popover 与三个示例行照旧作为设计稿。
+    var modelPopEntry = registerPopover('modelWrap', 'modelPop', 'modelBtn');
+    var modelPop = modelPopEntry ? modelPopEntry.pop : null;
+    var modelPopBtn = modelPopEntry ? modelPopEntry.btn : null;
+    if (modelPop && modelPopBtn) {
+      modelPop.addEventListener('click', function (e) {
+        var item = e.target.closest('.pop-item');
+        if (!item) return;
+        modelPop.querySelectorAll('.pop-item').forEach(function (b) {
+          b.setAttribute('aria-checked', String(b === item));
+          b.style.background = b === item ? 'var(--cds-fill-ghost-selected)' : '';
+        });
+        var label = modelPopBtn.querySelector('.pill-label');
+        if (label) label.textContent = item.dataset.label;
+        closeAllPopovers();
+      });
+    }
   }
 
   // 主题面板（侧边栏）：底色 × 强调色 × 深浅，一个面板三个维度
@@ -2222,6 +2246,282 @@
     // 故意不渲染任何东西 —— 见上。留这个空函数只为记录「面板已移除」这件事。
   }
 
+  /* ------------------------------------------------ 会话模型（live 模式）
+     这个面 2026-10-24 升格主界面时，把侧栏的会话列表、搜索框和「新建」按钮
+     整段藏掉了——那时它们背后没有数据。代价是开不了新对话、也回不去旧对话，
+     整个 transcript 永远追加在同一个文件里。
+
+     现在三者都渲染真实账本：ChatHistoryManager 是唯一事实源，页面只画 Kotlin
+     送来的快照，自己不存任何会话状态（localStorage 一份都不留——那份缓存
+     会在会话被别的面删掉之后继续说它存在）。
+
+     Kotlin → JS 的载荷形状：
+       { "current": {"id":"…","title":"…"},
+         "conversations": [{"id":"…","title":"…","createdAt":123}] }
+     current 为 null 表示还没有任何会话。 */
+  var sessionList = document.getElementById('sessionList');
+  var sessionSearch = document.getElementById('sessionSearch');
+  var newChatBtn = document.getElementById('newChatBtn');
+  var sessionsPayload = [];
+  var currentSessionId = '';
+  var sessionQuery = '';
+
+  function startNewChat() {
+    var b = bridge();
+    if (b && typeof b.newChat === 'function') {
+      // 同选会话：手机宽度先收抽屉，否则新对话开了屏幕还被盖着。
+      closeNav();
+      b.newChat();
+      return;
+    }
+    // 无桥的纯浏览器预览：没有账本可写，至少清掉示例回合，让「新建」看起来
+    // 真的做了点什么，而不是一个死按钮。
+    closeNav();
+    var feed = document.getElementById('feed');
+    if (feed) feed.innerHTML = '';
+  }
+
+  function openConversation(id) {
+    var b = bridge();
+    if (b && typeof b.openConversation === 'function') b.openConversation(String(id));
+  }
+
+  function renameConversation(id, title) {
+    var b = bridge();
+    if (b && typeof b.renameConversation === 'function') {
+      b.renameConversation(String(id), String(title));
+    }
+  }
+
+  function deleteConversation(id) {
+    var b = bridge();
+    if (b && typeof b.deleteConversation === 'function') b.deleteConversation(String(id));
+  }
+
+  function findConversation(id) {
+    for (var i = 0; i < sessionsPayload.length; i++) {
+      if (sessionsPayload[i].id === String(id)) return sessionsPayload[i];
+    }
+    return null;
+  }
+
+  function fmtDayLabel(ts) {
+    var d = new Date(ts || Date.now());
+    var now = new Date();
+    function same(a, b) {
+      return a.getFullYear() === b.getFullYear() &&
+             a.getMonth() === b.getMonth() &&
+             a.getDate() === b.getDate();
+    }
+    if (same(d, now)) return '今天';
+    var yesterday = new Date(now.getTime() - 86400000);
+    if (same(d, yesterday)) return '昨天';
+    return (d.getMonth() + 1) + '月' + d.getDate() + '日';
+  }
+
+  function buildSessionRow(c) {
+    var row = el('div', 'session-row');
+    row.setAttribute('data-current', String(c.id === currentSessionId));
+    var btn = el('button', 'session');
+    btn.type = 'button';
+    btn.setAttribute('data-id', String(c.id == null ? '' : c.id));
+    if (c.id === currentSessionId) btn.setAttribute('aria-current', 'true');
+    btn.appendChild(el('span', 'session-title', c.title || '（无标题对话）'));
+    row.appendChild(btn);
+
+    /* 重命名 / 删除是 .session 的兄弟而不是子元素：按钮嵌按钮是无效 HTML，
+       内层点击还会被外层按钮吞掉。默认隐形（见 .session-act），行 hover 才露面。 */
+    var rename = el('button', 'session-act');
+    rename.type = 'button';
+    rename.setAttribute('data-act', 'rename');
+    rename.setAttribute('aria-label', '重命名对话');
+    rename.innerHTML =
+      '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+      'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
+    row.appendChild(rename);
+
+    var del = el('button', 'session-act');
+    del.type = 'button';
+    del.setAttribute('data-act', 'delete');
+    del.setAttribute('aria-label', '删除对话');
+    del.innerHTML =
+      '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+      'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+      '<path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m3 0v14a2 2 0 0 1-2 2H7' +
+      'a2 2 0 0 1-2-2V6"/></svg>';
+    row.appendChild(del);
+    return row;
+  }
+
+  function renderSessionList() {
+    if (!sessionList) return;
+    sessionList.innerHTML = '';
+    var q = sessionQuery.trim().toLowerCase();
+    var rows = sessionsPayload.filter(function (c) {
+      if (!q) return true;
+      return String(c.title || '').toLowerCase().indexOf(q) >= 0;
+    });
+
+    if (!rows.length) {
+      sessionList.appendChild(el('div', 'sessions-empty', sessionsPayload.length
+        ? '没有匹配的会话'
+        : '还没有对话。点上面的「新建对话」开始。'));
+      return;
+    }
+
+    // 按天分组，只在相邻的同标签行之间合并——会话按时间倒序送来，
+    // 所以同一天的行本来就挨在一起。
+    var groups = [];
+    rows.forEach(function (c) {
+      var label = fmtDayLabel(c.createdAt);
+      var last = groups[groups.length - 1];
+      if (!last || last.label !== label) {
+        last = { label: label, items: [] };
+        groups.push(last);
+      }
+      last.items.push(c);
+    });
+    groups.forEach(function (g) {
+      sessionList.appendChild(el('div', 'group-label', g.label));
+      g.items.forEach(function (c) { sessionList.appendChild(buildSessionRow(c)); });
+    });
+  }
+
+  function setSessionTitle(t) {
+    var node = document.getElementById('sessionTitle');
+    if (node) node.textContent = t || '新对话';
+  }
+
+  function setConversations(payload) {
+    var data = payload || {};
+    sessionsPayload = (data.conversations || []).map(function (c) {
+      return {
+        id: String(c.id == null ? '' : c.id),
+        title: String(c.title == null ? '' : c.title),
+        createdAt: Number(c.createdAt) || 0
+      };
+    });
+    currentSessionId = data.current && data.current.id ? String(data.current.id) : '';
+    setSessionTitle(data.current && data.current.title ? String(data.current.title) : '');
+    renderSessionList();
+  }
+
+  /* 模型 pill。顶栏与 composer 两个位置同一个事实源——Kotlin 在页面加载、
+     onResume、以及从原生模型页返回时推送 ModelConfigRepository 的当前选择。
+     原先两处都是写死的示例文本，切换模型后顶部照样显示「本地模型」。 */
+  function setModelStatus(s) {
+    var st = s || {};
+    var label = String(st.label || '');
+    var dot = document.getElementById('modelPillDot');
+    var top = document.getElementById('modelPillLabel');
+    var composer = document.getElementById('modelPillComposer');
+    if (dot) dot.setAttribute('data-kind', String(st.kind || 'muted'));
+    if (top) top.textContent = label || '未选择模型';
+    if (composer) composer.textContent = String(st.short || label || '未选择模型');
+  }
+
+  /* -------------------------------------------- 会话重命名 / 删除对话框
+     一个壳两种用法：rename 显示输入框，delete 只显示说明和两个按钮。
+     破坏性档没有「始终允许」——删掉的历史找不回来，所以每次都要人点头。 */
+  var sessionDialog = document.getElementById('sessionDialog');
+  var sessionDialogScrim = document.getElementById('sessionDialogScrim');
+  var sessionDialogTitle = document.getElementById('sessionDialogTitle');
+  var sessionDialogBody = document.getElementById('sessionDialogBody');
+  var sessionDialogInput = document.getElementById('sessionDialogInput');
+  var sessionDialogOk = document.getElementById('sessionDialogOk');
+  var sessionDialogCancel = document.getElementById('sessionDialogCancel');
+  var sessionDialogMode = null;
+  var sessionDialogId = '';
+
+  function openSessionDialog(mode, conv) {
+    if (!sessionDialog || !conv) return;
+    sessionDialogMode = mode;
+    sessionDialogId = conv.id;
+    if (sessionDialogTitle) {
+      sessionDialogTitle.textContent = mode === 'rename' ? '重命名对话' : '删除对话';
+    }
+    if (sessionDialogBody) {
+      sessionDialogBody.textContent = mode === 'rename'
+        ? '换个名字，方便以后在列表里认出来。'
+        : '「' + (conv.title || '（无标题对话）') + '」的整段历史会从这台设备上删除，找不回来。';
+    }
+    if (sessionDialogInput) {
+      if (mode === 'rename') {
+        sessionDialogInput.value = conv.title || '';
+        sessionDialogInput.style.display = '';
+      } else {
+        sessionDialogInput.value = '';
+        sessionDialogInput.style.display = 'none';
+      }
+    }
+    if (sessionDialogOk) {
+      sessionDialogOk.textContent = mode === 'rename' ? '保存' : '删除';
+      sessionDialogOk.setAttribute('data-variant', mode === 'rename' ? 'primary' : 'danger');
+    }
+    sessionDialog.setAttribute('data-open', 'true');
+    if (sessionDialogScrim) sessionDialogScrim.setAttribute('data-open', 'true');
+    if (mode === 'rename' && sessionDialogInput) {
+      sessionDialogInput.focus();
+      sessionDialogInput.select();
+    } else if (sessionDialogOk) {
+      sessionDialogOk.focus();
+    }
+  }
+
+  function closeSessionDialog() {
+    sessionDialogMode = null;
+    sessionDialogId = '';
+    if (sessionDialog) sessionDialog.setAttribute('data-open', 'false');
+    if (sessionDialogScrim) sessionDialogScrim.setAttribute('data-open', 'false');
+  }
+
+  function submitSessionDialog() {
+    if (!sessionDialogMode) return;
+    if (sessionDialogMode === 'rename') {
+      var title = sessionDialogInput ? sessionDialogInput.value.trim() : '';
+      if (title) renameConversation(sessionDialogId, title);
+    } else {
+      deleteConversation(sessionDialogId);
+    }
+    closeSessionDialog();
+  }
+
+  if (newChatBtn) newChatBtn.addEventListener('click', startNewChat);
+
+  if (sessionSearch) {
+    sessionSearch.addEventListener('input', function () {
+      sessionQuery = sessionSearch.value || '';
+      renderSessionList();
+    });
+  }
+
+  if (sessionList) {
+    // 事件委托：列表每次整表重建，监听只挂一次在容器上。
+    sessionList.addEventListener('click', function (e) {
+      var act = e.target.closest('.session-act');
+      if (act) {
+        var row = act.closest('.session-row');
+        var btn = row ? row.querySelector('.session') : null;
+        var id = btn ? btn.getAttribute('data-id') : '';
+        openSessionDialog(act.getAttribute('data-act') === 'rename' ? 'rename' : 'delete',
+                          findConversation(id));
+        return;
+      }
+      var item = e.target.closest('.session');
+      if (item) {
+        // 手机上抽屉是覆盖层：不关的话用户点了会话，屏幕还被侧栏盖着。
+        // 桌面宽度 nav-open 从来没被加上，这一行是无操作。
+        closeNav();
+        openConversation(item.getAttribute('data-id'));
+      }
+    });
+  }
+
+  if (sessionDialogOk) sessionDialogOk.addEventListener('click', submitSessionDialog);
+  if (sessionDialogCancel) sessionDialogCancel.addEventListener('click', closeSessionDialog);
+  if (sessionDialogScrim) sessionDialogScrim.addEventListener('click', closeSessionDialog);
+
   /* ------------------------------------------------------------------ 启动 */
   qaBuildPanel();
   initTheme();
@@ -2269,6 +2569,10 @@
     schedulesBack: schedulesBack,
     schedulesLevel: function () { return schedulesLevel; },
     renderSchedules: renderSchedules,
+    // 会话模型：Kotlin 推快照，页面只画。setConversations 收
+    // {current, conversations}，setModelStatus 收 {label, short, kind}。
+    setConversations: setConversations,
+    setModelStatus: setModelStatus,
     rateLimit: triggerBackoff,
     resetRateLimit: function () {
       clearInterval(backoff.timer); backoff.timer = null;

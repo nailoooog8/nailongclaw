@@ -1346,6 +1346,11 @@ When in doubt, rerun the smaller bundle first, then expand only if something dri
 - [ ] **H70. 精确闹钟降级提示 [RELEASE-OK]**: `adb shell appops set io.agents.pokeclaw SCHEDULE_EXACT_ALARM ignore`（或系统设置里关「闹钟和提醒」）→ 排一个任务 → 打开定时队列：**顶部出现降级提示条**（「系统没有授予『精确闹钟』权限……07:30 的简报迟到几分钟是正常的」），任务行照常显示（不空态、不报错、倒计时照算）。`appops set ... allow` 恢复 → 重开队列提示条消失、`scheduleCards` 不变。判据：提示条文字节点 + `appops get` 状态，不认截图。这条补的是 BACKLOG P3「静默降级」的旧账。
 
 - [ ] **H71. 一次性 coach mark [RELEASE-OK]**: 全新安装（或 `pm clear` 后）首进主界面 → 打开侧栏抽屉 → 定时行下方出现 teaching bubble（「定时任务住在这里……」+「去看看」）。点「去看看」→ bubble 消失、直接进入定时队列；`adb shell run-as` 不适用（release），改判：杀进程重进 → bubble **不再出现**（SharedPreferences 标志）。直接点「定时」行（不点 bubble）→ 同样不再出现。无 bridge 的纯浏览器预览不显示 bubble（设计稿没有「第一次使用」）。
+- [ ] **H72. 键盘不遮输入区 [RELEASE-OK]**: 主界面点 composer 输入框 → 键盘弹出 → **整个 composer 连同「发送」与三个 pill 完整可见**，`.dock` 底边贴在键盘上沿（不再留在键盘背后）；输入框仍可打字、Enter 发送正常。收起键盘 → composer 回到底部、不被导航栏压住（底部 inset 与顶部对称，这一处原先也漏了）。判据：`uiautomator dump` 里 composer 节点的 bounds 下沿 ≤ 键盘上沿；截图只作辅助。设计稿（纯浏览器、无 bridge）不验——它没有真键盘。
+- [ ] **H73. 顶栏模型 pill 跟随真实选择 [RELEASE-OK]**: 主界面顶栏 pill 显示当前真实模型（装了本地模型时形如「Gemma 3n E2B · 本地」）。设置 → 模型与任务 → 切到一个云端模型（需已配 key）→ 返回主界面 → 顶栏 pill **变成该模型名 + 提供商**（不再是写死的「本地模型 · LiteRT-LM」），composer 的模型 pill 同步。再切回本地 → 两者都回本地。都没配时 pill 显示「未选择本地模型」/「未配置云端模型」而不是一个模型名。判据：pill 文本节点；`KVUtils` 的 provider 值作旁证。
+- [ ] **H74. composer 模型 pill 进原生页 [RELEASE-OK]**: 点 composer 的模型 pill → **不弹假 popover**，直接进原生「模型与任务」页（与设置面板每一行配置同行为）。原 popover 的三个示例行在真机不再可达。纯浏览器预览里 popover 仍可用（那是设计稿，没有桥）。
+- [ ] **H75. 新建对话 [RELEASE-OK]**: 主界面发几条消息 → 打开侧栏 → 点「新建对话」→ feed 清空、顶栏标题变「新对话」、输入框可用来开新话题；**上一段历史没有丢**——侧栏列表里出现它（按「今天」分组）。杀进程重进 → 落在那段新对话上（不是旧的）。落盘判据：`getExternalFilesDir(null)/chats` 下 `.md` 文件数 +1。
+- [ ] **H76. 会话列表 / 打开 / 重命名 / 删除 [RELEASE-OK]**: 侧栏列表按「今天 / 昨天 / 月日」分组，当前会话行高亮；点另一行 → feed 换成那段历史、顶栏标题跟着变，模型仍可用（不是冷启动）。hover 行尾出现重命名/删除两颗（默认隐形）：重命名 → 对话框改标题 → 列表与顶栏同步；删除 → 确认框列出标题 → 确认后列表移除该行。**删当前会话** → feed 清空并落到一条新 id（不是指向已删文件的幽灵）。搜索框输入 → 列表按标题过滤，无匹配显示「没有匹配的会话」。空列表显示「还没有对话。点上面的『新建对话』开始。」。最后一条硬判据：这些会话**也出现在 Compose 聊天页的侧栏**里（2026-10-27 起是刻意如此，见 BACKLOG 第五轮）。
 ## CI. Emulator Smoke Harness
 The runner itself is code. When it reports red for a reason that has nothing to do with
 the app, it burns triage time and trains everyone to ignore the matrix — which is worse

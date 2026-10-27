@@ -473,14 +473,25 @@ object ChatHistoryManager {
 
     /**
      * Rename a conversation by updating the title in the markdown frontmatter.
+     *
+     * The title goes through the same [oneLine] discipline the save path funnels
+     * it through (see [appendFrontmatter]). The transcript is line-oriented, so
+     * a raw newline in a user-supplied title continues the frontmatter — and an
+     * injected `id: …` line re-points the whole file at another conversation,
+     * because [listConversations] keeps the last `id:` it reads. Both doors that
+     * reach here take free text (the chat screen's rename dialog, the preview
+     * surface's bridge), so the title is sanitised here rather than trusted at
+     * either one.
      */
     fun rename(file: File, newTitle: String): Boolean {
         if (!file.exists()) return false
+        val safeTitle = newTitle.oneLine()
+        if (safeTitle.isEmpty()) return false
         try {
             val content = file.readText()
             val updated = content.replaceFirst(
                 Regex("(?m)^title: .+$"),
-                "title: $newTitle"
+                "title: $safeTitle"
             )
             file.writeText(updated)
             return true

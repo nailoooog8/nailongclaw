@@ -29,12 +29,14 @@ import androidx.core.view.updatePadding
 import androidx.webkit.WebViewAssetLoader
 import io.agents.pokeclaw.BuildConfig
 import io.agents.pokeclaw.agent.EffortLevel
+import io.agents.pokeclaw.agent.llm.ModelConfigRepository
 import io.agents.pokeclaw.agent.mcp.McpConfirmationCoordinator
 import io.agents.pokeclaw.agent.mcp.McpConfirmationGate
 import io.agents.pokeclaw.agent.mcp.McpConfirmationRequest
 import io.agents.pokeclaw.appViewModel
 import io.agents.pokeclaw.base.BaseActivity
 import io.agents.pokeclaw.ui.chat.ChatHistoryManager
+import io.agents.pokeclaw.ui.chat.ChatMessage
 import io.agents.pokeclaw.ui.chat.ChatSessionController
 import io.agents.pokeclaw.ui.chat.ChatSessionUiState
 import io.agents.pokeclaw.ui.chat.TaskFlowController
@@ -82,6 +84,16 @@ import java.util.concurrent.Executors
  * (QA H23 / H26).
  *
  * Not exported, so no other app can reach it.
+ *
+ * ## Conversations
+ *
+ * Since 2026-10-27 this surface has a real session model — new chat, session
+ * list, open, rename, delete — which it did not have when it became the main
+ * screen. Back then the sidebar's session list, search box and "new" button
+ * were hidden because there was no data behind them, and the consequence was
+ * that every visit appended to one fixed conversation id. The identity policy
+ * and the two payloads the page draws live in [ClaudeUiSessionBridge]; this
+ * class only owns which id is open and when to push.
  */
 class ClaudeUiPreviewActivity : BaseActivity() {
 
@@ -115,6 +127,57 @@ class ClaudeUiPreviewActivity : BaseActivity() {
      */
     @Volatile
     private var schedulesLevel: String = SCHEDULES_LEVEL_CLOSED
+
+    /**
+     * Conversation id this surface currently has open.
+     *
+     * Was [PREVIEW_CONVERSATION_ID], one fixed id for the life of the install —
+     * which is exactly why this surface could not start a second chat: every
+     * visit appended to the same file, and there was no way back to an older
+     * one either. Resolved for real in [onCreate], before any bridge method
+     * can run.
+     */
+    private var currentConversationId: String = PREVIEW_CONVERSATION_ID
+
+    /**
+     * Pick the conversation to open on entry, and remember it under a key of
+     * this surface's own.
+     *
+     * Deliberately NOT [io.agents.pokeclaw.ui.chat.ConversationStore]'s
+     * `CURRENT_CONVERSATION_ID`: that key is global, so the Compose chat screen
+     * and this surface would overwrite each other's pointer on every save. Two
+     * surfaces silently clobbering each other's history is worse than either
+     * one not persisting.
+     *
+     * Migration: before 2026-10-27 every transcript here lived under the fixed
+     * [PREVIEW_CONVERSATION_ID]. If that file still exists it keeps being
+     * opened, so the user's last conversation is not orphaned by this change.
+     */
+    private fun resolveInitialConversationId(): String {
+        val summaries = ChatHistoryManager.listConversations(this)
+        val stored = KVUtils.getString(SURFACE_CONVERSATION_ID_KEY, "")
+        // A stored pointer only wins while it still names a file on disk: the
+        // chat screen's sidebar can delete this surface's open conversation,
+        // and a dead pointer left in KV would reopen a ghost — restoreChat
+        // no-ops on the missing file while the topbar goes on naming a
+        // conversation the sidebar cannot select. The next setConversationId
+        // refreshes the pointer; until then it is simply not trusted.
+        val storedAlive = stored.isNotEmpty() && summaries.any { it.id == stored }
+        val legacyExists = summaries.any { it.id == ClaudeUiSessionBridge.LEGACY_CONVERSATION_ID }
+        return ClaudeUiSessionBridge.resolveInitialId(
+            stored = stored.takeIf { storedAlive }.orEmpty(),
+            legacyExists = legacyExists,
+            now = System.currentTimeMillis(),
+        )
+    }
+
+    private fun setConversationId(id: String) {
+        currentConversationId = id
+        KVUtils.putString(SURFACE_CONVERSATION_ID_KEY, id)
+    }
+
+    private fun newConversationId(): String =
+        ClaudeUiSessionBridge.newConversationId(System.currentTimeMillis())
 
     private val sink by lazy {
         WebChatSink(
@@ -186,7 +249,7 @@ class ClaudeUiPreviewActivity : BaseActivity() {
             executor = executor,
             appViewModel = appViewModel,
             chatSessionController = chatSessionController,
-            currentConversationId = { PREVIEW_CONVERSATION_ID },
+            currentConversationId = { currentConversationId },
             sink = sink,
             onPersistConversation = { saveChat() },
         )
@@ -222,21 +285,40 @@ class ClaudeUiPreviewActivity : BaseActivity() {
      * clobbering each other's history is worse than either one not persisting.
      *
      * [io.agents.pokeclaw.ui.chat.ChatHistoryManager] is stateless, so it can be
-     * called directly with a fixed id. The consequence is that this surface's
-     * history does not appear in the chat screen's sidebar, which is the right
-     * default: an experimental surface should not bury real conversations.
+     * called directly with whatever id this surface has open. Since 2026-10-27
+     * that id is a real conversation, so this surface's transcripts now *do*
+     * show up in the chat screen's sidebar too. That is the intended reversal of
+     * the old "an experimental surface should not bury real conversations"
+     * default: they are real conversations now, and a history the user cannot
+     * reach from the other surface is a history they can lose by clearing one
+     * of them.
      */
     private fun saveChat() {
         runCatching {
             ChatHistoryManager.save(
                 context = this,
-                conversationId = PREVIEW_CONVERSATION_ID,
+                conversationId = currentConversationId,
                 messages = sink.snapshotMessages(),
                 model = sink.modelStatus,
             )
         }.onFailure {
             XLog.e(TAG, "saveChat failed: ${it.message}", it)
         }
+    }
+
+    /**
+     * Save the open conversation — unless it holds nothing but the runtime's
+     * own system line.
+     *
+     * `startNewConversationRuntime` appends "New conversation started." to the
+     * feed, so a chat the user opened and immediately left would otherwise be
+     * written as an `untitled` file with no user message in it, and would then
+     * sit in this sidebar *and* the chat screen's. Two taps on 新建对话 is
+     * enough to produce one. A conversation is something somebody said.
+     */
+    private fun saveChatIfItHasContent() {
+        val said = sink.snapshotMessages().any { it.role != ChatMessage.Role.SYSTEM }
+        if (said) saveChat()
     }
 
     /**
@@ -255,7 +337,7 @@ class ClaudeUiPreviewActivity : BaseActivity() {
     private fun restoreChat() {
         runCatching {
             val match = ChatHistoryManager.listConversations(this)
-                .firstOrNull { it.id == PREVIEW_CONVERSATION_ID }
+                .firstOrNull { it.id == currentConversationId }
                 ?: return
             sink.restore(ChatHistoryManager.load(match.file))
             XLog.i(TAG, "restoreChat: reloaded '${match.title}'")
@@ -340,6 +422,121 @@ class ClaudeUiPreviewActivity : BaseActivity() {
                 startActivity(Intent(this@ClaudeUiPreviewActivity, target))
             }
         }
+
+        /**
+         * JS → Kotlin: start a new conversation.
+         *
+         * Saves whatever is on screen first — a new chat must not silently
+         * delete the one before it — then swaps in a fresh id and clears the
+         * feed. The page's session list is republished so the previous
+         * conversation appears in it immediately.
+         *
+         * Runs on the WebView's JavaScript thread; the task flow and the WebView
+         * are both main-thread, hence the hop.
+         */
+        @JavascriptInterface
+        fun newChat() {
+            runOnUiThread {
+                saveChatIfItHasContent()
+                val id = newConversationId()
+                setConversationId(id)
+                sink.clear()
+                chatSessionController.startNewConversationRuntime()
+                publishConversations()
+                XLog.e(TAG, "[chat] newChat -> $id")
+            }
+        }
+
+        /**
+         * JS → Kotlin: open [id] from the session list.
+         *
+         * Saves the current one first, then restores the target's transcript
+         * into the sink and rebuilds the runtime conversation so the model
+         * carries the restored history instead of starting cold.
+         */
+        @JavascriptInterface
+        fun openConversation(id: String?) {
+            val target = id?.trim().orEmpty()
+            if (target.isEmpty()) return
+            runOnUiThread {
+                val match = ChatHistoryManager.listConversations(this@ClaudeUiPreviewActivity)
+                    .firstOrNull { it.id == target }
+                if (match == null) {
+                    XLog.e(TAG, "[chat] openConversation('$target') — no such conversation")
+                    return@runOnUiThread
+                }
+                saveChatIfItHasContent()
+                setConversationId(target)
+                val restored = ChatHistoryManager.load(match.file)
+                sink.restore(restored)
+                chatSessionController.restoreConversationRuntime(target, restored)
+                publishConversations()
+                XLog.e(TAG, "[chat] openConversation -> $target ('${match.title}')")
+            }
+        }
+
+        /**
+         * JS → Kotlin: rename a conversation. Returns false when the id is
+         * unknown or the title is blank, so the page can say so instead of
+         * pretending the rename landed.
+         *
+         * File IO on the JavaScript thread, the same discipline as
+         * [readTaskList] — the markdown store is small and local.
+         */
+        @JavascriptInterface
+        fun renameConversation(id: String?, title: String?): Boolean {
+            val cleanTitle = title?.trim().orEmpty()
+            if (id.isNullOrBlank() || cleanTitle.isEmpty()) return false
+            val match = ChatHistoryManager.listConversations(this@ClaudeUiPreviewActivity)
+                .firstOrNull { it.id == id } ?: return false
+            val ok = ChatHistoryManager.rename(match.file, cleanTitle)
+            if (ok) {
+                // Renaming the open conversation moves the topbar title too.
+                publishConversations()
+            }
+            return ok
+        }
+
+        /**
+         * JS → Kotlin: delete a conversation.
+         *
+         * Deleting the one that is open leaves this surface pointing at a file
+         * that no longer exists, so it moves to a fresh id and clears the feed
+         * rather than restoring a ghost on the next save.
+         *
+         * The file delete stays on the JavaScript thread, the same discipline
+         * as [renameConversation]; the state swap after it hops to the main
+         * thread like its siblings — `sink.clear()` races the agent thread's
+         * appends, and the runtime start is main-thread work.
+         */
+        @JavascriptInterface
+        fun deleteConversation(id: String?): Boolean {
+            if (id.isNullOrBlank()) return false
+            val match = ChatHistoryManager.listConversations(this@ClaudeUiPreviewActivity)
+                .firstOrNull { it.id == id } ?: return false
+            if (!ChatHistoryManager.delete(match.file)) return false
+            runOnUiThread {
+                val wasOpen = id == currentConversationId
+                if (wasOpen) {
+                    setConversationId(newConversationId())
+                    sink.clear()
+                    chatSessionController.startNewConversationRuntime()
+                }
+                publishConversations()
+                XLog.e(TAG, "[chat] deleteConversation -> $id (wasOpen: $wasOpen)")
+            }
+            return true
+        }
+
+        /**
+         * JS → Kotlin: current model selection as the pill wants it.
+         *
+         * The projection lives in [ClaudeUiSessionBridge] so it is unit-tested;
+         * this is only the door to it.
+         */
+        @JavascriptInterface
+        fun readModelStatus(): String =
+            ClaudeUiSessionBridge.modelStatusPayload(ModelConfigRepository.snapshot())
 
         /**
          * JS → Kotlin: current theme preferences as JSON
@@ -629,6 +826,46 @@ class ClaudeUiPreviewActivity : BaseActivity() {
     }
 
     /**
+     * Kotlin → JS: the session list plus which conversation is open.
+     *
+     * Full snapshot, not a delta — the same reasoning as [publish]: the page
+     * rebuilds the sidebar from whatever it is handed, and a missed delta has
+     * no recovery path. Sent on entry, after every session operation, and on
+     * resume so a conversation started or deleted elsewhere is reflected.
+     *
+     * `current` carries a placeholder title when the open conversation has not
+     * been saved yet (a brand-new chat with no first message): without it the
+     * topbar would keep the previous conversation's name until the user typed
+     * something.
+     */
+    private fun publishConversations() {
+        if (!::webView.isInitialized) return
+        val json = ClaudeUiSessionBridge.conversationsPayload(
+            currentId = currentConversationId,
+            summaries = ChatHistoryManager.listConversations(this),
+            now = System.currentTimeMillis(),
+        )
+        webView.post {
+            webView.evaluateJavascript("window.__cds && window.__cds.setConversations($json);", null)
+        }
+    }
+
+    /**
+     * Kotlin → JS: which model is selected, for both pills.
+     *
+     * The page is not reloaded on resume, so a model switched on the native
+     * page has to be pushed — the topbar pill used to be static markup and
+     * kept saying 「本地模型」 after every switch.
+     */
+    private fun publishModelStatus() {
+        if (!::webView.isInitialized) return
+        val json = ClaudeUiSessionBridge.modelStatusPayload(ModelConfigRepository.snapshot())
+        webView.post {
+            webView.evaluateJavascript("window.__cds && window.__cds.setModelStatus($json);", null)
+        }
+    }
+
+    /**
      * Kotlin → JS: put the completion chip row on the answer turn.
      *
      * Pure projection of the ledger record via [TaskRecordChips] — the page
@@ -826,6 +1063,9 @@ class ClaudeUiPreviewActivity : BaseActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Before anything can call a bridge method: which conversation this
+        // surface has open decides what gets saved, restored and listed.
+        currentConversationId = resolveInitialConversationId()
         // adjustResize is declared in the manifest; re-assert it here because
         // BaseActivity may set its own soft-input mode.
         window.setSoftInputMode(
@@ -866,6 +1106,14 @@ class ClaudeUiPreviewActivity : BaseActivity() {
                     view: WebView,
                     request: WebResourceRequest
                 ): Boolean = true
+
+                override fun onPageFinished(view: WebView, url: String) {
+                    // The page's own bootstrap has run by now, so window.__cds
+                    // exists. Push the two things the markup cannot know: which
+                    // conversation is open, and which model is selected.
+                    publishConversations()
+                    publishModelStatus()
+                }
             }
             // Without a WebChromeClient the page's console output never leaves
             // the renderer — `adb logcat` shows nothing, which is NOT evidence
@@ -936,7 +1184,31 @@ class ClaudeUiPreviewActivity : BaseActivity() {
                 WindowInsetsCompat.Type.systemBars() or
                     WindowInsetsCompat.Type.displayCutout()
             )
+            // 键盘。targetSdk 36 边到边之下 adjustResize 不再替我们缩小窗口，
+            // 输入法高度是当 IME inset 递送上来的——而这个监听器原先只 pad 了
+            // 顶部，然后把 insets 整个 CONSUME 掉，于是键盘起来时 WebView 一步
+            // 没让，.dock（flex 列的最末一项）原样留在键盘背后。
+            //
+            // padding 加在 chrome 这个**包装容器**上而不是 WebView 自己：
+            // WebView 渲染内容时忽略自身的 padding（build 44 设过，页面没动），
+            // 但父容器变小会真的改变它的视口高度，100vh 与 .dock 随之重算。
+            //
+            // 键盘可见时 ime.bottom 已经含导航栏，直接用它；不可见时退回导航栏
+            // inset——否则 dock 会压在导航栏上（顶部一直是这么 pad 的，底部
+            // 原先漏了）。
+            // ime() 只有 API 30+ 递得上值（WindowInsets.Type.ime() 本身也是 R
+            // 才加的）；28-29 上它恒为 0，读它等于读空气，「键盘可见」的判定
+            // 会永远落空。那些版本不走边到边，onCreate 里显式声明的
+            // adjustResize 直接把窗口压缩，dock 跟着上去——所以这里门控在
+            // 30+，低版本只 pad 导航栏那一条。
+            val imeBottom = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+            } else {
+                0
+            }
+            val bottom = if (imeBottom > 0) imeBottom else bars.bottom
             if (bars.top > v.paddingTop) v.updatePadding(top = bars.top)
+            v.updatePadding(bottom = bottom)
             WindowInsetsCompat.CONSUMED
         }
         setContentView(chrome)
@@ -1115,6 +1387,11 @@ class ClaudeUiPreviewActivity : BaseActivity() {
         // itself is not reloaded on resume, so push whatever changed — KVUtils
         // is the source of truth, the page's localStorage is only a cache.
         syncPrefsToPage()
+        // Same reasoning, two more things the markup used to hardcode: the
+        // model pill (switched on the native 模型 page) and the session list
+        // (a conversation deleted from the chat screen's sidebar).
+        publishModelStatus()
+        publishConversations()
     }
 
     /**
@@ -1213,12 +1490,24 @@ class ClaudeUiPreviewActivity : BaseActivity() {
         private const val TAG = "ClaudeUiPreview"
 
         /**
-         * Fixed id for this surface's transcript.
+         * Legacy id for this surface's transcript.
+         *
+         * Every transcript written before 2026-10-27 lives under this one id,
+         * so it is still opened when present (see [resolveInitialConversationId]).
+         * New conversations get `preview_<timestamp>` instead.
          *
          * Not shared with the chat screen: see [saveChat] for why going through
          * ConversationStore would make the two surfaces overwrite each other.
          */
         private const val PREVIEW_CONVERSATION_ID = "preview_claude_ui"
+
+        /**
+         * Where this surface remembers which conversation it has open.
+         *
+         * Its own key, not ConversationStore's global one — the two surfaces
+         * would otherwise overwrite each other's pointer.
+         */
+        private const val SURFACE_CONVERSATION_ID_KEY = "CLAUDE_UI_CURRENT_CONVERSATION_ID"
         private const val ASSET_DOMAIN = "appassets.androidplatform.net"
         private const val PROBE_DELAY_MS = 2500L
 
