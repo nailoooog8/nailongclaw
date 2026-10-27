@@ -75,10 +75,10 @@ Priority: `P0` = blocks users, fix now. `P1` = next up. `P2` = when we get to it
 - [x] **P1 · R4-B1 (Medium, new) — 已修 2026-10-27（代码，真机 SEC22 待验）** 无障碍读屏内容出口无围栏：`GetScreenInfoTool`/`FindNodeInfoTool`/`ScrollToFindTool` 返回原始屏幕文本、不过 `ContextFence`（其余 9 处内容出口全围栏），主系统提示也无「屏幕内容是数据非指令」条款。屏幕文本可被设备上恶意 app 任意构造 → 间接提示注入，LOCAL 会话下可驱动高危工具（EXTERNAL/SCHEDULED/remote 有只读天花板挡）。修：主系统提示加常驻条款（+ 可选只围栏自由文本字段）。QA SEC22 待真机。
 - [x] **P1 · R4-R1 (Medium, new) — 已修 2026-10-27（代码，真机 SEC23 待验）** 导出 LAUNCHER 无门驱动：任何 app `am start -n io.agents.pokeclaw/.ui.splash.SplashActivity --es task "…"` 无需令牌/开关即可跑一次（被打成 Channel.EXTERNAL → 只读天花板）任务，跑截图/读通知/读屏/列应用/web_search 并烧用户 LLM 配额；不外泄（无回调 + send_* 被禁）。修：转发 task 前按 `getReferrer()`(shell) 或令牌门控，第三方丢弃。QA SEC23 待真机。
 - [ ] **P1 · 运维** 重刷设备：现网 QA 机（10AG4J1THX00524）装的是 §6.5 修复（`1b51c9d`，2026-10-26 19:30）之前的陈旧包（lastUpdate 2026-10-25 10:42），带着两个导出 debug 接收器；当前 HEAD release 已不含。安全 QA 前必须用当前 HEAD 重装。
-- [ ] **P2 · R3-07** 全 6 个 workflow 的第三方 action 均 tag-pin、无一 SHA-pin（比 R3 记的 cla.yml 更广）；尤其 `pull_request_target`+write+PAT 的 cla.yml、release 的 softprops/action-gh-release。修：全部 SHA-pin。
+- [x] **P2 · R3-07 — 已修 2026-10-27** 全 6 个 workflow 的第三方 action 均 tag-pin、无一 SHA-pin（比 R3 记的 cla.yml 更广）；尤其 `pull_request_target`+write+PAT 的 cla.yml、release 的 softprops/action-gh-release。修：全部 SHA-pin。
 - [ ] **P2 · R3-06 依赖侧** gradle wrapper 哈希已修；依赖仍无 `verification-metadata.xml`/lockfile。修：启用 Gradle 依赖校验。
 - [ ] **P3 · F3** 逐调用方签名白名单仍未做（令牌证明「持有秘密」，签名才证明「是哪个应用」；会破坏 Tasker/MacroDroid，需先定迁移路径）。
-- [ ] **P3 · F5 / R3-08 / R3-09 / R3-10** cleartext LAN 自签 TLS+指纹固定；UpdateChecker 展示发布哈希；签名口令移出 local.properties 明文；删死权限 REQUEST_INSTALL_PACKAGES、评估 JitPack 依赖。
+- [ ] **P3 · F5 / R3-08 / R3-09 / R3-10（死权限已删）** cleartext LAN 自签 TLS+指纹固定；UpdateChecker 展示发布哈希；签名口令移出 local.properties 明文；删死权限 REQUEST_INSTALL_PACKAGES、评估 JitPack 依赖。
 
 ## Memory bank (see `docs/MEMORY_DESIGN.md` for the rationale behind each call)
 

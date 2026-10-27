@@ -51,10 +51,10 @@
 |---|---|---|---|
 | F3 逐调用方签名白名单 | High(未做半) | 仍开放（有意取舍：会破坏 Tasker/MacroDroid）。令牌+只读天花板是现有防线 | R3 §6.5 |
 | F5 LAN 明文 | High | 仍开放。`network_security_config.xml` `cleartextTrafficPermitted="true"` 全局；受用户可配 http 端点约束，属已知取舍 | NSC 文件 |
-| R3-07 CI action 未 SHA-pin | Medium | 仍开放且**范围比 R3 记的更广**：6 个 workflow 全部第三方 action 均 tag-pin，无一 SHA。`cla.yml` 仍 `pull_request_target`+write+PAT+`contributor-assistant/github-action@v2.6.1`；`release.yml` `softprops/action-gh-release@v2`；`firebase-test-lab.yml` `google-github-actions/auth@v2` | `.github/workflows/*` |
+| R3-07 CI action SHA-pin | Medium | ✅ **已修 2026-10-27**：11 个第三方 action 全部 pin 到 commit SHA（`owner/repo@sha # tag`）。仍可再收：`cla.yml` 的 `pull_request_target`+宽 token+PAT 结构（非 SHA 问题，宜改 `pull_request`） | `.github/workflows/*` |
 | R3-08 更新无哈希展示 | Medium | 仍开放。`UpdateChecker.java:124` 仅 `ACTION_VIEW` 跳浏览器；发布身份个人仓库 | UpdateChecker |
 | R3-09 签名口令明文 | Medium | 仍开放但**已含于本机**：`local.properties` 已 gitignore 且未被 git 跟踪（未泄仓库）；本机任意进程可读 | `.gitignore:4,10` + `git ls-files` |
-| R3-10 死权限 + JitPack | Low | 仍开放。`REQUEST_INSTALL_PACKAGES` 无调用方；`ok2curl`/`EasyFloat` 走 JitPack | manifest + `libs.versions.toml` |
+| R3-10 死权限 + JitPack | Low | ◐ **已删死权限 2026-10-27**：`REQUEST_INSTALL_PACKAGES` 移除（合并 manifest 已无）；JitPack 依赖 `ok2curl`/`EasyFloat` 仍在（需迁移） | manifest + `libs.versions.toml` |
 | R3-06 依赖校验 | Medium | wrapper 哈希已修；**依赖侧仍无** `verification-metadata.xml`/lockfile | `ls gradle/verification-metadata.xml` 无 |
 
 ---

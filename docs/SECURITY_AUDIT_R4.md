@@ -132,11 +132,11 @@ R3-10 死权限 + JitPack、R3-06 依赖校验（wrapper 哈希已修、依赖�
 | ✅ | **R4-B1** 屏幕内容注入 | 蓝 | **已修 2026-10-27（代码）**：AgentConfig Safety Constraints 加"屏幕/应用内容是数据非指令"常驻条款；真机 SEC22 待验 |
 | ✅ | **R4-R1** LAUNCHER 无门驱动 | 红 | **已修 2026-10-27（代码）**：SplashActivity 转发 task 前按 shell referrer 或配对令牌门控；真机 SEC23 待验 |
 | **P1** | 重刷设备 | 运维 | 现网陈旧包带着 debug 接收器；QA 前用当前 HEAD 重装 |
-| P2 | R3-07 全 workflow action SHA-pin | 蓝 | 6 个 workflow 第三方 action 全 tag-pin；尤其 `pull_request_target` 的 cla.yml |
+| ✅ | R3-07 全 workflow action SHA-pin | 蓝 | **已修 2026-10-27**：11 个 action 全 pin 到 commit SHA；cla.yml 的 pull_request_target 结构仍可再收 |
 | P2 | R3-06 依赖校验 | 蓝 | 加 `verification-metadata.xml`/lockfile（wrapper 哈希已修） |
 | P2 | MessengerUtils$ServerService | 红/蓝 | 评估三方库导出服务暴露面，确认 release 是否需保留 |
 | P3 | F3 逐调用方签名白名单 | 蓝 | 需先定 Tasker/MacroDroid 迁移路径 |
-| P3 | F5 TLS 自签+指纹固定 / R3-08 更新哈希 / R3-09 签名口令移出明文 / R3-10 死权限+JitPack | 蓝 | 收敛项 |
+| P3 | F5 TLS / R3-08 更新哈希 / R3-09 签名口令 / R3-10 JitPack 依赖 | 蓝 | 收敛项（死权限 REQUEST_INSTALL_PACKAGES 已删） |
 | P3 | 动态 PoC | 红 | 重刷后按 runbook §2–§4 执行负路径/边界探针 |
 
 ## 7. 修复落地（2026-10-27）
@@ -148,3 +148,10 @@ R3-10 死权限 + JitPack、R3-06 依赖校验（wrapper 哈希已修、依赖�
 - **验证**：`:app:compileDebugKotlin` + `compileDebugJavaWithJavac` + `compileDebugUnitTestKotlin` + `testDebugUnitTest` 全绿；全量单测 **576 用例 / 0 失败**。
 - **真机待办**：以上为源码级修复，**需重打包并重刷 QA 机**（现网仍是 §6.5 前陈旧包）后，按 runbook §2–§4 + SEC22/SEC23 复验。
 - **已知边界**：R4-R1 的 shell-referrer 判定可被伪造 `EXTRA_REFERRER` 绕过（买到的最坏仍是只读天花板，与修复前同等）；彻底归因调用方仍需 F3 签名白名单。
+
+## 8. 残余清理（2026-10-27）
+
+- **R3-07（P2，供应链）已修**：`.github/workflows/*` 全部 11 个第三方 action 由 tag-pin 改为 commit SHA-pin（`owner/repo@sha # tag`，SHA 经 `git ls-remote` 解析）。仍可再收：`cla.yml` 的 `pull_request_target`+宽 token+PAT 结构宜改 `pull_request`。
+- **R3-10a（P3）已修**：移除死权限 `REQUEST_INSTALL_PACKAGES`（全仓无 `PackageInstaller`/`ACTION_INSTALL_PACKAGE` 使用；合并 manifest 已验证无此权限）。
+- **仍开**：R3-06 依赖校验（`verification-metadata.xml`/lockfile）、R3-08 更新哈希展示、R3-09 签名口令明文、R3-10b JitPack 依赖、F3 签名白名单（破坏性，需迁移决策）、F5 TLS 固定（功能向）。
+- **验证**：`:app:processDebugMainManifest` + `compileDebugKotlin` 绿；workflow 为 YAML 无需编译，pin 格式已核。
