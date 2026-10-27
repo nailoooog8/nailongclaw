@@ -133,10 +133,7 @@ adb shell am start -n io.agents.pokeclaw/.ui.splash.SplashActivity \
 **判定**：`established`（源码 + 真机导出面双证），但**影响被天花板压住** → 定 **Medium（隐私/配额；非外泄）**。
 对应 cloudflare 的 "exported component overreach" 类。
 
-**修复建议**（不破坏 adb QA）：`SplashActivity` 转发 `task` 前校验调用方身份——
-`adb shell am start` 的 referrer 是 shell（`getReferrer()` ≈ `android-app://com.android.shell`，uid 2000），
-或带有效令牌；**第三方 app 的 referrer 直接丢弃该 `task` extra**（改路由到普通首页，不建任务）。
-这样既堵住"任意 app 无门驱动"，又保留 `adb`/MacroDroid(带令牌) 的既有用法。
+**修复（已落地，真机校正过）**：`SplashActivity` 转发 `task` 前改**纯配对令牌门控**。注意：初版想用 `getReferrer()` 认 adb shell，**实测 `adb shell am start` 的 referrer 是 null**（不是 `com.android.shell`），且 referrer 可被伪造——故去掉 referrer 判定，只认令牌。代价：裸 `adb am start SplashActivity --es task`（无令牌）不再驱动任务；QA 请用 `am broadcast io.agents.pokeclaw.TASK`（debug 接收器）或带令牌的 ExternalAutomationActivity。**真机已验证（vc57）**：无令牌/错令牌均丢弃、ExternalAutomation 无令牌均拒。
 
 ---
 
