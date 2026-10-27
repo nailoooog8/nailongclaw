@@ -1,12 +1,16 @@
 /* ==========================================================================
-   Claude Design System (CDS) — PokeClaw mockup port
+   Claude Design System (CDS) — NailongClaw mockup port
    --------------------------------------------------------------------------
    Design values copied from https://github.com/Caho1/open-claude-ui
    (MIT, © Caho1). Token values are reproduced verbatim from that project's
    `code-examples/cds-theme.css` so the look matches the reference.
 
-   This is a DESIGN MOCKUP under mockup/. It is not shipped in the APK and is
-   not wired into ConfigServer. Nothing here runs in the Android app.
+   Design source of truth for the Claude UI main screen. Edited here (this is
+   the copy opened in a browser); app/build.gradle.kts's syncClaudeUiMockup
+   Sync task (a preBuild dependency) ships index.html/cds.css/cds.js into the
+   APK's assets, and ClaudeUiPreviewActivity renders it. The only part of the
+   old "not shipped / nothing runs" claim that still holds is ConfigServer:
+   it serves assets/web/ only and has no claude-ui route.
 
    NOTE: the reference theme *uses* several custom properties it never
    defines (--cds-bg-neutral, --cds-bg-neutral-hover, --cds-pad-lg/md,
@@ -1001,6 +1005,11 @@ body {
 .composer textarea::placeholder { color: var(--cds-text-muted); }
 .composer-bar {
   display: flex; align-items: center; gap: 8px;
+  /* 换行是必须的：真机上 pill 包含块只有 343px（见 .pop 的注释），四个
+     pill 排不下一行。pill 自己是 flex:none + nowrap（防窄屏被压到折字），
+     不换行就意味着搜索 pill 把发送键顶出屏幕。换行后窄屏上它落第二行，
+     宽屏（含桌面预览）照旧一行。 */
+  flex-wrap: wrap; row-gap: 6px;
   padding: 6px 9px 9px 11px;
 }
 .spacer { flex: 1; }
@@ -1021,6 +1030,61 @@ body {
 .send:disabled { opacity: .35; cursor: default; background: var(--cds-alpha-3); color: var(--cds-text-secondary); }
 
 .hint { font-size: 11px; color: var(--cds-text-muted); padding: 8px 4px 0; text-align: center; }
+
+/* ---- 智能搜索 ----
+   两件东西：composer 栏里常驻的搜索 pill（与模型 / 努力 / 允许操作并排，是
+   服务商切换器兼状态位），以及只在「当前服务商没密钥、且用户没关过」时
+   出现的引导卡。配置状态一律由 Kotlin 经 setWebSearchStatus 推送，这里只
+   负责画——没有任何写死的已配置/未配置文案。 */
+.pop-item-link { color: var(--cds-clay); }
+
+/* 引导卡。显隐只翻 hidden 属性（JS 不碰 display），所以这条 [hidden] 规则
+   必须显式写：.search-prompt 的 display:flex 会盖掉 UA 样式表的
+   [hidden]{display:none}，不写就是一张永远关不掉的卡。 */
+.search-prompt {
+  position: relative;
+  display: flex; gap: 10px; align-items: flex-start;
+  margin-bottom: 8px;
+  padding: 11px 12px;
+  border-radius: var(--cds-panel-radius);
+  background: var(--cds-surface-2);
+  box-shadow: inset 0 0 0 1px var(--cds-border);
+}
+.search-prompt[hidden] { display: none; }
+.search-prompt-icon {
+  width: 28px; height: 28px; flex: none;
+  display: grid; place-items: center;
+  border-radius: 8px;
+  background: var(--cds-accent-glow);
+  color: var(--cds-clay);
+}
+.search-prompt-body { min-width: 0; }
+.search-prompt-title { font-size: 12.5px; font-weight: 600; color: var(--cds-text-primary); }
+.search-prompt-text {
+  margin: 3px 0 0;
+  font-size: 11.5px; line-height: 1.55; color: var(--cds-text-secondary);
+}
+.search-prompt-actions { display: flex; gap: 8px; margin-top: 9px; }
+.prompt-go {
+  padding: 5px 13px;
+  border: none; cursor: pointer; font: inherit; font-size: 12px; font-weight: 550;
+  border-radius: 999px;
+  /* 与 .send 同一条理由：强调色上的文字固定深色，暗色模式下对比度才够。 */
+  background: var(--cds-clay); color: #151515;
+  transition: background-color 150ms var(--cds-ease-swift);
+}
+.prompt-go:hover { background: var(--cds-clay-hover); }
+.prompt-close {
+  position: absolute; top: 6px; right: 6px;
+  width: 26px; height: 26px;
+  display: grid; place-items: center;
+  border: none; cursor: pointer;
+  border-radius: 50%;
+  background: transparent; color: var(--cds-text-muted);
+  font: inherit; font-size: 12px; line-height: 1;
+  transition: background-color 150ms var(--cds-ease-swift), color 150ms ease;
+}
+.prompt-close:hover { background: var(--cds-fill-ghost-hover); color: var(--cds-text-primary); }
 
 /* 模型切换器 popover */
 .pop-wrap { position: relative; }
@@ -1600,6 +1664,132 @@ body {
 .tasks-empty svg { opacity: .45; margin-bottom: 14px; }
 .tasks-empty-title { font-size: 13.5px; font-weight: 600; color: var(--cds-text-secondary); }
 .tasks-empty-desc { font-size: 12px; line-height: 1.7; color: var(--cds-text-muted); margin: 6px auto 0; max-width: 260px; }
+
+/* ---- 模型卡片 ----
+   从 composer 的模型 pill 打开的选择器。借设置 / 任务两页的 scrim + view
+   结构，只改停靠方式：贴底、不全屏、顶部圆角 —— 选模型是顺手的事，不该把
+   背后的会话整块盖掉。76vh 上限 + 内部滚动：模型数以「十几个」计（本地
+   两款 + 云端九款 + 自定义端点），不出滚动就会顶出视口。 */
+.models-scrim {
+  position: fixed; inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 60;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms ease;
+}
+.models-view {
+  position: fixed;
+  left: 50%; bottom: 0;
+  width: 100%; max-width: 560px;
+  max-height: 76vh;
+  display: flex; flex-direction: column;
+  background: var(--cds-surface-1);
+  border-radius: 14px 14px 0 0;
+  box-shadow: var(--cds-shadow-popover);
+  z-index: 70;
+  transform: translate(-50%, 16px);
+  opacity: 0;
+  pointer-events: none;
+  /* 同 .settings-view：visibility 把关着的面板从无障碍树里摘掉，否则
+     uiautomator dump 会看到一堆不可见的按钮。 */
+  visibility: hidden;
+  transition: opacity 200ms ease, transform 240ms var(--cds-ease-swift),
+    visibility 0s linear 240ms;
+}
+.models-scrim[data-open="true"] { opacity: 1; pointer-events: auto; }
+.models-view[data-open="true"] {
+  opacity: 1;
+  pointer-events: auto;
+  visibility: visible;
+  transform: translate(-50%, 0);
+  transition: opacity 200ms ease, transform 240ms var(--cds-ease-swift),
+    visibility 0s;
+}
+.models-topbar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px 11px;
+  border-bottom: var(--cds-ring-hairline) solid var(--cds-border);
+  flex: none;
+}
+.models-title { font-weight: 600; font-size: 14.5px; }
+.models-topbar .icon-btn { margin-left: auto; flex: none; }
+.models-body {
+  flex: 1; min-height: 0;
+  overflow-y: auto;
+  padding: 6px 12px 18px;
+}
+.models-body .group-label { margin: 12px 4px 5px; }
+.models-body .group-label:first-child { margin-top: 6px; }
+
+/* 模型行：单选语义（role=radio + aria-checked），选中态与 popover 里那颗
+   6px 点同源 —— 行更高，点也跟着放大，不然选中态在一列行里几乎看不出来。
+   圆点用 ::after 而不是把边框加粗：边框加粗会改变外径，一列行的圆环就
+   不一样大了。 */
+.model-row {
+  display: flex; align-items: center; gap: 11px;
+  width: 100%;
+  padding: 10px;
+  border: none; cursor: pointer; font: inherit; text-align: left;
+  border-radius: var(--cds-radius);
+  background: transparent; color: var(--cds-text-primary);
+  transition: background-color 150ms var(--cds-ease-swift);
+}
+.model-row:hover:not(:disabled) { background: var(--cds-fill-ghost-hover); }
+.model-row:active:not(:disabled) {
+  background: var(--cds-fill-ghost-selected);
+  transform: scale(0.99);
+}
+.model-row[aria-checked="true"] { background: var(--cds-fill-ghost-selected); }
+.model-row:disabled { cursor: default; opacity: .8; }
+.model-radio {
+  position: relative;
+  width: 14px; height: 14px; border-radius: 50%; flex: none;
+  border: var(--cds-ring-hairline) solid var(--cds-text-muted);
+  transition: border-color 150ms ease;
+}
+.model-row[aria-checked="true"] .model-radio { border-color: var(--cds-clay); }
+.model-row[aria-checked="true"] .model-radio::after {
+  content: "";
+  position: absolute; inset: 3px;
+  border-radius: 50%;
+  background: var(--cds-clay);
+}
+.model-row-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.model-row-label {
+  font-size: 13.5px; color: var(--cds-text-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.model-row[aria-checked="true"] .model-row-label { font-weight: 600; }
+.model-row-meta {
+  font-size: 11.5px; color: var(--cds-text-muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.model-row:disabled .model-row-label { color: var(--cds-text-secondary); }
+.model-row-tag {
+  margin-left: auto; flex: none;
+  font-size: 10.5px; padding: 2px 7px; border-radius: 999px;
+  color: var(--cds-text-muted);
+  background: var(--cds-bg-neutral-hover);
+}
+.model-row-tag[data-tone="active"] {
+  color: var(--cds-clay);
+  background: var(--cds-clay-light);
+}
+.models-empty {
+  font-size: 12.5px; line-height: 1.7; color: var(--cds-text-muted);
+  padding: 28px 12px; text-align: center;
+}
+/* 底部出口：密钥 / 下载 / 自定义端点都在原生页，卡片只管「用哪个」。 */
+.model-manage {
+  display: block; width: 100%;
+  margin-top: 10px; padding: 11px 10px;
+  border: none; cursor: pointer; font: inherit; font-size: 12.5px;
+  border-radius: var(--cds-radius);
+  background: transparent; color: var(--cds-text-secondary);
+  transition: background-color 150ms var(--cds-ease-swift);
+}
+.model-manage:hover { background: var(--cds-fill-ghost-hover); color: var(--cds-text-primary); }
 
 /* ---- 定时队列 ----
    与任务账本同构：sheet 形态、令牌、列表行纪律全部沿用（行不是卡，

@@ -19,7 +19,7 @@ import sys
 import time
 import xml.etree.ElementTree as ET
 
-PKG = "io.agents.pokeclaw"
+PKG = "io.agents.nailongclaw"
 ENTRY = "Claude UI 聊天"   # matches settings_about_claude_ui_preview (zh)
 NUM = re.compile(r"-?\d+")
 

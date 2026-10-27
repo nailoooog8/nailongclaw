@@ -1,0 +1,76 @@
+// Copyright 2026 PokeClaw (agents.io). All rights reserved.
+// Licensed under the Apache License, Version 2.0.
+
+package io.agents.nailongclaw.channel
+
+import io.agents.nailongclaw.AppCapabilityCoordinator
+import io.agents.nailongclaw.ClawApplication
+import io.agents.nailongclaw.R
+import io.agents.nailongclaw.ServiceBindingState
+import io.agents.nailongclaw.TaskOrchestrator
+import io.agents.nailongclaw.channel.security.ChannelSecurityGuard
+import io.agents.nailongclaw.service.ClawAccessibilityService
+import io.agents.nailongclaw.utils.KVUtils
+
+/**
+ * Channel initialization and message routing.
+ * Responsible for reading local config to initialize channels and dispatching received messages to [TaskOrchestrator].
+ */
+class ChannelSetup(
+    private val taskOrchestrator: TaskOrchestrator
+) {
+
+    fun setup() {
+        ChannelManager.init(
+            discordBotToken = KVUtils.getDiscordBotToken().ifEmpty { null },
+            telegramBotToken = KVUtils.getTelegramBotToken().ifEmpty { null },
+            wechatBotToken = KVUtils.getWechatBotToken().ifEmpty { null },
+            wechatApiBaseUrl = KVUtils.getWechatApiBaseUrl().ifEmpty { null },
+            qqWsUrl = KVUtils.getQqWsUrl().ifEmpty { null },
+            qqBotToken = KVUtils.getQqBotToken().ifEmpty { null },
+            douyinGatewayUrl = KVUtils.getDouyinWebhookUrl().ifEmpty { null },
+            douyinBotToken = KVUtils.getDouyinToken().ifEmpty { null }
+        )
+        ChannelManager.setOnMessageReceivedListener(object : ChannelManager.OnMessageReceivedListener {
+            override fun onMessageReceived(channel: Channel, message: String, messageID: String, senderId: String) {
+                // First line of defense: check sender authorization against whitelist & PIN binding
+                val decision = ChannelSecurityGuard.verify(channel, senderId, message)
+                if (decision is ChannelSecurityGuard.Decision.Reject) {
+                    ChannelManager.sendMessage(channel, decision.replyMessage, messageID)
+                    ChannelManager.flushMessages(channel)
+                    return
+                }
+
+                val app = ClawApplication.instance
+                val capabilityState = AppCapabilityCoordinator.accessibilityState(app)
+                if (capabilityState == ServiceBindingState.DISABLED) {
+                    ChannelManager.sendMessage(channel, "Accessibility service is not enabled. Please enable NailongClaw in Settings > Accessibility.", messageID)
+                    ChannelManager.flushMessages(channel)
+                    return
+                }
+                val waitMs = if (capabilityState == ServiceBindingState.CONNECTING) 20_000L else 5_000L
+                if (!ClawAccessibilityService.awaitRunning(waitMs)) {
+                    val error = when (AppCapabilityCoordinator.accessibilityState(app)) {
+                        ServiceBindingState.DISABLED ->
+                            "Accessibility service is not enabled. Please enable NailongClaw in Settings > Accessibility."
+                        ServiceBindingState.CONNECTING ->
+                            "Accessibility is still reconnecting. Please try again in a few seconds."
+                        ServiceBindingState.DEGRADED ->
+                            "Accessibility disconnected. Please re-open NailongClaw or re-enable Accessibility."
+                        ServiceBindingState.READY ->
+                            app.getString(R.string.channel_msg_no_accessibility)
+                    }
+                    ChannelManager.sendMessage(channel, error, messageID)
+                    ChannelManager.flushMessages(channel)
+                    return
+                }
+                if (!taskOrchestrator.tryAcquireTask(messageID, channel, message)) {
+                    ChannelManager.sendMessage(channel, app.getString(R.string.channel_msg_task_in_progress), messageID)
+                    ChannelManager.flushMessages(channel)
+                    return
+                }
+                taskOrchestrator.startNewTask(channel, message, messageID)
+            }
+        })
+    }
+}

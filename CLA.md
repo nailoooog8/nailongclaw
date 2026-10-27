@@ -2,7 +2,7 @@
 
 **Project:** PokeClaw  
 **Upstream:** [`agents-io/PokeClaw`](https://github.com/agents-io/PokeClaw) — Copyright 2026 agents.io  
-**This fork:** [`nailoooog8/PokeClaw`](https://github.com/nailoooog8/PokeClaw)
+**This fork:** [`nailoooog8/nailongclaw`](https://github.com/nailoooog8/nailongclaw)
 
 Thank you for your interest in contributing to this fork of PokeClaw.
 
@@ -27,7 +27,7 @@ By submitting a pull request or otherwise contributing to this project, you acce
 
 **"You"** means the individual or legal entity accepting this agreement.
 
-**"Project"** means this repository (`nailoooog8/PokeClaw`) and any derivative of it.
+**"Project"** means this repository (`nailoooog8/nailongclaw`) and any derivative of it.
 
 ---
 

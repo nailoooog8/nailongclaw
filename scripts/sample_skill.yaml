@@ -1,5 +1,5 @@
 # 示例技能配方：打开"设置"应用并停留
-# 复制到手机 <外部存储>/Android/data/io.agents.pokeclaw/files/skills/ 下即可，
+# 复制到手机 <外部存储>/Android/data/io.agents.nailongclaw/files/skills/ 下即可，
 # 重启 app 自动加载注册。字段含义见 docs/SKILL_FORMAT.md
 id: open_settings_demo
 name: 打开设置

@@ -1,4 +1,4 @@
-# Claude UI 表面（PokeClaw）
+# Claude UI 表面（NailongClaw）
 
 这是应用的**主界面**（Claude UI 设计语言）—— 2026-10-24 起由 Splash 直接落地
 （此前是经设置进入的第二聊天界面，`ComposeChatActivity` 退居外部 `task` 契约接收方）。

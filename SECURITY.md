@@ -11,7 +11,7 @@
 
 请使用 GitHub 的**私有漏洞上报**通道：
 
-> **Security → Report a vulnerability** — https://github.com/nailoooog8/PokeClaw/security
+> **Security → Report a vulnerability** — https://github.com/nailoooog8/nailongclaw/security
 
 你的报告会**私密地**送到维护者手上，只有你能看到，别人看不到。修复就绪后
 才会公开，并以 GitHub Security Advisory 的形式发布。

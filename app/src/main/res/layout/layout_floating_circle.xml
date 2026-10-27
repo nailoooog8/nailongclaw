@@ -47,7 +47,7 @@
 
     </androidx.cardview.widget.CardView>
 
-    <!-- 等待任务状态（默认） — PokeClaw 圖標代替 "AI" 文字 -->
+    <!-- 等待任务状态（默认） — NailongClaw 圖標代替 "AI" 文字 -->
     <androidx.cardview.widget.CardView
         android:id="@+id/cardIdle"
         android:layout_width="match_parent"

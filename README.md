@@ -1,23 +1,21 @@
-# PokeClaw Fork — 远程控制与安全加固版
+# NailongClaw — 远程控制与安全加固版
 
-> 这是 [agents-io/PokeClaw](https://github.com/agents-io/PokeClaw) 的独立 fork。上游停在 2026-06-02，本分支在其基础上继续开发，重点解决**多渠道远程控制**、**安全边界收敛**和**中文本地化**三个上游未覆盖的方向。
+> 独立发行版，衍生自 [agents-io/PokeClaw](https://github.com/agents-io/PokeClaw)（Apache-2.0）。上游最后提交停在 2026-06-02；本版本在其代码基础上继续开发，完成了上游未覆盖的**多渠道远程控制**、**安全边界收敛**、**中文本地化**三个方向，并于 2026-10-27 完成独立化：**改名 NailongClaw、更换图标、启用新 applicationId**（`io.agents.nailongclaw`）。
 >
-> 下方「[上游原始 README](#upstream-readme)」之后是完整的官方文档、产品定位和基准数据，内容未经改动。
+> 上游 README 的商标条款要求 fork 分发前改名，本次改名即依该条款执行；上游归属依 Apache-2.0 §4 完整保留（见 `NOTICE` 与下方逐字未动的上游原始 README）。
 >
-> 🟢 活跃维护中 · 最新 **v0.8.3** · CI 全绿 · 欢迎 [issue](https://github.com/nailoooog8/PokeClaw/issues) / [PR](https://github.com/nailoooog8/PokeClaw/pulls)
+> 🟢 活跃维护中 · 最新 **v0.9.0** · CI 全绿 · 欢迎 [issue](https://github.com/nailoooog8/nailongclaw/issues) / [PR](https://github.com/nailoooog8/nailongclaw/pulls)
 
-[![fork](https://img.shields.io/badge/fork-of-agents--io%2FPokeClaw-3DDC84?style=flat-square)](https://github.com/agents-io/PokeClaw)
-[![branch](https://img.shields.io/badge/branch-fork%2Fpersonal--fork--release-8A2BE2?style=flat-square)](#)
-[![license](https://img.shields.io/badge/license-Apache--2.0-3DDC84?style=flat-square)](https://github.com/nailoooog8/PokeClaw/blob/main/LICENSE)
+[![license](https://img.shields.io/badge/license-Apache--2.0-3DDC84?style=flat-square)](https://github.com/nailoooog8/nailongclaw/blob/main/LICENSE)
 [![android](https://img.shields.io/badge/Android-9%2B-3DDC84?logo=android&logoColor=white)](https://developer.android.com)
 
 **为什么 Android 需要一个 OEM 中立的 agent 中间层**
 
-Google 的移动 agent 永远是 Pixel-first 的；Samsung 的 Galaxy AI 战略核心就是去 Google 化；HyperOS 的路线图写着「去 Google 化」；而中国市场 Google 根本进不来。**OEM 之间互不信任，意味着永远需要第三方的中立开源层。** 这是本 fork 存在的理由。
+Google 的移动 agent 永远是 Pixel-first 的；Samsung 的 Galaxy AI 战略核心就是去 Google 化；HyperOS 的路线图写着「去 Google 化」；而中国市场 Google 根本进不来。**OEM 之间互不信任，意味着永远需要第三方的中立开源层。** 这是本项目存在的理由。
 
 ---
 
-## 本 fork 相对上游做了什么
+## 本项目相对上游做了什么
 
 | 能力 | 说明 |
 |---|---|
@@ -34,6 +32,7 @@ Google 的移动 agent 永远是 Pixel-first 的；Samsung 的 Galaxy AI 战略�
 | **任务看门狗** | 120 秒无活动 / 600 秒总时长自动中止并释放任务锁，避免卡死 |
 | **后台保活** | 常驻前台服务开关 + 粘性服务 + 看门狗 |
 | **三语界面** | English / 简体中文 / 日本語 |
+| **独立发行** | 自有名称、图标、签名密钥与 applicationId，issue / 更新检查均指向本仓库 |
 
 ### 安全审计
 
@@ -50,7 +49,7 @@ Google 的移动 agent 永远是 Pixel-first 的；Samsung 的 Galaxy AI 战略�
 
 完整审计报告见 [`docs/SECURITY_AUDIT.md`](docs/SECURITY_AUDIT.md)。**该文档明确区分了「代码已修复」与「真机 E2E 已验证」**——SEC1–SEC11 目前全部尚未执行，请勿将代码修复等同于已通过安全测试。
 
-发现新漏洞请走[私有漏洞上报](https://github.com/nailoooog8/PokeClaw/security/advisories/new)，**不要开公开 issue**——修复落地前 issue 里的细节对所有人可见。报告范围、响应预期与转上游的边界见 [`SECURITY.md`](SECURITY.md)。
+发现新漏洞请走[私有漏洞上报](https://github.com/nailoooog8/nailongclaw/security/advisories/new)，**不要开公开 issue**——修复落地前 issue 里的细节对所有人可见。报告范围、响应预期与转上游的边界见 [`SECURITY.md`](SECURITY.md)。
 
 ---
 
@@ -59,54 +58,56 @@ Google 的移动 agent 永远是 Pixel-first 的；Samsung 的 Galaxy AI 战略�
 | 聊天首页 | 设置 · 通道分组 | 设置 · 工具与远程控制 |
 |:---:|:---:|:---:|
 | <img src="Screenshots/fork-chat-home.jpg" width="250" alt="聊天首页"> | <img src="Screenshots/fork-settings-channels.jpg" width="250" alt="设置页通道分组"> | <img src="Screenshots/fork-settings-tools.jpg" width="250" alt="设置页工具与远程控制分组"> |
-| 本地 / 云端双模式，<br>中文快捷任务模板 | 本 fork 恢复可达的**通道分组**：<br>Discord / Telegram / 微信 / QQ / 抖音<br>+ 安全配对 PIN + 局域网配置 | 技能管理、MCP 服务器、<br>记忆库、常驻后台、<br>外部自动化与 Web 控制台 |
+| 本地 / 云端双模式，<br>中文快捷任务模板 | 本项目恢复可达的**通道分组**：<br>Discord / Telegram / 微信 / QQ / 抖音<br>+ 安全配对 PIN + 局域网配置 | 技能管理、MCP 服务器、<br>记忆库、常驻后台、<br>外部自动化与 Web 控制台 |
 
 > **左图**：云端模式下接 MiniMax-M3.1-Flash-Preview 的实际对话界面，中文快捷任务模板直接可点。
 >
-> **中图**：这一整组入口此前被 `visibility="gone"` 隐藏——代码完整但**七个入口全部不可达**，是本 fork 修复的第一个可见问题。
+> **中图**：这一整组入口此前被 `visibility="gone"` 隐藏——代码完整但**七个入口全部不可达**，是本项目修复的第一个可见问题。
 >
 > **右图**：工具与远程控制分组，可见 MCP 鉴权选择器与记忆库入口。
-
-截图取自 fork 开发版真机（vivo X300 Pro BD，Android 16），拍摄于汉化补齐与版本号提升之前，因此**右图中的分组标题（`Appearance` / `Tools` / `Remote Control`）与部分状态串仍为英文**。这些已在 [v0.8.1](#changelog) 修复——重新安装 v0.8.1 后即为中文。
+>
+> ⚠️ 截图拍摄于 2026-10-27 独立化改名之前，图中启动器图标与部分界面文字仍是旧标识；图标已于 v0.9.0 更换（灰蓝紫—锈橙渐变 + 白色 N）。
 
 ---
 
 ## 下载
 
-[**下载本 fork 的 APK**](https://github.com/nailoooog8/PokeClaw/releases/latest)
+[**下载最新版 APK**](https://github.com/nailoooog8/nailongclaw/releases/latest)
 
 | 版本 | 说明 |
 |---|---|
-| **v0.8.3** | 设置页 About：移除指向上游作者的「开发者」，改为指向本 fork 的赞助入口 |
+| **v0.9.0** | **独立发行版**：改名 NailongClaw、新启动图标、新 applicationId `io.agents.nailongclaw` |
+| v0.8.3 | 设置页 About：移除指向上游作者的「开发者」，改为指向本项目的赞助入口 |
 | v0.8.2 | 第二轮红队审计：Telegram 按 user id 授权 + 远程来源禁用高危工具 |
 | v0.8.1 | 修复 fork 专属的分发问题（issue 链接、更新检查指向上游）+ 汉化补齐 |
 | v0.8.0 | 首个包含安全加固与多渠道的正式版 |
-| v0.7.1 | 早前的 MCP 扩展试发版，**不含**本 fork 的安全修复 |
+| v0.7.1 | 早前的 MCP 扩展试发版，**不含**安全修复 |
 
-> ⚠️ **升级说明**：v0.7.1 及更早的公开 APK 所用签名密钥已不在维护者手中。若两者签名不一致，Android 会拒绝覆盖安装，需要**先卸载旧版再安装新版本**——这会清空本地数据（本地模型缓存约 2.6 GB 需重新下载，记忆库与技能配置需重新配置）。流程与密钥约定见 [`RELEASING.md`](RELEASING.md)。
+> ⚠️ **v0.9.0 是一个全新的应用，不能覆盖升级**。applicationId 从 `io.agents.pokeclaw` 改为 `io.agents.nailongclaw`，Android 视其为另一个应用：直接安装会与旧版并存，需要**先卸载旧版**（本地模型缓存约 2.6 GB 需重新下载，记忆库与技能配置需重新配置）。旧仓库 [`nailoooog8/PokeClaw`](https://github.com/nailoooog8/PokeClaw) 保留至 2026 年底用于旧版用户过渡，之后仅在此仓库发版。流程与密钥约定见 [`RELEASING.md`](RELEASING.md)。
 
 ---
 
-## 上游状态
+## 上游状态与归属
 
-上游 [`agents-io/PokeClaw`](https://github.com/agents-io/PokeClaw) 的 `main` 最后提交停在 **2026-06-02**，已有约 4 个月无更新。其 8 个 `feature/*` 分支中最新的停在 2026-05-26，其余均为 2026-04-13，相关改动已全部包含在本 fork 中，**无需合并**。
+上游 [`agents-io/PokeClaw`](https://github.com/agents-io/PokeClaw) 的 `main` 最后提交停在 **2026-06-02**，已有约 4 个月无更新。其 8 个 `feature/*` 分支中最新的停在 2026-05-26，其余均为 2026-04-13，相关改动已全部包含在本项目中，**无需合并**。
 
-本 fork 独立维护，不依赖上游合并节奏。具体含义：
+本项目独立维护，不依赖上游合并节奏。具体含义：
 
-- **不在上游排队的 PR。** 本仓库曾向 `agents-io/PokeClaw` 提交过 [PR #80](https://github.com/agents-io/PokeClaw/pull/80)（Windows 下 `local.properties` 路径被 `Properties` 吃掉反斜杠）与 [issue #81](https://github.com/agents-io/PokeClaw/issues/81)（CLA 工作流因 `signatures/cla.json` 是空对象而失败）。截至 2026-10-14 两者均无任何回复，该仓库最老的开放 PR 已等待 161 天。**上述两个问题在本 fork 内均已修复并合入 `main`**：PR #80 的改动见 `app/build.gradle.kts` 顶部注释，issue #81 的修复见 `signatures/cla.json`。**不再等待上游处理。**
-- **贡献者保留版权。** 上游用的是 CLA（要求把版权**转让**给 Nicole / agents.io）。本 fork 改用 [DCO 1.1](CLA.md)——贡献者只确认作品是自己的，不转让任何权利。这既是 Apache-2.0 项目的通行做法，也是本 fork 独立维护的必然结果：我们无权授予自己不具备的权利。
-- **上游归属保持完整。** 依 [Apache-2.0 §4](https://www.apache.org/licenses/LICENSE-2.0)，本 fork 保留原 `LICENSE`、`NOTICE`（含 `Copyright 2026 agents.io`）与全部署名声明，本节即为改动说明。Apache-2.0 属宽松许可，既不要求回馈上游，也不限制本 fork 的分发方式。
-- **不继承上游的商业目标。** 上游仓库中的 [`STRATEGY.md`](STRATEGY.md) 与 [`EXECUTION_PLAN.md`](EXECUTION_PLAN.md) 是一份**以出售为目标的退出计划**（含估值区间与潜在买家名单），由原作者于 2026-05-26 撰写，此后未再修改。本 fork 依 Apache-2.0 §4 原样保留它们，仅为满足归属要求，**并在文件顶部加了声明**。本 fork 不主张任何估值、不寻求任何收购、不继承其中的里程碑与外联清单。**两个仓库不是同一卖方，不应被视为同一项资产。**
-- **产品叙事仍属上游。** `docs/index.html` 是上游作者的产品主页（含其署名与多语言文案），本 fork 未启用 GitHub Pages，也不修改该文件。发布它并改掉里面的链接等同于冒名，与本 fork 的定位相悖。
-- **问题反馈请提在本仓库。** App 设置页、调试报告正文、issue 链接均已改为指向本 fork（见 [Changelog v0.8.1](#changelog)）。提在上游只会进入一个已停更四个多月的队列。
+- **不在上游排队的 PR。** 本仓库曾向 `agents-io/PokeClaw` 提交过 [PR #80](https://github.com/agents-io/PokeClaw/pull/80)（Windows 下 `local.properties` 路径被 `Properties` 吃掉反斜杠）与 [issue #81](https://github.com/agents-io/PokeClaw/issues/81)（CLA 工作流因 `signatures/cla.json` 是空对象而失败）。截至 2026-10-14 两者均无任何回复，该仓库最老的开放 PR 已等待 161 天。**上述两个问题在本项目内均已修复并合入**：PR #80 的改动见 `app/build.gradle.kts` 顶部注释，issue #81 的修复见 `signatures/cla.json`。**不再等待上游处理。**
+- **贡献者保留版权。** 上游用的是 CLA（要求把版权**转让**给 Nicole / agents.io）。本项目改用 [DCO 1.1](CLA.md)——贡献者只确认作品是自己的，不转让任何权利。这既是 Apache-2.0 项目的通行做法，也是本项目独立维护的必然结果：我们无权授予自己不具备的权利。
+- **上游归属保持完整。** 依 [Apache-2.0 §4](https://www.apache.org/licenses/LICENSE-2.0)，本项目保留原 `LICENSE`、`NOTICE`（含 `Copyright 2026 agents.io`）与全部署名声明，本节即为改动说明。Apache-2.0 属宽松许可，既不要求回馈上游，也不限制本项目的分发方式。
+- **改名依上游商标条款执行。** 上游 README 的 Trademark 段写明 "Forks must be renamed before distribution"。本项目因此于 2026-10-27 改名 NailongClaw 并更换图标，**不主张上游名称与图标上的任何权利**；`NOTICE` 中的上游版权块逐字未动。
+- **不继承上游的商业目标。** 上游仓库中的 [`STRATEGY.md`](STRATEGY.md) 与 [`EXECUTION_PLAN.md`](EXECUTION_PLAN.md) 是一份**以出售为目标的退出计划**（含估值区间与潜在买家名单），由原作者于 2026-05-26 撰写，此后未再修改。本项目依 Apache-2.0 §4 原样保留它们，仅为满足归属要求，**并在文件顶部加了声明**。本项目不主张任何估值、不寻求任何收购、不继承其中的里程碑与外联清单。**两个仓库不是同一卖方，不应被视为同一项资产。**
+- **产品叙事仍属上游。** `docs/index.html` 是上游作者的产品主页（含其署名与多语言文案），本项目未启用 GitHub Pages，也不修改该文件。发布它并改掉里面的链接等同于冒名，与本项目的定位相悖。
+- **问题反馈请提在本仓库。** App 设置页、调试报告正文、issue 链接均已指向本仓库（见 Changelog v0.8.1）。提在上游只会进入一个已停更四个多月的队列。
 
 ---
 
 ## 快速开始
 
 ```bash
-git clone -b fork/personal-fork-release https://github.com/nailoooog8/PokeClaw.git
-cd PokeClaw
+git clone https://github.com/nailoooog8/nailongclaw.git
+cd nailongclaw
 ./gradlew assembleDebug
 ```
 
@@ -122,8 +123,8 @@ cd PokeClaw
 
 | 文件 | 内容 |
 |---|---|
-| [`STRATEGY.md`](STRATEGY.md) | 项目定位、护城河论证、买家图谱 |
-| [`EXECUTION_PLAN.md`](EXECUTION_PLAN.md) | 分阶段执行计划 |
+| [`STRATEGY.md`](STRATEGY.md) | 项目定位、护城河论证、买家图谱（上游原文，仅存归属） |
+| [`EXECUTION_PLAN.md`](EXECUTION_PLAN.md) | 分阶段执行计划（上游原文，仅存归属） |
 | [`docs/ARCHITECTURE_DECISIONS.md`](docs/ARCHITECTURE_DECISIONS.md) | D1–D8 架构决策（技术尽调向） |
 | [`docs/MEMORY_BANK.md`](docs/MEMORY_BANK.md) | 记忆库设计 |
 | [`docs/SKILL_FORMAT.md`](docs/SKILL_FORMAT.md) | 技能配方格式 |
@@ -135,13 +136,13 @@ cd PokeClaw
 
 ## 贡献与许可
 
-本 fork 遵循上游的 **Apache-2.0** 许可，保留上游署名。原始项目作者与社区贡献者见文末 [Acknowledgments](#acknowledgments)。
+本项目遵循上游的 **Apache-2.0** 许可，保留上游署名。原始项目作者与社区贡献者见文末 [Acknowledgments](#acknowledgments)。
 
 ---
 
 <a name="upstream-readme"></a>
 
-# ↑↑ 以上为本 fork 内容，以下为上游 agents-io/PokeClaw 原始 README ↑↑
+# ↑↑ 以上为本项目内容，以下为上游 agents-io/PokeClaw 原始 README（逐字保留，依 Apache-2.0 §4）↑↑
 
 ---
 
@@ -481,9 +482,9 @@ Verified on a Pixel 8 Pro on 2026-04-30:
 - MacroDroid macro trigger: `Shortcut Launched`
 - MacroDroid action: `Send Intent`
 - Intent target: `Activity`
-- Intent action: `io.agents.pokeclaw.RUN_TASK`
-- Package: `io.agents.pokeclaw`
-- Class: `io.agents.pokeclaw.automation.ExternalAutomationActivity`
+- Intent action: `io.agents.nailongclaw.RUN_TASK`
+- Package: `io.agents.nailongclaw`
+- Class: `io.agents.nailongclaw.automation.ExternalAutomationActivity`
 - Extra: `task = how much battery left`
 - Result: MacroDroid launched PokeClaw's automation activity, PokeClaw accepted it, executed the deterministic battery tool, and returned a live battery result in the PokeClaw chatroom.
 
@@ -495,9 +496,9 @@ MacroDroid setup:
 4. Add any trigger you want. For a simple smoke test, use `User Input -> Shortcut Launched`.
 5. Add action `Device Actions -> Send Intent`.
 6. Set `Target` to `Activity`.
-7. Set `Action` to `io.agents.pokeclaw.RUN_TASK`.
-8. Set `Package` to `io.agents.pokeclaw`.
-9. Set `Class` to `io.agents.pokeclaw.automation.ExternalAutomationActivity`.
+7. Set `Action` to `io.agents.nailongclaw.RUN_TASK`.
+8. Set `Package` to `io.agents.nailongclaw`.
+9. Set `Class` to `io.agents.nailongclaw.automation.ExternalAutomationActivity`.
 10. Set `Extra 1` name to `token`.
 11. Set `Extra 1` value to the pairing token copied in step 2.
 12. Set `Extra 2` name to `task`.
@@ -510,7 +511,7 @@ Both entry points are exported to every app on the device, so the token is what 
 
 For chat instead of task mode, use:
 
-- Intent action: `io.agents.pokeclaw.RUN_CHAT`
+- Intent action: `io.agents.nailongclaw.RUN_CHAT`
 - Extra name: `chat`
 - Extra value: the chat message
 
@@ -520,8 +521,8 @@ Task example:
 
 ```bash
 adb shell am broadcast \
-  -a io.agents.pokeclaw.RUN_TASK \
-  -p io.agents.pokeclaw \
+  -a io.agents.nailongclaw.RUN_TASK \
+  -p io.agents.nailongclaw \
   --es task "Summarize my notifications and tell me what is urgent"
 ```
 
@@ -529,8 +530,8 @@ Chat example:
 
 ```bash
 adb shell am broadcast \
-  -a io.agents.pokeclaw.RUN_CHAT \
-  -p io.agents.pokeclaw \
+  -a io.agents.nailongclaw.RUN_CHAT \
+  -p io.agents.nailongclaw \
   --es chat "What can you see on my phone right now?"
 ```
 
@@ -573,6 +574,20 @@ PokeClaw is moving fast, and the roadmap is being shaped directly by real device
 Every star helps more people find the project. Every issue helps shape the next release.
 
 ## Changelog
+
+### v0.9.0 (2026-10-27) — 独立发行版：改名、换图标、新 applicationId
+
+依上游商标条款（"Forks must be renamed before distribution"）执行的独立化改造。除下列身份变更外无行为改动。
+
+**改名 NailongClaw**：`app_name`（三语）、`rootProject.name`、APK 输出名、`APP_ORIGIN`、通知渠道 ID、全部用户可见字符串与 WebView 界面文字（mockup/claude-ui 与 assets/web）一并更换。上游版权头、`NOTICE` 上游块、`docs/index.html`、`STRATEGY.md`、`EXECUTION_PLAN.md` 依 Apache-2.0 §4 逐字保留；`scripts/check_attribution.py` 改按独立发行版语义校验归属，全部通过。
+
+**新 applicationId `io.agents.nailongclaw`**：源码目录 `io/agents/pokeclaw/` → `io/agents/nailongclaw/`（main/test/androidTest 三个源码集，353 个文件的 package 与 import）。与旧版在 Android 眼中是两个应用，**无法覆盖升级**——已装用户需卸载旧版后安装（本地模型缓存需重新下载）。外部自动化 intent action 随之改为 `io.agents.nailongclaw.RUN_TASK` / `RUN_CHAT`，旧 action 字符串对 MacroDroid / Tasker 配置失效；`scripts/e2e-quick-tasks.sh` 的无障碍服务 label 匹配同步更新。
+
+**新启动图标**：自适应图标重构为「渐变背景层 + N 字形前景层」——对角三段渐变（灰蓝紫 `#8A89AD` → 雾紫 `#C2B6B8` → 锈橙 `#AD6E57`，采样自参考设计）+ 白色粗体 N（帽高 31%，与原 P 同位同重）；monochrome 层由火箭改为 N 字形。应用内 splash / 悬浮球 / 小组件所用 `ic_launcher.png` 同步更换。
+
+**构建配置**：`POKECLAW_*` 环境变量键更名为 `NAILONGCLAW_*`（`local.properties` 配过旧键的需同步改名）；版本默认值升至 0.9.0 / versionCode 34；应用内更新检查与 issue 链接默认指向新仓库 `nailoooog8/nailongclaw`。**新仓库尚未创建**——创建前不要发版，否则更新检查会 404。
+
+**验证**：614 项单元测试 / 62 套件 / 0 失败（`./gradlew testDebugUnitTest assembleDebug`，BUILD SUCCESSFUL）。图标未做真机渲染验证（设备未连接）；三语界面文字未逐语种过目。
 
 ### v0.8.4 (2026-10-24) — 设置分区化：composer 两个档位键活化 + 主题三轴合并
 
@@ -660,7 +675,7 @@ v0.8.0 把安全加固和多渠道发了出去，但漏了一类**只有 fork �
 
 **更新分发通道此前是断的**
 
-应用内更新检查同样写死了上游仓库（`UpdateChecker`）。用户装的是本 fork 的 APK，App 每天问的却是上游最新版（停在 v0.7.1，2026-05-26）——**本 fork 之后发的任何版本，他们都不会收到通知**。已改为指向本 fork，可用 `POKECLAW_UPDATE_CHECK_URL` 覆盖。
+应用内更新检查同样写死了上游仓库（`UpdateChecker`）。用户装的是本 fork 的 APK，App 每天问的却是上游最新版（停在 v0.7.1，2026-05-26）——**本 fork 之后发的任何版本，他们都不会收到通知**。已改为指向本 fork，可用 `NAILONGCLAW_UPDATE_CHECK_URL` 覆盖。
 
 > 这两条**只存在于 fork 打包的构建中**，上游代码本身没有这个问题。
 
@@ -718,7 +733,7 @@ v0.8.0 的设置页仍有大量英文。根因不是「没翻译」，而是 `Se
 
 ### v0.6.12 (2026-04-30)
 - **Hotfix for Android background activity launch limits.** External automation now has an exported activity entrypoint for MacroDroid, Tasker, and Locale-style apps, avoiding Android 16 / targetSdk 36 background launch blocking when a broadcast receiver tries to open the chatroom.
-- **MacroDroid setup now uses Activity target.** The verified setup launches `io.agents.pokeclaw.automation.ExternalAutomationActivity` with `RUN_TASK` / `RUN_CHAT` and the same `task` / `chat` extras.
+- **MacroDroid setup now uses Activity target.** The verified setup launches `io.agents.nailongclaw.automation.ExternalAutomationActivity` with `RUN_TASK` / `RUN_CHAT` and the same `task` / `chat` extras.
 - **Broadcast support remains available.** The broadcast receiver is still present for ADB and compatible callers, but app-based automation should prefer the Activity target on modern Android.
 - **Install note for early testers.** If Android reports a package/signature conflict from an older debug or early signed APK, uninstall that old build once and then install this stable signed release.
 

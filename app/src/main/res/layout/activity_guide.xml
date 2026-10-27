@@ -100,7 +100,7 @@
     </ScrollView>
 
     <!-- 开始使用按钮 -->
-    <io.agents.pokeclaw.widget.KButton
+    <io.agents.nailongclaw.widget.KButton
         android:id="@+id/btnStart"
         android:layout_width="match_parent"
         android:layout_height="52dp"

@@ -9,7 +9,7 @@
     android:background="@color/colorBgPrimary"
     android:orientation="vertical">
 
-    <io.agents.pokeclaw.widget.CommonToolbar
+    <io.agents.nailongclaw.widget.CommonToolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="44dp" />
@@ -417,7 +417,7 @@
                         android:text="测试"
                         android:textSize="12.5sp" />
 
-                    <io.agents.pokeclaw.widget.KButton
+                    <io.agents.nailongclaw.widget.KButton
                         android:id="@+id/btnSaveCloud"
                         android:layout_width="0dp"
                         android:layout_height="44dp"

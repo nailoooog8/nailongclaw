@@ -7,13 +7,22 @@ Licensed under the Apache License, Version 2.0.
 
 --------------------------------------------------------------------------------
 
-This distribution is an independent fork, maintained separately from the
-upstream project and not affiliated with, endorsed by, or a substitute for it.
+NailongClaw
+Copyright 2026 nailoooog8
 
-Fork of:      https://github.com/agents-io/PokeClaw
-This fork:    https://github.com/nailoooog8/PokeClaw
+This distribution is derived from the upstream PokeClaw codebase under the
+Apache License 2.0. It is maintained and distributed independently under its
+own name, icon, and package identifier (io.agents.nailongclaw), and is not
+affiliated with, endorsed by, or a substitute for the upstream project.
 
-Modifications made in this fork, summarised (full list in git history):
+Derived from:  https://github.com/agents-io/PokeClaw
+This project:  https://github.com/nailoooog8/nailongclaw
+
+The upstream trademark notice requires forks to be renamed before
+distribution. This distribution ships under the NailongClaw name and icon for
+that reason, and asserts no rights in the upstream name or logo.
+
+Modifications made in this distribution, summarised (full list in git history):
 
   - Security hardening: brute-force protection on channel and LAN pairing PINs,
     credential masking in the LAN control server, path-traversal fix in file
@@ -29,6 +38,9 @@ Modifications made in this fork, summarised (full list in git history):
     the build workflow.
   - Distribution: independent signing key, and issue/update links retargeted
     from the upstream repository to this one.
+  - Rebrand (2026-10-27): renamed to NailongClaw with a new launcher icon and
+    a new applicationId, per the upstream trademark notice above. Source-file
+    copyright headers from the upstream codebase are retained unchanged.
 
 The upstream copyright notice above is retained unchanged, as required by
 Apache License 2.0 section 4(d). Upstream authored STRATEGY.md,

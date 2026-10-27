@@ -7,7 +7,7 @@
 > the upstream author's intentions only.
 >
 > **This fork does not inherit any of it.** We are an independent distribution
-> (`nailoooog8/PokeClaw`): Chinese localisation, security hardening, and our own signed
+> (`nailoooog8/nailongclaw`): Chinese localisation, security hardening, and our own signed
 > builds. We make no acquisition claim, assert no valuation, and pursue no acquirer
 > outreach. If you are reading this while evaluating either repository for M&A, the two
 > projects are **not** a single seller and must not be treated as one asset.

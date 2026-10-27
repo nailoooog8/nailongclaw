@@ -24,6 +24,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "PokeClaw"
+rootProject.name = "NailongClaw"
 include(":app")
  

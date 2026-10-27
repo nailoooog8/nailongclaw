@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Claude Design System — PokeClaw mockup interaction layer
+   Claude Design System — NailongClaw mockup interaction layer
    --------------------------------------------------------------------------
    Vanilla port of the reference project's React hooks:
      useClaudeScrollPinning.tsx  →  scroll pinning
@@ -516,15 +516,15 @@
   // 模型切换器
   var modelBtn = document.getElementById('modelBtn');
   if (modelBtn && hasNativeBridge()) {
-    /* 有桥（真机）时不注册 popover，pill 改为打开原生「模型与任务」页。
-       可选模型的真实集合在 LlmConfigActivity 里，这里再列三个示例行就是
-       第二个会说谎的来源——原先点它们只改本地 label，模型根本没换，而顶栏
-       pill 又是另一段写死的文本，于是「切换模型了顶部还显示本地模型」。
-       与设置面板每一行配置的行为一致：页面纯呈现，配置只在原生一处。 */
-    modelBtn.setAttribute('aria-haspopup', 'false');
+    /* 有桥（真机）：开页内模型卡片。可选模型的真实集合由 Kotlin 投影
+       （readModelCatalog），切换经 selectModel 写回 —— 页面纯呈现、不存
+       状态，配置与选择的语义都只在原生一处，但「换当前用哪个」这个动作
+       在页内完成，不必跳去设置页再跳回来。 */
+    modelBtn.setAttribute('aria-haspopup', 'dialog');
+    modelBtn.setAttribute('aria-expanded', 'false');
     modelBtn.addEventListener('click', function () {
-      var b = bridge();
-      if (b && typeof b.openSettingsPage === 'function') b.openSettingsPage('model');
+      closeAllPopovers();
+      openModelsView();
     });
   } else {
     // 纯浏览器预览：没有桥，popover 与三个示例行照旧作为设计稿。
@@ -645,6 +645,33 @@
       applyPolicy(item.dataset.policyKey);
       closeAllPopovers();
     });
+  }
+
+  /* 智能搜索 pill：popover 选服务商（经桥写 KVUtils），「管理密钥…」进原生
+     网络搜索页——与设置面板那一行同一个目的地，配置只在原生一处。 */
+  var searchEntry = registerPopover('searchWrap', 'searchPop', 'searchBtn');
+  if (searchEntry) {
+    searchEntry.pop.addEventListener('click', function (e) {
+      if (e.target.closest('#searchManageKeys')) {
+        closeAllPopovers();
+        openWebSearchSettings();
+        return;
+      }
+      var item = e.target.closest('.pop-item[data-provider-key]');
+      if (!item) return;
+      applySearchProvider(item.dataset.providerKey);
+      closeAllPopovers();
+    });
+  }
+
+  /* 引导卡两个出口：「去配置」进原生页，「✕」关掉并记住。 */
+  var searchPromptGo = document.getElementById('searchPromptGo');
+  if (searchPromptGo) {
+    searchPromptGo.addEventListener('click', openWebSearchSettings);
+  }
+  var searchPromptClose = document.getElementById('searchPromptClose');
+  if (searchPromptClose) {
+    searchPromptClose.addEventListener('click', dismissSearchPrompt);
   }
 
   /* ------------------------------------------------------------ 消息渲染 */
@@ -1025,6 +1052,193 @@
       openSettingsView();
     });
   }
+
+  /* --------------------------------------------- 模型卡片
+     从 composer 的模型 pill 打开的选择器：把「能用的模型」一次列全，点一下
+     就切。行由 Kotlin 投影（PokeClawChat.readModelCatalog），选择经桥写回
+     （selectModel）并用**桥返回的新投影**重画 —— 页面不存任何模型状态，
+     切没切成只认桥回的那一份，与另外几个 pill 同一条纪律。
+
+     行的可点性完全听从 usable / supported：本地没下载、内存不够、云端没
+     密钥的行照样列出来（否则用户不知道有这些模型），但 disabled 并给出
+     理由标。原生「模型与任务」页是同一条规则 —— 两个门一个松一个紧，就
+     会有一边点得动、一边模型加载失败。
+
+     为什么不跳原生页：设置面板那一行是「去管配置」（密钥、下载、自定义
+     端点），这里是「换当前用哪个」。前者一年点几次，后者一句话就能改完，
+     为此离开会话再回来是纯浪费。 */
+  var modelsView = document.getElementById('modelsView');
+  var modelsScrim = document.getElementById('modelsScrim');
+  var modelsBody = document.getElementById('modelsBody');
+  var MODELS_PREVIEW_KEY = 'cds-mockup-model-selection';
+  var MODEL_GROUP_LABELS = { local: '本地模型', cloud: '云端模型' };
+
+  /* 纯浏览器预览的样例：没有桥就换不了真模型，所以点行只把选中项挪过去，
+     绝不装作切换成功。 */
+  function modelCatalogFallback() {
+    var models = [
+      { key: 'local:gemma4-e2b', kind: 'local', id: 'gemma4-e2b', label: 'Gemma 4 E2B — 2.6GB', meta: '2580 MB · 需 8GB+ 内存', provider: '', providerLabel: '', usable: true, supported: true },
+      { key: 'local:gemma4-e4b', kind: 'local', id: 'gemma4-e4b', label: 'Gemma 4 E4B — 3.6GB', meta: '3650 MB · 需 10GB+ 内存', provider: '', providerLabel: '', usable: true, supported: false },
+      { key: 'cloud:ANTHROPIC:claude-sonnet-4-6', kind: 'cloud', id: 'claude-sonnet-4-6', label: 'Claude Sonnet 4.6', meta: 'Pro · 200K', provider: 'ANTHROPIC', providerLabel: 'Anthropic', usable: true, supported: true },
+      { key: 'cloud:OPENAI:gpt-4o-mini', kind: 'cloud', id: 'gpt-4o-mini', label: 'GPT-4o Mini', meta: 'Fast · 128K', provider: 'OPENAI', providerLabel: 'OpenAI', usable: false, supported: true }
+    ];
+    var key = read(MODELS_PREVIEW_KEY) || models[0].key;
+    var hit = models.filter(function (m) { return m.key === key; })[0];
+    return {
+      active: hit || { key: models[0].key, kind: 'local', id: 'gemma4-e2b', provider: '' },
+      models: models
+    };
+  }
+
+  /* 行尾标：使用中 / 未下载 / 内存不足 / 未配置密钥。宁可不标，也不标一个
+     跟 Kotlin 投影无关的理由。 */
+  function modelRowTag(model, active) {
+    if (model.key === active.key) return { text: '使用中', tone: 'active' };
+    if (model.kind === 'local') {
+      if (model.usable !== true) return { text: '未下载', tone: 'muted' };
+      if (model.supported !== true) return { text: '内存不足', tone: 'muted' };
+      return null;
+    }
+    if (model.usable !== true) return { text: '未配置密钥', tone: 'muted' };
+    return null;
+  }
+
+  function renderModelCatalog(payload) {
+    if (!modelsBody) return;
+    var data = payload || modelCatalogFallback();
+    var models = Array.isArray(data.models) ? data.models : [];
+    var active = data.active || {};
+    var html = '';
+    var groupKind = null;
+    var groupHtml = '';
+    var groupLabel = '';
+
+    function flushGroup() {
+      if (!groupKind) return;
+      html += '<div class="group-label">' + esc(groupLabel) + '</div>' +
+        '<div class="model-group" role="radiogroup" aria-label="' + esc(groupLabel) + '">' +
+        groupHtml + '</div>';
+      groupKind = null;
+      groupHtml = '';
+    }
+
+    models.forEach(function (model) {
+      if (model.kind !== groupKind) {
+        flushGroup();
+        groupKind = model.kind;
+        groupLabel = MODEL_GROUP_LABELS[model.kind] || String(model.kind);
+      }
+      var isActive = model.key === active.key;
+      var selectable = model.usable === true && model.supported === true;
+      var tag = modelRowTag(model, active);
+      groupHtml += '<button class="model-row" type="button" role="radio"' +
+        ' aria-checked="' + (isActive ? 'true' : 'false') + '"' +
+        (selectable ? '' : ' disabled') +
+        ' data-key="' + esc(String(model.key)) + '"' +
+        ' data-kind="' + esc(String(model.kind)) + '"' +
+        ' data-id="' + esc(String(model.id)) + '"' +
+        ' data-provider="' + esc(String(model.provider || '')) + '">' +
+        '<span class="model-radio" aria-hidden="true"></span>' +
+        '<span class="model-row-text">' +
+        '<span class="model-row-label">' + esc(String(model.label)) + '</span>' +
+        '<span class="model-row-meta">' + esc(String(model.meta || '')) + '</span>' +
+        '</span>' +
+        (tag ? '<span class="model-row-tag" data-tone="' + tag.tone + '">' + esc(tag.text) + '</span>' : '') +
+        '</button>';
+    });
+    flushGroup();
+
+    if (!models.length) {
+      html += '<p class="models-empty">没有可选模型。在「模型与任务」里下载本地模型，或填写云端服务商的密钥。</p>';
+    }
+    // 密钥 / 下载 / 自定义端点都在原生页，卡片只管「用哪个」。
+    html += '<button class="model-manage" type="button" id="modelsManage">管理模型与密钥…</button>';
+    modelsBody.innerHTML = html;
+  }
+
+  function loadModelCatalog() {
+    var b = bridge();
+    if (b && b.readModelCatalog) {
+      try {
+        renderModelCatalog(JSON.parse(b.readModelCatalog() || 'null'));
+        return;
+      } catch (e) { console.warn('[cds] readModelCatalog failed:', e); }
+    }
+    renderModelCatalog(null);
+  }
+
+  /* 选模型：有桥就经桥写 KVUtils 并用返回的新投影重画（一次往返完成
+     「写 + 重画」），没桥只挪本地选中项。 */
+  function applyModelSelection(row) {
+    var b = bridge();
+    if (b && b.selectModel) {
+      try {
+        renderModelCatalog(JSON.parse(
+          b.selectModel(row.dataset.kind, row.dataset.id, row.dataset.provider) || 'null'
+        ));
+        return;
+      } catch (e) { console.warn('[cds] selectModel failed:', e); }
+    }
+    store(MODELS_PREVIEW_KEY, row.dataset.key);
+    renderModelCatalog(null);
+  }
+
+  function notifyModelsView(open) {
+    var b = bridge();
+    if (b && b.notifyModelsView) b.notifyModelsView(open);
+  }
+
+  function openModelsView() {
+    if (!modelsView) return;
+    // 四个全屏层互斥：开一个就关其余三个，否则会叠层。
+    closeSettingsView();
+    closeTasksView();
+    closeSchedulesView();
+    closeNav();
+    if (modelsScrim) modelsScrim.setAttribute('data-open', 'true');
+    modelsView.setAttribute('data-open', 'true');
+    if (modelBtn) modelBtn.setAttribute('aria-expanded', 'true');
+    // 每次打开都重读：模型可能在原生「模型与任务」页被换过，关着的卡片里
+    // 那份旧投影会说谎。
+    loadModelCatalog();
+    notifyModelsView(true);
+  }
+
+  function closeModelsView() {
+    if (!modelsView) return;
+    if (modelsScrim) modelsScrim.setAttribute('data-open', 'false');
+    modelsView.setAttribute('data-open', 'false');
+    if (modelBtn) modelBtn.setAttribute('aria-expanded', 'false');
+    notifyModelsView(false);
+  }
+
+  function modelsViewIsOpen() {
+    return !!modelsView && modelsView.getAttribute('data-open') === 'true';
+  }
+
+  if (modelsScrim) {
+    modelsScrim.addEventListener('click', closeModelsView);
+  }
+  var modelsCloseBtn = document.getElementById('modelsCloseBtn');
+  if (modelsCloseBtn) {
+    modelsCloseBtn.addEventListener('click', closeModelsView);
+  }
+  if (modelsBody) {
+    modelsBody.addEventListener('click', function (e) {
+      if (e.target.closest('#modelsManage')) {
+        closeModelsView();
+        var b = bridge();
+        if (b && typeof b.openSettingsPage === 'function') b.openSettingsPage('model');
+        return;
+      }
+      var row = e.target.closest('.model-row');
+      if (!row || row.disabled) return;
+      applyModelSelection(row);
+    });
+  }
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeModelsView();
+  });
 
   /* ------------------------------------------------------------ 任务账本
      只读任务页。两级：列表（task-card）与详情（步骤账本），都在 #tasksBody
@@ -1847,7 +2061,7 @@
     var box = el('div', 'schedules-note');
     box.textContent =
       '系统没有授予「精确闹钟」权限：定时任务仍然会运行，但可能被系统延后——' +
-      '07:30 的简报迟到几分钟是正常的。要准时就到系统设置里给 PokeClaw 打开「闹钟和提醒」。';
+      '07:30 的简报迟到几分钟是正常的。要准时就到系统设置里给 NailongClaw 打开「闹钟和提醒」。';
     return box;
   }
 
@@ -1902,7 +2116,7 @@
     var b = bridge();
     var text = confirmBox.querySelector('.schedule-cancel-confirm-text');
     if (!b || !b.cancelSchedule) {
-      text.textContent = '预览模式：取消需要连接到 PokeClaw。';
+      text.textContent = '预览模式：取消需要连接到 NailongClaw。';
       return;
     }
     var ok = false;
@@ -2211,11 +2425,11 @@
 
   function qaReport() {
     var s = qaState();
-    if (window.PokeClawQA) {
+    if (window.NailongClawQA) {
       // 顺序要紧：先读原生记住的上次值，再写本次值。反过来会读到刚写的
       // 自己，对照组就退化成 localStorage 自己，等于什么都没验。
       try {
-        var last = window.PokeClawQA.lastState();
+        var last = window.NailongClawQA.lastState();
         if (last) {
           var parts = String(last).split('|');
           s.spAccent = parts[0];
@@ -2223,7 +2437,7 @@
         }
       } catch (e) { s.spAccent = 'THREW'; }
       try {
-        window.PokeClawQA.report(
+        window.NailongClawQA.report(
           JSON.stringify(s), String(s.applied.accent), String(s.applied.mode)
         );
       } catch (e) { /* 无桥：只留页面内证据 */ }
@@ -2240,7 +2454,7 @@
   // 上正常），排查那个渲染问题本身没有价值：结论已经拿到了。
   //
   // 诊断能力不丢，只是改为纯编程接口：`window.__cds.qa()` 返回同一份状态对象，
-  // 自动化仍可调用，也仍会经 PokeClawQA 桥镜像到 SharedPreferences。
+  // 自动化仍可调用，也仍会经 NailongClawQA 桥镜像到 SharedPreferences。
   // 结论写在代码注释与 QA_CHECKLIST 里，而不是永久糊在设计稿顶上。
   function qaBuildPanel() {
     // 故意不渲染任何东西 —— 见上。留这个空函数只为记录「面板已移除」这件事。
@@ -2421,6 +2635,124 @@
     if (composer) composer.textContent = String(st.short || label || '未选择模型');
   }
 
+  /* -------------------------------------------- 智能搜索
+     两件东西共用一份状态：composer 栏的搜索 pill（服务商切换器兼状态位）和
+     只在未配置时出现的引导卡。状态来自 Kotlin 桥（readWebSearchStatus /
+     selectSearchProvider / dismissSearchPrompt，背后是 KVUtils ——
+     WebSearchTool 执行时读的同一份），页面只画、不存。
+
+     两条不敢破的规则：
+     1. 已配置才在 pill 上显示服务商名，否则显示「未配置」——另一个服务商
+        的密钥不算数，因为工具只会拒。
+     2. 引导卡只在「当前服务商没密钥 且 用户没关过」时出现。配好了就不弹；
+        手动关掉也记住（promptDismissed 存 KVUtils；无桥预览存 localStorage）——关掉就是关掉，换一个
+        服务商也不再弹，否则「隐藏」这个选择就没有意义了。pill 上始终显示
+        未配置，关卡不丢任何信息。 */
+  var SEARCH_PREVIEW_KEY = 'cds-mockup-search-provider';
+  var SEARCH_DISMISSED_KEY = 'cds-mockup-search-prompt-dismissed';
+
+  function searchStatusFallback() {
+    var providers = [
+      { name: 'DEEPSEEK', label: 'DeepSeek', hasKey: false },
+      { name: 'BOCHA', label: '博查 Bocha', hasKey: false },
+      { name: 'TAVILY', label: 'Tavily', hasKey: false }
+    ];
+    var name = read(SEARCH_PREVIEW_KEY) || 'DEEPSEEK';
+    var hit = providers.filter(function (p) { return p.name === name; })[0];
+    return {
+      provider: hit ? hit.name : 'DEEPSEEK',
+      label: hit ? hit.label : '',
+      configured: false,
+      promptDismissed: read(SEARCH_DISMISSED_KEY) === '1',
+      providers: providers
+    };
+  }
+
+  function setWebSearchStatus(status) {
+    var st = status || searchStatusFallback();
+    var list = Array.isArray(st.providers) ? st.providers : [];
+    var active = String(st.provider || '');
+    var configured = st.configured === true;
+    var label = String(st.label || '');
+    if (!label) {
+      var hit = list.filter(function (p) { return p && p.name === active; })[0];
+      label = hit ? String(hit.label || '') : '';
+    }
+
+    // pill：已配置报服务商名，未配置报「未配置」。pill 是常驻的，配置好了
+    // 也在这儿——它是切换器，不是一次性提示。
+    var pillLabel = document.getElementById('searchPillLabel');
+    if (pillLabel) pillLabel.textContent = configured && label ? label : '未配置';
+
+    // 引导卡：没密钥 + 没被关过才露面。hidden 属性控制，见 cds.css 里
+    // .search-prompt[hidden] 的说明。
+    var prompt = document.getElementById('searchPrompt');
+    if (prompt) prompt.hidden = configured || st.promptDismissed === true;
+
+    var pop = document.getElementById('searchPop');
+    if (pop) {
+      pop.querySelectorAll('.pop-item[data-provider-key]').forEach(function (item) {
+        var entry = list.filter(function (p) { return p && p.name === item.dataset.providerKey; })[0];
+        item.setAttribute('aria-checked', String(item.dataset.providerKey === active));
+        var tag = item.querySelector('.tag');
+        // 「密钥」标只在真的存了钥匙时出现——列表不說没存过的事。
+        if (tag) tag.hidden = !(entry && entry.hasKey === true);
+      });
+    }
+  }
+
+  function initSearchCard() {
+    var b = bridge();
+    if (b && b.readWebSearchStatus) {
+      try {
+        setWebSearchStatus(JSON.parse(b.readWebSearchStatus() || 'null'));
+        return;
+      } catch (e) { console.warn('[cds] readWebSearchStatus failed:', e); }
+    }
+    setWebSearchStatus(null);
+  }
+
+  /* 选服务商：有桥就经桥写 KVUtils，并直接用桥回的刷新状态重画——一次往返
+     完成「写 + 重画」，页面不缓存旧值。没桥（纯预览）只改本地 label。 */
+  function applySearchProvider(key) {
+    var b = bridge();
+    if (b && b.selectSearchProvider) {
+      try {
+        setWebSearchStatus(JSON.parse(b.selectSearchProvider(key) || 'null'));
+        return;
+      } catch (e) { console.warn('[cds] selectSearchProvider failed:', e); }
+    }
+    store(SEARCH_PREVIEW_KEY, key);
+    setWebSearchStatus(null);
+  }
+
+  /* 关掉引导卡：经桥写 KVUtils（记住这次关闭），并用桥回的刷新状态重画；
+     没桥（纯预览）就存 localStorage 的 dismiss 标记——刷新后同样不再弹。
+     关闭不等于配置——pill 上仍是「未配置」，信息一点没少。 */
+  function dismissSearchPrompt() {
+    var prompt = document.getElementById('searchPrompt');
+    var b = bridge();
+    if (b && b.dismissSearchPrompt) {
+      try {
+        setWebSearchStatus(JSON.parse(b.dismissSearchPrompt() || 'null'));
+        return;
+      } catch (e) { console.warn('[cds] dismissSearchPrompt failed:', e); }
+    }
+    store(SEARCH_DISMISSED_KEY, '1');
+    if (prompt) prompt.hidden = true;
+  }
+
+  /* 引导卡的「去配置」与 popover 的「管理密钥…」是同一个目的地：原生网络
+     搜索页。配置只在原生一处，页面不复制一份密钥表单。 */
+  function openWebSearchSettings() {
+    var b = bridge();
+    if (b && typeof b.openSettingsPage === 'function') {
+      b.openSettingsPage('websearch');
+    } else {
+      openSettingsView();
+    }
+  }
+
   /* -------------------------------------------- 会话重命名 / 删除对话框
      一个壳两种用法：rename 显示输入框，delete 只显示说明和两个按钮。
      破坏性档没有「始终允许」——删掉的历史找不回来，所以每次都要人点头。 */
@@ -2528,6 +2860,7 @@
   initAccent();
   initBase();
   initTaskGears();
+  initSearchCard();
   // 必须在主题初始化之后、且在首次读桥之前。addJavascriptInterface 在页面
   // 加载前就注入了，所以这里读到的一定是最终状态。
   if (hasNativeBridge()) enterLiveMode();
@@ -2557,6 +2890,9 @@
     openSettingsView: openSettingsView,
     closeSettingsView: closeSettingsView,
     settingsViewIsOpen: settingsViewIsOpen,
+    openModelsView: openModelsView,
+    closeModelsView: closeModelsView,
+    modelsViewIsOpen: modelsViewIsOpen,
     openTasksView: openTasksView,
     closeTasksView: closeTasksView,
     tasksBack: tasksBack,
@@ -2573,6 +2909,7 @@
     // {current, conversations}，setModelStatus 收 {label, short, kind}。
     setConversations: setConversations,
     setModelStatus: setModelStatus,
+    setWebSearchStatus: setWebSearchStatus,
     rateLimit: triggerBackoff,
     resetRateLimit: function () {
       clearInterval(backoff.timer); backoff.timer = null;

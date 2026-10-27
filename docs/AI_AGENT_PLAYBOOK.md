@@ -42,9 +42,9 @@ d(description='Send').click()
 
 `BuildConfig.DEBUG=false` on signed release. Specifically:
 
-- `adb shell run-as io.agents.pokeclaw ...` returns `package not debuggable`. **MMKV file inspection only works on debug builds.** For signed release, use force-stop + relaunch + Settings UI to verify persistence.
+- `adb shell run-as io.agents.nailongclaw ...` returns `package not debuggable`. **MMKV file inspection only works on debug builds.** For signed release, use force-stop + relaunch + Settings UI to verify persistence.
 - `XLog.i` and `XLog.d` are suppressed from `adb logcat` because `ClawApplication.kt` calls `XLog.setDEBUG(BuildConfig.DEBUG)`. But `AppLogStore.log()` still captures `XLog.i` to the in-app log files — so the data lives in `debug-report.zip` even when not in logcat.
-- `DebugTaskReceiver` at `io.agents.pokeclaw.debug.DebugTaskReceiver:39` has `if (!BuildConfig.DEBUG) return` as the FIRST line of `onReceive`. **Every debug broadcast is silently dropped on release.** This means: `am broadcast --es task config:` for cloud LLM config, `--es support_action build_debug_report` for debug report generation, all NOT available on signed release. You must use the actual UI flow.
+- `DebugTaskReceiver` at `io.agents.nailongclaw.debug.DebugTaskReceiver:39` has `if (!BuildConfig.DEBUG) return` as the FIRST line of `onReceive`. **Every debug broadcast is silently dropped on release.** This means: `am broadcast --es task config:` for cloud LLM config, `--es support_action build_debug_report` for debug report generation, all NOT available on signed release. You must use the actual UI flow.
 
 ### 3. Send FAB in Cloud+Send mode opens Settings — this is BY DESIGN, not a bug
 
@@ -100,12 +100,12 @@ PokeClaw is already configured correctly; other side-projects may not be. See `~
 
 `.github/workflows/emulator-matrix.yml` for Android emulator smoke tests:
 
-- **Component name**: launch via `io.agents.pokeclaw/.ui.splash.SplashActivity` (not `com.apk.claw.android...` which is a pre-rename stale name).
+- **Component name**: launch via `io.agents.nailongclaw/.ui.splash.SplashActivity` (not `com.apk.claw.android...` which is a pre-rename stale name).
 - **APK artifact path**: `actions/upload-artifact@v4` with a path-glob preserves directory structure. The `.apk` may be at `apk/app/build/outputs/apk/debug/PokeClaw_*.apk` not `apk/*.apk`. Always use `find apk -type f -name '*.apk'` not assume a flat layout.
 
 ### 9. Component names changed during repo rename
 
-The project was renamed from a `com.apk.claw.android.*` namespace to `io.agents.pokeclaw.*`. Old references may still appear in:
+The project was renamed from a `com.apk.claw.android.*` namespace to `io.agents.nailongclaw.*`. Old references may still appear in:
 - Stale doc snippets / older session notes
 - Earlier workflow files
 - Some hardcoded strings
@@ -117,7 +117,7 @@ When in doubt, grep the source — `grep -rn "com.apk.claw"` should return zero 
 Android 13+ has "restricted settings" that block ADB from enabling Accessibility / Notification-listener style services. The escape hatch is the `ACCESS_RESTRICTED_SETTINGS` appop:
 
 ```bash
-PKG=io.agents.pokeclaw
+PKG=io.agents.nailongclaw
 
 # 1. POST_NOTIFICATIONS (Task Notifications row)
 adb shell pm grant $PKG android.permission.POST_NOTIFICATIONS
@@ -132,11 +132,11 @@ adb shell appops set $PKG SYSTEM_ALERT_WINDOW allow
 adb shell dumpsys deviceidle whitelist +$PKG
 
 # 5. Notification Access row (NotificationListenerService)
-adb shell cmd notification allow_listener $PKG/io.agents.pokeclaw.service.ClawNotificationListener
+adb shell cmd notification allow_listener $PKG/io.agents.nailongclaw.service.ClawNotificationListener
 
 # 6. Accessibility Service — REQUIRES the appop bypass FIRST
 adb shell appops set $PKG ACCESS_RESTRICTED_SETTINGS allow
-adb shell settings put secure enabled_accessibility_services $PKG/io.agents.pokeclaw.service.ClawAccessibilityService
+adb shell settings put secure enabled_accessibility_services $PKG/io.agents.nailongclaw.service.ClawAccessibilityService
 adb shell settings put secure accessibility_enabled 1
 
 # Verify
@@ -178,9 +178,9 @@ When you reconnect ADB to this device, expect:
 To reset to clean state:
 
 ```bash
-adb uninstall io.agents.pokeclaw
+adb uninstall io.agents.nailongclaw
 # Or to keep app but clear data:
-adb shell pm clear io.agents.pokeclaw
+adb shell pm clear io.agents.nailongclaw
 ```
 
 ---
@@ -192,7 +192,7 @@ adb shell pm clear io.agents.pokeclaw
 ```bash
 source ~/.config/pokeclaw/release-signing.env   # exports KEYSTORE_FILE etc.
 cd ~/MyGithub/PokeClaw
-POKECLAW_VERSION_CODE=29 POKECLAW_VERSION_NAME=0.7.1 ./gradlew assembleRelease
+NAILONGCLAW_VERSION_CODE=29 NAILONGCLAW_VERSION_NAME=0.7.1 ./gradlew assembleRelease
 adb install -r app/build/outputs/apk/release/PokeClaw_v*.apk
 ```
 
@@ -203,18 +203,18 @@ Must go via the actual UI (debug receiver is gated):
 ```python
 import uiautomator2 as u2
 d = u2.connect()
-d.app_start('io.agents.pokeclaw')
+d.app_start('io.agents.nailongclaw')
 # Navigate Settings → About → Share Debug Report — open share sheet → save to file
-# Files live at /data/data/io.agents.pokeclaw/cache/debug_reports/*.zip
+# Files live at /data/data/io.agents.nailongclaw/cache/debug_reports/*.zip
 # But you can't pull them via run-as on release — use the share intent to a
 # file manager or messaging app you control.
 ```
 
 On debug build, much simpler:
 ```bash
-adb shell am broadcast -p io.agents.pokeclaw -a io.agents.pokeclaw.DEBUG_TASK \
+adb shell am broadcast -p io.agents.nailongclaw -a io.agents.nailongclaw.DEBUG_TASK \
   --es support_action build_debug_report
-adb shell run-as io.agents.pokeclaw ls -t cache/debug_reports/ | head -1
+adb shell run-as io.agents.nailongclaw ls -t cache/debug_reports/ | head -1
 ```
 
 ### Push a release (after pre-tag QA passes)

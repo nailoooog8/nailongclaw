@@ -64,7 +64,7 @@ check("workflow YAML parses", True)
 check("use-dco-flag is true", str(job["use-dco-flag"]).lower() == "true")
 check(
     "document points at this fork",
-    job["path-to-document"].startswith("https://github.com/nailoooog8/PokeClaw/"),
+    job["path-to-document"].startswith("https://github.com/nailoooog8/nailongclaw/"),
     job["path-to-document"],
 )
 if quoted is None:

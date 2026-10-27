@@ -1,4 +1,4 @@
-# Minimal MCP Streamable HTTP test server for PokeClaw e2e test.
+# Minimal MCP Streamable HTTP test server for NailongClaw e2e test.
 # Usage: python scripts/mcp_test_server.py [port]   (default 8765)
 # Client: McpStreamableHttpClient (plain application/json responses OK)
 
@@ -12,7 +12,7 @@ START_TIME = time.time()
 TOOLS = [
     {
         "name": "echo",
-        "description": "Echo back the given message (PokeClaw e2e test tool)",
+        "description": "Echo back the given message (NailongClaw e2e test tool)",
         "inputSchema": {
             "type": "object",
             "properties": {

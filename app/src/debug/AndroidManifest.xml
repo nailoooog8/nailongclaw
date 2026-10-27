@@ -25,7 +25,7 @@
             android:name=".debug.TaskTriggerReceiver"
             android:exported="true">
             <intent-filter>
-                <action android:name="io.agents.pokeclaw.TASK" />
+                <action android:name="io.agents.nailongclaw.TASK" />
             </intent-filter>
         </receiver>
 
@@ -34,7 +34,7 @@
             android:name=".debug.DebugTaskReceiver"
             android:exported="true">
             <intent-filter>
-                <action android:name="io.agents.pokeclaw.DEBUG_TASK" />
+                <action android:name="io.agents.nailongclaw.DEBUG_TASK" />
             </intent-filter>
         </receiver>
     </application>

@@ -40,14 +40,14 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/Theme.PokeClaw">
+        android:theme="@style/Theme.NailongClaw">
 
         <!-- 启动页 -->
         <activity
             android:name=".ui.splash.SplashActivity"
             android:exported="true"
             android:screenOrientation="portrait"
-            android:theme="@style/Theme.PokeClaw.Splash">
+            android:theme="@style/Theme.NailongClaw.Splash">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -143,8 +143,8 @@
             android:noHistory="true"
             android:theme="@style/Theme.Transparent">
             <intent-filter>
-                <action android:name="io.agents.pokeclaw.RUN_TASK" />
-                <action android:name="io.agents.pokeclaw.RUN_CHAT" />
+                <action android:name="io.agents.nailongclaw.RUN_TASK" />
+                <action android:name="io.agents.nailongclaw.RUN_CHAT" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
@@ -153,8 +153,8 @@
             android:name=".automation.ExternalAutomationReceiver"
             android:exported="true">
             <intent-filter>
-                <action android:name="io.agents.pokeclaw.RUN_TASK" />
-                <action android:name="io.agents.pokeclaw.RUN_CHAT" />
+                <action android:name="io.agents.nailongclaw.RUN_TASK" />
+                <action android:name="io.agents.nailongclaw.RUN_CHAT" />
             </intent-filter>
         </receiver>
 

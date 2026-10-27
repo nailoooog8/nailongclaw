@@ -28,7 +28,7 @@ i have read the dco document and i hereby sign the dco
 ## 本地构建
 
 ```bash
-git clone -b fork/personal-fork-release https://github.com/nailoooog8/PokeClaw.git
+git clone -b fork/personal-fork-release https://github.com/nailoooog8/nailongclaw.git
 cd PokeClaw
 ./gradlew assembleDebug
 ```

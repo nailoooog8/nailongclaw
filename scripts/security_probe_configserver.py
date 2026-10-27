@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Adversarial probe for PokeClaw's LAN ConfigServer (E2E, on-device).
+Adversarial probe for NailongClaw's LAN ConfigServer (E2E, on-device).
 
 Simulates a real attacker on the same Wi-Fi:
   A1  unauthenticated secret harvest
@@ -95,7 +95,7 @@ hr("A2  PIN brute force (expect lockout, not 10^6 attempts)")
 #
 # Side effect: this leaves the probing client locked out with an escalating
 # backoff (30s << strikes, capped at 30 min). BruteForceGuard is in-memory
-# only, so `adb shell am force-stop io.agents.pokeclaw` clears it; re-enable
+# only, so `adb shell am force-stop io.agents.nailongclaw` clears it; re-enable
 # LAN config in Settings afterwards. Run A2 last if you care about A1/A3/A4.
 
 if PIN is None:
@@ -149,7 +149,7 @@ print(f"  Origin=evil.example.com        -> HTTP {status}")
 hr("A4  Path traversal on /api/debug/file (debug builds only)")
 for probe in ["/api/debug/file?path=/etc/passwd",
               "/api/debug/file?path=../../../../etc/passwd",
-              "/api/debug/file?path=/data/data/io.agents.pokeclaw/databases/x"]:
+              "/api/debug/file?path=/data/data/io.agents.nailongclaw/databases/x"]:
     status, body = req(probe)
     leaked = status == 200 and ("root:" in body or len(body) > 200)
     print(f"  {probe[:52]:54} -> HTTP {status} {'LEAK' if leaked else 'blocked'}")

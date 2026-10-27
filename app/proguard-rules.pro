@@ -27,14 +27,14 @@
 
 
 # Agent 相关（反射/SPI）
--keep class io.agents.pokeclaw.agent.langchain.http.** { *; }
--keep class io.agents.pokeclaw.agent.** { *; }
+-keep class io.agents.nailongclaw.agent.langchain.http.** { *; }
+-keep class io.agents.nailongclaw.agent.** { *; }
 
 # Tool 注册（反射）
--keep class io.agents.pokeclaw.tool.** { *; }
+-keep class io.agents.nailongclaw.tool.** { *; }
 
 # Channel（钉钉/飞书回调，保留泛型签名）
--keep class io.agents.pokeclaw.channel.** { *; }
+-keep class io.agents.nailongclaw.channel.** { *; }
 
 # ============================================================
 # Gson

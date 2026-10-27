@@ -56,7 +56,7 @@ jobs:
           # Signatures are still persisted here by the action.
           path-to-signatures: signatures/cla.json
           # Point at THIS fork's document, not the upstream one.
-          path-to-document: https://github.com/nailoooog8/PokeClaw/blob/main/CLA.md
+          path-to-document: https://github.com/nailoooog8/nailongclaw/blob/main/CLA.md
           branch: main
           allowlist: bot*
 
@@ -73,7 +73,7 @@ jobs:
 
             > i have read the dco document and i hereby sign the dco
 
-            Full text: https://github.com/nailoooog8/PokeClaw/blob/main/CLA.md
+            Full text: https://github.com/nailoooog8/nailongclaw/blob/main/CLA.md
 
           custom-pr-sign-comment: |
             :white_check_mark: DCO signature recorded. Your contribution is ready for review.

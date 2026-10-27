@@ -5,7 +5,7 @@
     android:background="@color/colorBgPrimary"
     android:orientation="vertical">
 
-    <io.agents.pokeclaw.widget.CommonToolbar
+    <io.agents.nailongclaw.widget.CommonToolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="44dp" />
@@ -40,7 +40,7 @@
                 android:orientation="vertical"
                 android:padding="12dp">
 
-                <io.agents.pokeclaw.widget.CdsSegmented
+                <io.agents.nailongclaw.widget.CdsSegmented
                     android:id="@+id/modeSegmented"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
@@ -54,14 +54,14 @@
             </LinearLayout>
 
             <!-- 底色：整体背景色，七个暖调方案 -->
-            <io.agents.pokeclaw.widget.MenuGroup
+            <io.agents.nailongclaw.widget.MenuGroup
                 android:id="@+id/baseGroup"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp" />
 
             <!-- 强调色：与底色、深浅正交 -->
-            <io.agents.pokeclaw.widget.MenuGroup
+            <io.agents.nailongclaw.widget.MenuGroup
                 android:id="@+id/accentGroup"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content" />

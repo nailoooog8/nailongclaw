@@ -82,7 +82,7 @@ val syncClaudeUiMockup by tasks.registering(Sync::class) {
 }
 
 android {
-    namespace = "io.agents.pokeclaw"
+    namespace = "io.agents.nailongclaw"
     compileSdk {
         version = release(36) {
             minorApiLevel = 1
@@ -109,20 +109,20 @@ android {
     }
 
     defaultConfig {
-        applicationId = "io.agents.pokeclaw"
+        applicationId = "io.agents.nailongclaw"
         minSdk = 28
         targetSdk = 36
-        versionCode = readLocalOrEnvInt("POKECLAW_VERSION_CODE", 33)
-        versionName = readLocalOrEnvString("POKECLAW_VERSION_NAME", "0.8.3")
+        versionCode = readLocalOrEnvInt("NAILONGCLAW_VERSION_CODE", 34)
+        versionName = readLocalOrEnvString("NAILONGCLAW_VERSION_NAME", "0.9.0")
         buildConfigField("String", "VERSION_INFO", getVersionGit())
-        buildConfigField("String", "APP_ORIGIN", "\"PokeClaw by agents.io | github.com/agents-io/PokeClaw\"")
+        buildConfigField("String", "APP_ORIGIN", "\"NailongClaw | github.com/nailoooog8/nailongclaw\"")
         // Where the in-app update checker polls. Must point at THIS fork's releases:
         // with the upstream URL, anyone who installed this fork's APK would be told
         // about agents-io releases instead, and would never learn about fork releases.
         buildConfigField(
             "String",
             "UPDATE_CHECK_URL",
-            "\"${readLocalOrEnvString("POKECLAW_UPDATE_CHECK_URL", "https://api.github.com/repos/nailoooog8/PokeClaw/releases/latest")}\""
+            "\"${readLocalOrEnvString("NAILONGCLAW_UPDATE_CHECK_URL", "https://api.github.com/repos/nailoooog8/nailongclaw/releases/latest")}\""
         )
         // Links shown in About and used by the bug-report flow. Upstream defaults
         // shipped in the UI would funnel this fork's users into agents-io's issue
@@ -130,17 +130,17 @@ android {
         buildConfigField(
             "String",
             "REPO_URL",
-            "\"${readLocalOrEnvString("POKECLAW_REPO_URL", "https://github.com/nailoooog8/PokeClaw")}\""
+            "\"${readLocalOrEnvString("NAILONGCLAW_REPO_URL", "https://github.com/nailoooog8/nailongclaw")}\""
         )
         buildConfigField(
             "String",
             "REPO_SLUG",
-            "\"${readLocalOrEnvString("POKECLAW_REPO_SLUG", "nailoooog8/PokeClaw")}\""
+            "\"${readLocalOrEnvString("NAILONGCLAW_REPO_SLUG", "nailoooog8/nailongclaw")}\""
         )
         buildConfigField(
             "String",
             "ISSUES_URL",
-            "\"${readLocalOrEnvString("POKECLAW_ISSUES_URL", "https://github.com/nailoooog8/PokeClaw/issues/new")}\""
+            "\"${readLocalOrEnvString("NAILONGCLAW_ISSUES_URL", "https://github.com/nailoooog8/nailongclaw/issues/new")}\""
         )
         // Where the About group's sponsor row sends people. Mirrors the `custom:`
         // target in .github/FUNDING.yml so the in-app button and the GitHub ❤
@@ -158,7 +158,7 @@ android {
         buildConfigField(
             "String",
             "SPONSOR_URL",
-            "\"${readLocalOrEnvString("POKECLAW_SPONSOR_URL", "https://raw.githubusercontent.com/nailoooog8/PokeClaw/main/docs/sponsor-qr.jpg")}\""
+            "\"${readLocalOrEnvString("NAILONGCLAW_SPONSOR_URL", "https://raw.githubusercontent.com/nailoooog8/nailongclaw/main/docs/sponsor-qr.jpg")}\""
         )
         buildConfigField("String", "BUILD_FINGERPRINT", "\"${getBuildFingerprint()}\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -313,7 +313,7 @@ androidComponents {
         variant.outputs.forEach { output ->
             if (output is com.android.build.api.variant.impl.VariantOutputImpl) {
                 val versionName = android.defaultConfig.versionName ?: "0.0.0"
-                val fileName = "PokeClaw_v${versionName}_${getDateTime()}.apk"
+                val fileName = "NailongClaw_v${versionName}_${getDateTime()}.apk"
                 println("output file name: $fileName")
                 output.outputFileName.set(fileName)
             }

@@ -5,7 +5,7 @@
     android:background="@color/colorBgPrimary"
     android:orientation="vertical">
 
-    <io.agents.pokeclaw.widget.CommonToolbar
+    <io.agents.nailongclaw.widget.CommonToolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="44dp" />
@@ -20,7 +20,7 @@
             android:orientation="vertical"
             android:paddingVertical="8dp">
 
-            <io.agents.pokeclaw.widget.MenuGroup
+            <io.agents.nailongclaw.widget.MenuGroup
                 android:id="@+id/modelGroup"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -46,7 +46,7 @@
                 android:orientation="vertical"
                 android:padding="12dp">
 
-                <io.agents.pokeclaw.widget.CdsSegmented
+                <io.agents.nailongclaw.widget.CdsSegmented
                     android:id="@+id/effortSegmented"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
@@ -79,7 +79,7 @@
                 android:orientation="vertical"
                 android:padding="12dp">
 
-                <io.agents.pokeclaw.widget.CdsSegmented
+                <io.agents.nailongclaw.widget.CdsSegmented
                     android:id="@+id/policySegmented"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
@@ -92,7 +92,7 @@
                     android:textSize="11sp" />
             </LinearLayout>
 
-            <io.agents.pokeclaw.widget.MenuGroup
+            <io.agents.nailongclaw.widget.MenuGroup
                 android:id="@+id/taskGroup"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

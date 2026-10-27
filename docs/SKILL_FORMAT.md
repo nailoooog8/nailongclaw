@@ -6,7 +6,7 @@
 
 ## 存放位置与加载
 
-- 目录：`<外部存储>/Android/data/io.agents.pokeclaw/files/skills/*.yaml`（与 `mcp_servers.json` 同级，adb 推送兼容；无外部存储时回退内部 `filesDir/skills/`）
+- 目录：`<外部存储>/Android/data/io.agents.nailongclaw/files/skills/*.yaml`（与 `mcp_servers.json` 同级，adb 推送兼容；无外部存储时回退内部 `filesDir/skills/`）
 - 加载：app 启动时 `UserSkillLoader.loadAndRegister()`（`ClawApplication.onCreate`，在内置技能之后）
 - 校验：步骤引用的工具必须在 `ToolRegistry` 中；`mcp_*` 前缀的远程工具允许（MCP 异步注册，可能晚于本加载器）；其余未知工具 → 整个文件拒载并记日志
 - 生命周期：配方解析失败只跳过该文件，不影响其他技能；删除配方文件即卸载
@@ -59,7 +59,7 @@ agent 循环内每次工具调用都被 `ToolCallRecorder` 记录（`ToolRegistr
 
 ```bash
 # 1. 推配方
-adb push scripts/sample_skill.yaml /sdcard/Android/data/io.agents.pokeclaw/files/skills/open_settings_demo.yaml
+adb push scripts/sample_skill.yaml /sdcard/Android/data/io.agents.nailongclaw/files/skills/open_settings_demo.yaml
 # 2. 重启 app，看启动日志
 adb logcat -s SkillRegistry:* UserSkillLoader:*
 #    预期：Registered skill: open_settings_demo (打开设置) / User skills: 1 loaded

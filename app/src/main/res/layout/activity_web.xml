@@ -5,7 +5,7 @@
     android:orientation="vertical">
 
     <!-- Toolbar -->
-    <io.agents.pokeclaw.widget.CommonToolbar
+    <io.agents.nailongclaw.widget.CommonToolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="56dp" />

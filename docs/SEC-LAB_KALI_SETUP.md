@@ -1,6 +1,6 @@
 # PokeClaw 攻防实验台 · Kali WSL 工具基线（授权自测）
 
-> 目标：把 `kali-linux` WSL 变成能对 **io.agents.pokeclaw**（本人 fork 的 Android 助手）做授权红队自测的实验台。
+> 目标：把 `kali-linux` WSL 变成能对 **io.agents.nailongclaw**（本人 fork 的 Android 助手）做授权红队自测的实验台。
 > 授权边界：只测本机/本人设备上本人拥有的 app；不碰任何第三方系统。
 > 运行环境：`wsl -d kali-linux`，用户 `nailoog`（在 sudo 组）。adb 走 Windows 侧 platform-tools，
 > 或在本脚本里装 `adb` 后用 `adb connect`/USB。设备通过 Windows 的 adb 管理，WSL 用 `/mnt/c` 复用同一 adb。

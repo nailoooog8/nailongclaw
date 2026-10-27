@@ -5,7 +5,7 @@
     android:background="@color/colorBgPrimary"
     android:orientation="vertical">
 
-    <io.agents.pokeclaw.widget.CommonToolbar
+    <io.agents.nailongclaw.widget.CommonToolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="44dp" />
@@ -21,26 +21,26 @@
             android:paddingVertical="8dp">
 
             <!-- 配置：模型与任务 / 渠道接入 / 监听与权限 -->
-            <io.agents.pokeclaw.widget.MenuGroup
+            <io.agents.nailongclaw.widget.MenuGroup
                 android:id="@+id/configGroup"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp" />
 
             <!-- 功能：工具 / MCP / 技能 / 记忆库 -->
-            <io.agents.pokeclaw.widget.MenuGroup
+            <io.agents.nailongclaw.widget.MenuGroup
                 android:id="@+id/featureGroup"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content" />
 
             <!-- 外观 -->
-            <io.agents.pokeclaw.widget.MenuGroup
+            <io.agents.nailongclaw.widget.MenuGroup
                 android:id="@+id/appearanceGroup"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content" />
 
             <!-- 系统 -->
-            <io.agents.pokeclaw.widget.MenuGroup
+            <io.agents.nailongclaw.widget.MenuGroup
                 android:id="@+id/systemGroup"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content" />

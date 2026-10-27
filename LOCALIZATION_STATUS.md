@@ -10,7 +10,7 @@
 - **装机**：构建 + `pm uninstall -k` 保数据 + shell 全新安装（受限设置标志随之清除），数据完整保留（mmkv/API Key 都在，无需重填）
 - **无障碍**：`ClawAccessibilityService` 已绑定（capabilities=161，稳定不回弹）——注意 adb 全路线已证伪（settings put 秒回写、appops set 静默丢弃），必须 UI 手动拨开关
 - **通知监听**：`ClawNotificationListener` 已启用
-- **MCP e2e 全链路**：测试服务器(8765) → `adb reverse tcp:8765 tcp:8765` → `mcp_servers.json` 推到 `/sdcard/Android/data/io.agents.pokeclaw/files/` → 重启 app → logcat 实锤 `Registered 2 MCP tools from 'e2e' (registry size: 30)`；**agent 循环内实调 echo 工具成功**（服务器日志见 tools/call，云端走 OpenAI 格式 + 中转站 GLM/DeepSeek）——2026-10-07 全部实测通过，USB 隧道不依赖 WiFi
+- **MCP e2e 全链路**：测试服务器(8765) → `adb reverse tcp:8765 tcp:8765` → `mcp_servers.json` 推到 `/sdcard/Android/data/io.agents.nailongclaw/files/` → 重启 app → logcat 实锤 `Registered 2 MCP tools from 'e2e' (registry size: 30)`；**agent 循环内实调 echo 工具成功**（服务器日志见 tools/call，云端走 OpenAI 格式 + 中转站 GLM/DeepSeek）——2026-10-07 全部实测通过，USB 隧道不依赖 WiFi
 
 ## 已完成（编译通过，APK 已产出）
 

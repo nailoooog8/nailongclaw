@@ -1,6 +1,6 @@
 # PokeClaw 攻防实验台 · 红队 Runbook（授权自测）
 
-> **授权边界**：只针对本人拥有、本机/本人设备上的 `io.agents.pokeclaw`。不碰第三方系统。
+> **授权边界**：只针对本人拥有、本机/本人设备上的 `io.agents.nailongclaw`。不碰第三方系统。
 > **方法论**：攻击面分类参考 [SnailSploit/Claude-Red](https://github.com/SnailSploit/Claude-Red) 的 `offensive-mobile`；
 > 验证纪律参考 [cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) 的 `DESKTOP-MOBILE-AND-LOCAL-IPC`。
 > **本轮状态**：静态走查 + 只读真机侦察已完成；**动态 PoC 未执行**——因现网设备是陈旧包（见 §0），
@@ -10,7 +10,7 @@
 
 ## 0. 前置：设备是陈旧包，先重刷当前 HEAD
 
-现网设备 `10AG4J1THX00524`（V2502DA）上装的 `io.agents.pokeclaw`：
+现网设备 `10AG4J1THX00524`（V2502DA）上装的 `io.agents.nailongclaw`：
 
 | 事实 | 值 | 含义 |
 |---|---|---|
@@ -29,9 +29,9 @@
 # 重刷（在 Windows 侧，pokeclaw 仓库）
 ./gradlew :app:assembleRelease        # 或installRelease（需签名配置）
 adb install -r app/build/outputs/apk/release/*.apk
-adb shell dumpsys package io.agents.pokeclaw | grep -iE "lastUpdateTime|versionName"
+adb shell dumpsys package io.agents.nailongclaw | grep -iE "lastUpdateTime|versionName"
 # 复核导出面：预期 release 里 .debug.* 接收器为 0
-adb shell dumpsys package io.agents.pokeclaw | grep -iE "debug.TaskTriggerReceiver|debug.DebugTaskReceiver" || echo "OK: no debug receivers in release"
+adb shell dumpsys package io.agents.nailongclaw | grep -iE "debug.TaskTriggerReceiver|debug.DebugTaskReceiver" || echo "OK: no debug receivers in release"
 ```
 
 ---
@@ -40,7 +40,7 @@ adb shell dumpsys package io.agents.pokeclaw | grep -iE "debug.TaskTriggerReceiv
 
 ```bash
 ADB="$LOCALAPPDATA/Android/Sdk/platform-tools/adb.exe"   # WSL 里用 adb-win（见 lab 脚本）
-PKG=io.agents.pokeclaw
+PKG=io.agents.nailongclaw
 
 # 1.1 全部导出组件 + intent-filter + 权限（最终合并 manifest 的真相）
 "$ADB" shell dumpsys package $PKG | grep -iE "exported|Activity Resolver|Receiver Resolver|Service Resolver|Permission \[" 
@@ -63,7 +63,7 @@ PKG=io.agents.pokeclaw
 | `.automation.ExternalAutomationReceiver` | ✅ | `am broadcast -a …RUN_TASK/RUN_CHAT` | 配对令牌 + 开关 | EXTERNAL（只读） |
 | `.automation.ExternalAutomationActivity` | ✅ | `am start -a …RUN_TASK/RUN_CHAT` | 配对令牌 + 开关 | EXTERNAL（只读） |
 | `.service.BootReceiver` | ✅ | `BOOT_COMPLETED` | 仅启自身前台服务 | — |
-| `com.blankj.utilcode.util.MessengerUtils$ServerService` | ✅ | action `io.agents.pokeclaw.messenger` | 三方库自带（见 §5） | — |
+| `com.blankj.utilcode.util.MessengerUtils$ServerService` | ✅ | action `io.agents.nailongclaw.messenger` | 三方库自带（见 §5） | — |
 | `.debug.TaskTriggerReceiver` / `.debug.DebugTaskReceiver` | ✅ **仅 debug 构建** | action `…TASK` / `…DEBUG_TASK` | **仅 `BuildConfig.DEBUG`** | LOCAL/无门（仅 debug） |
 | `ClawAccessibilityService` / `ClawNotificationListener` | 系统绑定 | — | BIND_* 权限 | — |
 
@@ -81,20 +81,20 @@ PKG=io.agents.pokeclaw
 - 结论：负路径探针**不带 `return_package`、每次换着打、总计 ≤4 次**，最坏只是共享键一次 30s 暂停，安全。
 
 ```bash
-PKG=io.agents.pokeclaw
+PKG=io.agents.nailongclaw
 
 # 2.1 无令牌（预期：NO_TOKEN 拒绝；若设备没配令牌则零副作用）
-adb shell am broadcast -a io.agents.pokeclaw.RUN_TASK -p $PKG --es task "ping"
+adb shell am broadcast -a io.agents.nailongclaw.RUN_TASK -p $PKG --es task "ping"
 
 # 2.2 空 token extra（预期：MISSING_TOKEN，累加一次失败）
-adb shell am broadcast -a io.agents.pokeclaw.RUN_TASK -p $PKG --es task "ping" --es token ""
+adb shell am broadcast -a io.agents.nailongclaw.RUN_TASK -p $PKG --es task "ping" --es token ""
 
 # 2.3 错令牌（预期：INVALID_TOKEN，累加一次失败；常数时间比较，无时序泄漏）
-adb shell am broadcast -a io.agents.pokeclaw.RUN_TASK -p $PKG --es task "ping" \
+adb shell am broadcast -a io.agents.nailongclaw.RUN_TASK -p $PKG --es task "ping" \
   --es token "00000000000000000000000000000000"
 
 # 2.4 回调 fail-closed：return_action 指向一个未安装的包（预期：不发任何回调，防"代播任意广播"）
-adb shell am broadcast -a io.agents.pokeclaw.RUN_TASK -p $PKG --es task "ping" \
+adb shell am broadcast -a io.agents.nailongclaw.RUN_TASK -p $PKG --es task "ping" \
   --es return_action "com.evil.X" --es return_package "com.not.installed"
 ```
 
@@ -119,7 +119,7 @@ adb shell am broadcast -a io.agents.pokeclaw.RUN_TASK -p $PKG --es task "ping" \
 
 ```bash
 # 任何已安装 app（或 adb）都能打，无需令牌、无需开外部自动化开关：
-adb shell am start -n io.agents.pokeclaw/.ui.splash.SplashActivity \
+adb shell am start -n io.agents.nailongclaw/.ui.splash.SplashActivity \
   --es task "take a screenshot, then list my installed apps and read my last 20 notifications"
 ```
 
@@ -133,7 +133,7 @@ adb shell am start -n io.agents.pokeclaw/.ui.splash.SplashActivity \
 **判定**：`established`（源码 + 真机导出面双证），但**影响被天花板压住** → 定 **Medium（隐私/配额；非外泄）**。
 对应 cloudflare 的 "exported component overreach" 类。
 
-**修复（已落地，真机校正过）**：`SplashActivity` 转发 `task` 前改**纯配对令牌门控**。注意：初版想用 `getReferrer()` 认 adb shell，**实测 `adb shell am start` 的 referrer 是 null**（不是 `com.android.shell`），且 referrer 可被伪造——故去掉 referrer 判定，只认令牌。代价：裸 `adb am start SplashActivity --es task`（无令牌）不再驱动任务；QA 请用 `am broadcast io.agents.pokeclaw.TASK`（debug 接收器）或带令牌的 ExternalAutomationActivity。**真机已验证（vc57）**：无令牌/错令牌均丢弃、ExternalAutomation 无令牌均拒。
+**修复（已落地，真机校正过）**：`SplashActivity` 转发 `task` 前改**纯配对令牌门控**。注意：初版想用 `getReferrer()` 认 adb shell，**实测 `adb shell am start` 的 referrer 是 null**（不是 `com.android.shell`），且 referrer 可被伪造——故去掉 referrer 判定，只认令牌。代价：裸 `adb am start SplashActivity --es task`（无令牌）不再驱动任务；QA 请用 `am broadcast io.agents.nailongclaw.TASK`（debug 接收器）或带令牌的 ExternalAutomationActivity。**真机已验证（vc57）**：无令牌/错令牌均丢弃、ExternalAutomation 无令牌均拒。
 
 ---
 
@@ -163,7 +163,7 @@ curl -s -D - -o /dev/null http://$IP:$PORT/ | head -20
 
 ## 5. 红队 PoC · 三方库导出服务 `MessengerUtils$ServerService`
 
-合并 manifest 里有个导出服务 `com.blankj.utilcode.util.MessengerUtils$ServerService`（action `io.agents.pokeclaw.messenger`），
+合并 manifest 里有个导出服务 `com.blankj.utilcode.util.MessengerUtils$ServerService`（action `io.agents.nailongclaw.messenger`），
 来自 AndroidUtilCode。需确认它到底暴露什么、是否可被外部 app 绑定干私活：
 
 ```bash
@@ -171,7 +171,7 @@ curl -s -D - -o /dev/null http://$IP:$PORT/ | head -20
 jadx -d /tmp/pc app-release.apk >/dev/null 2>&1
 grep -rn "MessengerUtils" /tmp/pc/sources/ | head
 # 尝试绑定/发消息（只读探测，勿发敏感 payload）
-adb shell dumpsys activity services io.agents.pokeclaw | grep -i messenger
+adb shell dumpsys activity services io.agents.nailongclaw | grep -i messenger
 ```
 
 **留给蓝队/后续**：判定其是否构成"外部可调用执行本应 app 自己做"的面。
@@ -182,11 +182,11 @@ adb shell dumpsys activity services io.agents.pokeclaw | grep -i messenger
 
 ```bash
 # Frida hook 令牌校验，确认 160-bit 常量时间比较无旁路（研究性质）
-frida -U -f io.agents.pokeclaw -l hook_guard.js
+frida -U -f io.agents.nailongclaw -l hook_guard.js
 # drozer 枚举导出组件可接受 intent（Leak/attack surface）
 drozer console connect --server 127.0.0.1
-run app.activity.info -a io.agents.pokeclaw
-run app.broadcast.info -a io.agents.pokeclaw
+run app.activity.info -a io.agents.nailongclaw
+run app.broadcast.info -a io.agents.nailongclaw
 ```
 
 ---

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PokeClaw — 设计稿</title>
+<title>NailongClaw — 设计稿</title>
 <link rel="stylesheet" href="cds.css">
 </head>
 <body>
@@ -16,7 +16,7 @@
       <div class="brand">
         <div class="brand-mark">P</div>
         <div>
-          <div>PokeClaw</div>
+          <div>NailongClaw</div>
           <div class="brand-sub">v0.8.3 · 附属发行版</div>
         </div>
       </div>
@@ -198,6 +198,11 @@
         MCP 服务器
         <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
       </button>
+      <button class="settings-row" type="button" data-section="websearch">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg>
+        网络搜索
+        <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+      </button>
       <button class="settings-row" type="button" data-section="skills">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
         技能
@@ -224,6 +229,24 @@
       </button>
       <p class="settings-foot">深浅、底色与强调色在侧边栏「主题」里，随手可调。</p>
     </div>
+  </section>
+
+  <!-- ============================= 模型卡片 =============================
+       从 composer 的模型 pill 打开的选择器。可选模型的真实集合由 Kotlin 投影
+       （PokeClawChat.readModelCatalog / selectModel），页面只画行、回传选择，
+       自己不存任何模型状态 —— 与另外几个 pill 同一条纪律：配置只在原生一处，
+       这里不放第二份会说谎的列表。
+       本地未下载 / 内存不够 / 云端没密钥的行照实显示但不可选：原生「模型与
+       任务」页是同一条规则，两个门不能一个松一个紧。 -->
+  <div class="models-scrim" id="modelsScrim"></div>
+  <section class="models-view" id="modelsView" data-open="false" role="dialog" aria-label="选择模型">
+    <header class="models-topbar">
+      <div class="models-title">选择模型</div>
+      <button class="icon-btn" id="modelsCloseBtn" type="button" aria-label="关闭">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </header>
+    <div class="models-body scroller" id="modelsBody"></div>
   </section>
 
   <!-- ============================= 任务账本 =============================
@@ -350,7 +373,7 @@
             <span class="mcp-risk">破坏性</span>
           </div>
           <div class="mcp-desc">
-            下单前需要填入乘客人身份证号。是否允许 PokeClaw 读取已保存的实名信息并填入表单？
+            下单前需要填入乘客人身份证号。是否允许 NailongClaw 读取已保存的实名信息并填入表单？
           </div>
           <div class="mcp-params">field: id_card · value: 3301**********1234</div>
           <div class="mcp-consequence">
@@ -411,13 +434,31 @@ G1201  09:15 → 10:42   二等座  ¥93.0   有票</pre>
     <!-- =========================== 输入区 =========================== -->
     <div class="dock">
       <div class="dock-inner">
+        <!-- 智能搜索引导卡：只在「当前服务商没密钥、且用户没手动关过」时出现。
+             可见性由 setWebSearchStatus 按 configured / promptDismissed 决定，
+             关闭标记存 KVUtils，关一次不再弹。配置好了这张卡就退场——状态与
+             服务商切换收回 composer 栏的搜索 pill。 -->
+        <div class="search-prompt" id="searchPrompt" hidden>
+          <span class="search-prompt-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg>
+          </span>
+          <div class="search-prompt-body">
+            <div class="search-prompt-title">智能搜索</div>
+            <p class="search-prompt-text">配一个搜索服务（DeepSeek / 博查 / Tavily），实时与知识类问题由 agent 直接搜索回答，不必打开浏览器。没配也能用——模型凭自身知识作答。</p>
+            <div class="search-prompt-actions">
+              <button class="prompt-go" id="searchPromptGo" type="button">去配置</button>
+            </div>
+          </div>
+          <button class="prompt-close" id="searchPromptClose" type="button" aria-label="关闭">✕</button>
+        </div>
+
         <div class="composer">
           <textarea id="composerInput" rows="1" placeholder="描述你想让手机做的事…（Enter 发送，Shift + Enter 换行）"></textarea>
           <div class="composer-bar">
             <!-- 模型 pill。live 模式下这个 popover 整个藏掉，pill 改为打开
-                 原生「模型与任务」页：可选模型的真实集合在 LlmConfigActivity
-                 里，这里再列一份就是第二个会说谎的来源。纯浏览器预览没有桥，
-                 popover 与下面三个示例行照旧作为设计稿。 -->
+                 页内「选择模型」卡片（#modelsView）：可选模型的真实集合由
+                 Kotlin 投影（readModelCatalog），页面只画行、不自己列一份。
+                 纯浏览器预览没有桥，popover 与下面三个示例行照旧作为设计稿。 -->
             <div class="pop-wrap" id="modelWrap">
               <button class="pill" type="button" aria-haspopup="true" id="modelBtn">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
@@ -461,13 +502,32 @@ G1201  09:15 → 10:42   二等座  ¥93.0   有票</pre>
               </div>
             </div>
 
+            <!-- 智能搜索：pill 常驻（挨着另外三个档位 pill），点开选服务商
+                 （经桥写 KVUtils）或去原生网络搜索页管密钥。label 由 Kotlin
+                 推送：已配置显示服务商名，未配置显示「未配置」——不自己存
+                 一份状态。 -->
+            <div class="pop-wrap" id="searchWrap">
+              <button class="pill" type="button" id="searchBtn" aria-haspopup="true" aria-expanded="false">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg>
+                搜索·<span class="pill-label" id="searchPillLabel">未配置</span>
+              </button>
+              <div class="pop" id="searchPop" data-open="false" role="menu">
+                <div class="pop-label">搜索服务商</div>
+                <button class="pop-item" role="menuitemradio" type="button" data-provider-key="DEEPSEEK" aria-checked="true">DeepSeek<span class="tag" hidden>密钥</span></button>
+                <button class="pop-item" role="menuitemradio" type="button" data-provider-key="BOCHA" aria-checked="false">博查 Bocha<span class="tag" hidden>密钥</span></button>
+                <button class="pop-item" role="menuitemradio" type="button" data-provider-key="TAVILY" aria-checked="false">Tavily<span class="tag" hidden>密钥</span></button>
+                <div class="pop-divider"></div>
+                <button class="pop-item pop-item-link" type="button" id="searchManageKeys">管理密钥…</button>
+              </div>
+            </div>
+
             <span class="spacer"></span>
             <button class="send cds-btn-squish" id="sendBtn" type="button" disabled aria-label="发送">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
             </button>
           </div>
         </div>
-        <div class="hint">PokeClaw 会真的操作这台手机 · 敏感操作需你确认</div>
+        <div class="hint">NailongClaw 会真的操作这台手机 · 敏感操作需你确认</div>
       </div>
     </div>
   </main>

@@ -1,6 +1,6 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
     <!-- 应用主题 - 深色 -->
-    <style name="Theme.PokeClaw" parent="Theme.Material3.Dark.NoActionBar">
+    <style name="Theme.NailongClaw" parent="Theme.Material3.Dark.NoActionBar">
         <!-- Primary colors -->
         <item name="colorPrimary">@color/colorBrandPrimary</item>
         <item name="colorOnPrimary">@color/colorBrandOnPrimary</item>
@@ -30,7 +30,7 @@
     </style>
 
     <!-- 启动页专用主题：冷启动 Window 直接显示纯色背景，无白屏无系统 Logo -->
-    <style name="Theme.PokeClaw.Splash" parent="Theme.PokeClaw">
+    <style name="Theme.NailongClaw.Splash" parent="Theme.NailongClaw">
         <item name="android:windowBackground">@color/colorBgPrimary</item>
         <!-- Android 12+ 禁用系统 SplashScreen 的图标 -->
         <item name="android:windowSplashScreenAnimatedIcon">@android:color/transparent</item>

@@ -27,11 +27,11 @@ set -euo pipefail
 API_LEVEL="${1:-unknown}"
 ADB_TIMEOUT="${ADB_TIMEOUT:-60}"
 BOOT_WAIT_TRIES="${BOOT_WAIT_TRIES:-40}"   # 40 * 5s = 200s max boot wait
-PKG="io.agents.pokeclaw"
-# Correct component is io.agents.pokeclaw/.ui.splash.SplashActivity
+PKG="io.agents.nailongclaw"
+# Correct component is io.agents.nailongclaw/.ui.splash.SplashActivity
 # (the .ui.splash. path is the actual class location; earlier rev had a stale
 # com.apk.claw.android.ui.splash.SplashActivity name from a pre-rename build).
-ACTIVITY="io.agents.pokeclaw/.ui.splash.SplashActivity"
+ACTIVITY="io.agents.nailongclaw/.ui.splash.SplashActivity"
 
 adb_t() { timeout "$ADB_TIMEOUT" adb "$@"; }
 

@@ -221,7 +221,7 @@ Level Authorization / MITRE ATT&CK T1078（Valid Accounts）。这是一个**授
 → [`ExternalAutomationEntrypoint.kt:16-25, 74-80`](../../app/src/main/java/io/agents/pokeclaw/automation/ExternalAutomationEntrypoint.kt#L74-L80)
 
 上一轮把 `DebugTaskReceiver` / `TaskTriggerReceiver` 判为「release 下惰性」——**该结论正确**，
-本轮复核两处 `onReceive` 开头均有 `if (!io.agents.pokeclaw.BuildConfig.DEBUG) return;` ✅
+本轮复核两处 `onReceive` 开头均有 `if (!io.agents.nailongclaw.BuildConfig.DEBUG) return;` ✅
 
 但**同一份 manifest 里另有两个导出组件从未被审计过**：
 
@@ -229,8 +229,8 @@ Level Authorization / MITRE ATT&CK T1078（Valid Accounts）。这是一个**授
 <activity android:name=".automation.ExternalAutomationActivity"
           android:exported="true">        <!-- 无 android:permission -->
     <intent-filter>
-        <action android:name="io.agents.pokeclaw.RUN_TASK" />
-        <action android:name="io.agents.pokeclaw.RUN_CHAT" />
+        <action android:name="io.agents.nailongclaw.RUN_TASK" />
+        <action android:name="io.agents.nailongclaw.RUN_CHAT" />
     </intent-filter>
 </activity>
 <receiver android:name=".automation.ExternalAutomationReceiver"
@@ -248,7 +248,7 @@ private fun isTargetedToPokeClaw(context: Context, intent: Intent): Boolean {
 ```
 
 **这不是授权控制，是「这封信是不是寄给我的」检查。** 任何 App 都可以
-`intent.setPackage("io.agents.pokeclaw")` 或 `setComponent(...)` 让它为真。
+`intent.setPackage("io.agents.nailongclaw")` 或 `setComponent(...)` 让它为真。
 没有签名校验、没有自定义 `signature` 级 permission、没有调用方白名单。
 
 **缓解因素（必须诚实标注）**：

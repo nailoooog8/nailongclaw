@@ -30,7 +30,7 @@ case "\$args" in
   *"getprop ro.build.version.sdk"*)     echo 36; exit 0 ;;
   *"getprop ro.product.model"*)         echo sdk_gphone64_x86_64; exit 0 ;;
   "install"*)                           echo "Performing Streamed Install"; echo Success; exit 0 ;;
-  *"pm list packages"*)                 echo "package:io.agents.pokeclaw"; exit 0 ;;
+  *"pm list packages"*)                 echo "package:io.agents.nailongclaw"; exit 0 ;;
   *"am start"*)                         echo "Status: ok"; exit 0 ;;
   *"pidof"*)                            printf '%s' '${pid_answer}'; exit 0 ;;
   *"logcat -d -b crash"*)               exit 0 ;;

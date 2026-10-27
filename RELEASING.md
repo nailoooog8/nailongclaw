@@ -68,8 +68,8 @@ The GitHub Actions workflow will then create the GitHub Release, upload the sign
 To verify that the next public build can upgrade in place over the current signed build, create a temporary local build with the same key and a higher version:
 
 ```bash
-export POKECLAW_VERSION_CODE=15
-export POKECLAW_VERSION_NAME=0.5.1-upgrade-test
+export NAILONGCLAW_VERSION_CODE=15
+export NAILONGCLAW_VERSION_NAME=0.5.1-upgrade-test
 ./gradlew --no-daemon :app:assembleRelease -x lintVitalRelease -x lintVitalAnalyzeRelease -x lintVitalReportRelease
 ```
 

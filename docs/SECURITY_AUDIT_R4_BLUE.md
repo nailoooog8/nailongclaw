@@ -61,7 +61,7 @@
 
 ## D. Hardening / needs_validation（非漏洞）
 
-- **`com.blankj.utilcode.util.MessengerUtils$ServerService`**（导出、action `io.agents.pokeclaw.messenger`，来自 AndroidUtilCode）：库内置跨进程 messenger，未注册的 id 被忽略，风险低。建议确认 release 是否真需要、有无敏感 handler 注册。needs_validation。
+- **`com.blankj.utilcode.util.MessengerUtils$ServerService`**（导出、action `io.agents.nailongclaw.messenger`，来自 AndroidUtilCode）：库内置跨进程 messenger，未注册的 id 被忽略，风险低。建议确认 release 是否真需要、有无敏感 handler 注册。needs_validation。
 - **BruteForceGuard 锁定可被身份轮换绕过**（`ExternalAutomationGuard.kt:188-189` 按调用方自报 `return_package` 键控）：对 160-bit 令牌无增益，文档已如实记录，非漏洞。
 
 ---

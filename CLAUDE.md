@@ -1,10 +1,10 @@
-# PokeClaw — Project Rules
+# NailongClaw — Project Rules
 
 ## Read This First
 
 Before changing prompts, skills, task routing, local runtime, QA, or release behavior, read `README.md` sections `Product Direction`, `Roadmap`, and `Known platform constraints`.
 
-The short version: PokeClaw is a generic Android mobile-agent harness, not a collection of hardcoded demo tasks. Prioritize runtime, hardware, storage, accessibility, foreground-service, install/signing, and QA-harness correctness before narrow prompt or workflow tuning.
+The short version: NailongClaw is a generic Android mobile-agent harness, not a collection of hardcoded demo tasks. Prioritize runtime, hardware, storage, accessibility, foreground-service, install/signing, and QA-harness correctness before narrow prompt or workflow tuning.
 
 ## Project Files
 
@@ -121,4 +121,4 @@ Every code path must be traceable through logcat alone. If a bug happens and the
 
 ### The rule
 
-When reading logcat for any user flow, you should be able to reconstruct exactly what happened, what decisions were made, and where it went wrong — without reading the source code. One session of `adb logcat --pid=$(pidof io.agents.pokeclaw)` should tell the full story.
+When reading logcat for any user flow, you should be able to reconstruct exactly what happened, what decisions were made, and where it went wrong — without reading the source code. One session of `adb logcat --pid=$(pidof io.agents.nailongclaw)` should tell the full story.

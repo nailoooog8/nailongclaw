@@ -1,0 +1,295 @@
+// Copyright 2026 PokeClaw (agents.io). All rights reserved.
+// Licensed under the Apache License, Version 2.0.
+
+package io.agents.nailongclaw.channel.telegram
+
+import io.agents.nailongclaw.channel.Channel
+import io.agents.nailongclaw.channel.ChannelHandler
+import io.agents.nailongclaw.channel.ChannelManager
+import io.agents.nailongclaw.utils.KVUtils
+import io.agents.nailongclaw.utils.XLog
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.OkHttpClient
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
+import java.util.concurrent.TimeUnit
+
+class TelegramChannelHandler(
+    private val scope: CoroutineScope,
+    private val httpClient: OkHttpClient,
+    private var botToken: String,
+) : ChannelHandler {
+
+    override val channel = Channel.TELEGRAM
+
+    @Volatile
+    private var lastChatId: Long? = null
+
+    /**
+     * Telegram user id of the most recent sender.
+     *
+     * This is the identity that ChannelSecurityGuard authorises. It is
+     * deliberately NOT what [getLastSenderId] returns: replies and scheduled
+     * pushes must go to the conversation the message arrived in, which is
+     * [lastChatId]. Keep the two apart — using a chat id for authorisation is
+     * what let any group member drive the phone.
+     */
+    private var lastFromUserId: Long? = null
+    @Volatile
+    private var pollingActive = false
+    private var pollingThread: Thread? = null
+
+    private val pollingHttpClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(40, TimeUnit.SECONDS)
+            .writeTimeout(15, TimeUnit.SECONDS)
+            .build()
+    }
+
+    private fun apiUrl(method: String): String =
+        "https://api.telegram.org/bot$botToken/$method"
+
+    override fun isConnected(): Boolean = pollingActive
+
+    override fun init() {
+        if (botToken.isEmpty()) {
+            XLog.w(TAG, "Telegram Bot Token not configured, Telegram channel will be unavailable")
+            return
+        }
+
+        pollingActive = true
+        pollingThread = Thread({
+            var offset = 0L
+            XLog.i(TAG, "Telegram polling thread started")
+            while (pollingActive) {
+                try {
+                    val reqBody = JSONObject().apply {
+                        put("offset", offset)
+                        put("timeout", 30)
+                        put("allowed_updates", org.json.JSONArray().put("message"))
+                    }
+                    val request = okhttp3.Request.Builder()
+                        .url(apiUrl("getUpdates"))
+                        .post(okhttp3.RequestBody.create("application/json".toMediaTypeOrNull(), reqBody.toString()))
+                        .build()
+                    val response = pollingHttpClient.newCall(request).execute()
+                    val body = response.body?.string()
+                    val code = response.code
+                    response.close()
+
+                    if (body == null) {
+                        XLog.w(TAG, "Telegram getUpdates response body is empty, code=$code")
+                        continue
+                    }
+
+                    val json = JSONObject(body)
+                    if (!json.optBoolean("ok", false)) {
+                        XLog.e(TAG, "Telegram getUpdates failed: code=$code, body=$body")
+                        if (code == 401 || code == 404) {
+                            XLog.e(TAG, "Telegram Bot Token invalid, stopping polling")
+                            break
+                        }
+                        Thread.sleep(5000)
+                        continue
+                    }
+
+                    val result = json.optJSONArray("result") ?: continue
+                    for (i in 0 until result.length()) {
+                        val update = result.getJSONObject(i)
+                        val updateId = update.getLong("update_id")
+                        if (updateId >= offset) offset = updateId + 1
+
+                        val message = update.optJSONObject("message") ?: continue
+                        val text = message.optString("text", "")
+                        if (text.isEmpty()) continue
+
+                        val chat = message.getJSONObject("chat")
+                        val chatId = chat.getLong("id")
+                        val messageId = message.getInt("message_id")
+                        lastChatId = chatId
+
+                        // Authorise the *person*, not the room. chat.id is the
+                        // conversation: in a group or channel it is shared by
+                        // every member, so pairing there would hand the whole
+                        // group permanent control of the phone. from.id is the
+                        // account that actually sent the message, and matches
+                        // what WeChat (fromUserId) and QQ (userId) already pass.
+                        val fromUserId = message.optJSONObject("from")?.optLong("id")
+                            ?: chatId  // channel posts carry no `from`
+                        lastFromUserId = fromUserId
+
+                        XLog.i(TAG, "[${channel.displayName}] Message received: $text, from=$fromUserId chatId=$chatId")
+                        ChannelManager.dispatchMessage(channel, text, messageId.toString(), fromUserId.toString())
+                    }
+                } catch (_: java.net.SocketTimeoutException) {
+                    XLog.d(TAG, "Telegram polling timeout, continuing to poll")
+                } catch (e: Exception) {
+                    if (pollingActive) {
+                        XLog.w(TAG, "Telegram polling exception, retrying in 5 seconds", e)
+                        try { Thread.sleep(5000) } catch (_: InterruptedException) { break }
+                    }
+                }
+            }
+            XLog.i(TAG, "Telegram polling thread exited")
+        }, "telegram-polling").apply { isDaemon = true; start() }
+
+        XLog.i(TAG, "Telegram Long Polling started")
+    }
+
+    override fun disconnect() {
+        pollingActive = false
+        pollingThread?.interrupt()
+        pollingThread = null
+        lastChatId = null
+        lastFromUserId = null
+        XLog.i(TAG, "Telegram Long Polling stopped")
+    }
+
+    override fun reinitFromStorage() {
+        disconnect()
+        botToken = KVUtils.getTelegramBotToken()
+        init()
+    }
+
+    override fun sendMessage(content: String, messageID: String) {
+        val chatId = lastChatId
+        if (chatId == null) {
+            XLog.w(TAG, "Telegram reply failed: no available chatId")
+            return
+        }
+        scope.launch {
+            try {
+                if (TelegramMarkdownUtils.containsMarkdown(content)) {
+                    val v2 = TelegramMarkdownUtils.markdownToTelegramV2(content)
+                    val ok = sendText(chatId, v2, "MarkdownV2")
+                    if (!ok) sendText(chatId, content, null)
+                } else {
+                    sendText(chatId, TelegramMarkdownUtils.escapePlain(content), "MarkdownV2")
+                }
+            } catch (e: Exception) {
+                XLog.e(TAG, "Telegram reply failed", e)
+            }
+        }
+    }
+
+    override fun sendImage(imageBytes: ByteArray, messageID: String) {
+        val chatId = lastChatId ?: return
+        scope.launch {
+            try {
+                val body = MultipartBody.Builder()
+                    .setType(MultipartBody.FORM)
+                    .addFormDataPart("chat_id", chatId.toString())
+                    .addFormDataPart(
+                        "photo", "screenshot.png",
+                        imageBytes.toRequestBody("image/png".toMediaTypeOrNull())
+                    )
+                    .build()
+                val request = okhttp3.Request.Builder()
+                    .url(apiUrl("sendPhoto"))
+                    .post(body)
+                    .build()
+                val response = httpClient.newCall(request).execute()
+                XLog.i(TAG, "Telegram image send response: ${response.code}")
+                response.close()
+            } catch (e: Exception) {
+                XLog.e(TAG, "Telegram image send failed", e)
+            }
+        }
+    }
+
+    override fun sendFile(file: java.io.File, messageID: String) {
+        val chatId = lastChatId ?: return
+        scope.launch {
+            try {
+                val mimeType = when (file.extension.lowercase()) {
+                    "png", "jpg", "jpeg", "gif", "bmp", "webp" -> "image/${file.extension.lowercase()}"
+                    else -> "application/octet-stream"
+                }
+                val body = MultipartBody.Builder()
+                    .setType(MultipartBody.FORM)
+                    .addFormDataPart("chat_id", chatId.toString())
+                    .addFormDataPart(
+                        "document", file.name,
+                        file.readBytes().toRequestBody(mimeType.toMediaTypeOrNull())
+                    )
+                    .build()
+                val request = okhttp3.Request.Builder()
+                    .url(apiUrl("sendDocument"))
+                    .post(body)
+                    .build()
+                val response = httpClient.newCall(request).execute()
+                XLog.i(TAG, "Telegram file send response: ${response.code}")
+                response.close()
+            } catch (e: Exception) {
+                XLog.e(TAG, "Telegram file send failed", e)
+            }
+        }
+    }
+
+    /**
+     * Routing target for replies and scheduled pushes, not the authorising id.
+     *
+     * Telegram bots can only open a private chat with a user who has started
+     * them, so replying to the conversation is the reliable behaviour here.
+     * Authorisation uses the sender's user id instead.
+     */
+    override fun getLastSenderId(): String? = lastChatId?.toString()
+
+    override fun restoreRoutingContext(targetUserId: String) {
+        targetUserId.toLongOrNull()?.let { lastChatId = it }
+    }
+
+    override fun sendMessageToUser(userId: String, content: String) {
+        val chatId = userId.toLongOrNull()
+        if (chatId == null) {
+            XLog.w(TAG, "Telegram sendMessageToUser failed: invalid chatId: $userId")
+            return
+        }
+        scope.launch {
+            try {
+                if (TelegramMarkdownUtils.containsMarkdown(content)) {
+                    val v2 = TelegramMarkdownUtils.markdownToTelegramV2(content)
+                    val ok = sendText(chatId, v2, "MarkdownV2")
+                    if (!ok) sendText(chatId, content, null)
+                } else {
+                    sendText(chatId, TelegramMarkdownUtils.escapePlain(content), "MarkdownV2")
+                }
+            } catch (e: Exception) {
+                XLog.e(TAG, "Telegram sendMessageToUser failed", e)
+            }
+        }
+    }
+
+    // ---------- Internal helper methods ----------
+
+    private fun sendText(chatId: Long, text: String, parseMode: String?): Boolean {
+        val json = JSONObject().apply {
+            put("chat_id", chatId)
+            put("text", text)
+            if (parseMode != null) put("parse_mode", parseMode)
+        }
+        val body = okhttp3.RequestBody.create("application/json".toMediaTypeOrNull(), json.toString())
+        val request = okhttp3.Request.Builder()
+            .url(apiUrl("sendMessage"))
+            .post(body)
+            .build()
+        val response = httpClient.newCall(request).execute()
+        val code = response.code
+        if (code !in 200..299) {
+            val respBody = response.body?.string()
+            XLog.w(TAG, "Telegram sendMessage failed: code=$code, parseMode=$parseMode, resp=$respBody")
+        } else {
+            XLog.i(TAG, "Telegram reply succeeded: code=$code, parseMode=$parseMode")
+        }
+        response.close()
+        return code in 200..299
+    }
+
+    companion object {
+        private const val TAG = "TelegramHandler"
+    }
+}

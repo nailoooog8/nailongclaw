@@ -238,8 +238,8 @@ Agent 不会把你让它删掉的那句话原样背回来，它会把**同一个
 
 ```bash
 adb push memories.example.json \
-  /sdcard/Android/data/io.agents.pokeclaw/files/memories.json
-adb shell am force-stop io.agents.pokeclaw   # 重启后重新读取
+  /sdcard/Android/data/io.agents.nailongclaw/files/memories.json
+adb shell am force-stop io.agents.nailongclaw   # 重启后重新读取
 ```
 
 ## 管理界面

@@ -1,0 +1,178 @@
+// Copyright 2026 PokeClaw (agents.io). All rights reserved.
+// Licensed under the Apache License, Version 2.0.
+
+package io.agents.nailongclaw.agent.memory
+
+import com.google.gson.Gson
+import com.google.gson.JsonArray
+import com.google.gson.JsonObject
+import java.util.Locale
+
+/**
+ * One durable item in the long-term memory bank.
+ *
+ * Unlike the knowledge base (KBManager), which is a user-authored markdown
+ * vault, a memory is a small single-sentence fact the agent decided is worth
+ * carrying into future sessions: who the user is, how they like things done,
+ * facts about their devices and accounts, or outcomes worth not repeating.
+ *
+ * Persisted as a JSON array in memories.json (see [MemoryStore]).
+ */
+data class MemoryEntry(
+    /** Stable id: short hash of the normalized content (see MemoryStore.remember). */
+    val id: String,
+    /** The remembered fact, one sentence. Keep it self-contained — it is read without its context. */
+    val content: String,
+    /** One of [MemoryKind]'s keys. Defaults to "fact". */
+    val kind: String = MemoryKind.FACT,
+    /** Free-form labels, lowercased, used for retrieval and grouping. */
+    val tags: List<String> = emptyList(),
+    /** Pinned entries are always injected into the prompt and never decay. */
+    val pinned: Boolean = false,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis(),
+    /** How many times this entry has been surfaced to the model. Drives ranking. */
+    val hits: Int = 0,
+    /** Last time this entry was surfaced (0 = never recalled). */
+    val lastUsedAt: Long = 0L,
+    /** Ids of entries this one appears to contradict. Surfaced, never auto-merged. */
+    val conflictsWith: List<String> = emptyList(),
+    /**
+     * Ids this entry was linked to at write time because the agent said the
+     * two are about the same thing.
+     *
+     * One-sided on purpose, unlike [conflictsWith]: a link is a claim the agent
+     * made *about the new fact while writing it*, and it never gets to revise
+     * what it claimed about memories that already existed. Conflicts are the
+     * opposite — [MemorySimilarity.contradicts] is symmetric, so both sides
+     * can be updated without inventing anything.
+     */
+    val relatedIds: List<String> = emptyList(),
+    /**
+     * When the fact became true, which is not always when it was learned.
+     * Defaults to [createdAt] (absent in legacy files) — the two only differ
+     * for a fact restated after being superseded, where the new validity
+     * window starts at the restatement. Graphiti's `valid_at`.
+     */
+    val validAt: Long = 0L,
+    /**
+     * 0 while the fact is still true; set to the moment a later statement
+     * superseded it. Invalidated entries stay on disk (history, not deletion)
+     * but never enter the briefing or default recall. Graphiti's `invalid_at`.
+     */
+    val invalidAt: Long = 0L,
+    /** Id of the live entry that superseded this one; empty while valid. */
+    val supersededBy: String = "",
+    /** Ids of entries this one superseded when it was written. */
+    val supersedes: List<String> = emptyList(),
+) {
+    val kindLabel: String get() = MemoryKind.labelOf(kind)
+
+    /** True once a later statement replaced this fact — superseded, not deleted. */
+    val isInvalidated: Boolean get() = invalidAt > 0L
+
+    /** The moment this fact started being true: [validAt] or [createdAt]. */
+    val effectiveValidAt: Long get() = if (validAt > 0L) validAt else createdAt
+
+    companion object {
+        private val GSON = Gson()
+
+        /**
+         * Parses a memories.json payload.
+         *
+         * Every field is read defensively: the file is hand-editable over adb
+         * and a user-edited array may be missing keys or hold wrong types,
+         * which must degrade to defaults instead of throwing away the bank.
+         */
+        fun parseList(json: String): List<MemoryEntry> {
+            if (json.isBlank()) return emptyList()
+            return try {
+                val root = GSON.fromJson(json, com.google.gson.JsonElement::class.java)
+                val arr = root as? JsonArray ?: return emptyList()
+                arr.mapNotNull { el -> (el as? JsonObject)?.let { obj -> fromJson(obj) } }
+            } catch (_: Exception) {
+                emptyList()
+            }
+        }
+
+        private fun fromJson(o: JsonObject): MemoryEntry? {
+            val content = o.str("content")
+            if (content.isBlank()) return null
+            val now = System.currentTimeMillis()
+            val kind = o.str("kind").lowercase(Locale.US)
+                .let { if (MemoryKind.isValid(it)) it else MemoryKind.FACT }
+            return MemoryEntry(
+                id = o.str("id").ifBlank { content.hashCode().toString(16) },
+                content = content,
+                kind = kind,
+                tags = o.arr("tags"),
+                pinned = o.bool("pinned"),
+                createdAt = o.num("createdAt").takeIf { it > 0 } ?: now,
+                updatedAt = o.num("updatedAt").takeIf { it > 0 } ?: now,
+                hits = o.num("hits").toInt(),
+                lastUsedAt = o.num("lastUsedAt"),
+                conflictsWith = o.arr("conflictsWith"),
+                relatedIds = o.arr("relatedIds"),
+                // Temporal fields absent from legacy files all mean "valid":
+                // validAt falls back to createdAt via effectiveValidAt, and
+                // an invalidAt of 0 keeps the entry in every default read.
+                validAt = o.num("validAt"),
+                invalidAt = o.num("invalidAt").takeIf { it > 0 } ?: 0L,
+                supersededBy = o.str("supersededBy"),
+                supersedes = o.arr("supersedes"),
+            )
+        }
+
+        private fun JsonObject.str(key: String): String =
+            runCatching { get(key)?.asString }.getOrNull().orEmpty().trim()
+
+        private fun JsonObject.num(key: String): Long =
+            runCatching { get(key)?.asLong }.getOrNull() ?: 0L
+
+        private fun JsonObject.bool(key: String): Boolean =
+            runCatching { get(key)?.asBoolean }.getOrNull() ?: false
+
+        private fun JsonObject.arr(key: String): List<String> =
+            runCatching {
+                get(key)?.asJsonArray
+                    ?.mapNotNull { it.asString.trim().lowercase(Locale.US) }
+                    ?.filter { it.isNotEmpty() }
+                    ?.distinct()
+                    .orEmpty()
+            }.getOrDefault(emptyList())
+    }
+}
+
+/**
+ * The kinds a memory can have. Weight biases retrieval toward identity and
+ * preferences, which stay true longer than one-off events.
+ */
+object MemoryKind {
+    const val PROFILE = "profile"
+    const val PREFERENCE = "preference"
+    const val FACT = "fact"
+    const val EVENT = "event"
+
+    /** Chinese labels for the management UI. */
+    fun labelOf(kind: String): String = when (kind) {
+        PROFILE -> "身份"
+        PREFERENCE -> "偏好"
+        FACT -> "事实"
+        EVENT -> "事件"
+        else -> "记忆"
+    }
+
+    /** Valid kinds, in the order the UI and tool descriptions list them. */
+    val all = listOf(PROFILE, PREFERENCE, FACT, EVENT)
+
+    /** Retrieval weight: identity and preferences outrank one-off events. */
+    fun weight(kind: String): Double = when (kind) {
+        PROFILE -> 1.2
+        PREFERENCE -> 1.0
+        FACT -> 0.7
+        EVENT -> 0.3
+        else -> 0.5
+    }
+
+    fun isValid(kind: String): Boolean = kind in all
+}

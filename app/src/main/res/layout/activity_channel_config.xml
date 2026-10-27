@@ -11,7 +11,7 @@
     android:background="@color/colorBgPrimary"
     android:orientation="vertical">
 
-    <io.agents.pokeclaw.widget.CommonToolbar
+    <io.agents.nailongclaw.widget.CommonToolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="44dp" />
@@ -107,7 +107,7 @@
             </LinearLayout>
 
             <!-- 保存按钮 -->
-            <io.agents.pokeclaw.widget.KButton
+            <io.agents.nailongclaw.widget.KButton
                 android:id="@+id/btnSave"
                 android:layout_width="match_parent"
                 android:layout_height="48dp"

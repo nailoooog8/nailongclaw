@@ -22,7 +22,7 @@ import sys
 import time
 import xml.etree.ElementTree as ET
 
-PKG = "io.agents.pokeclaw"
+PKG = "io.agents.nailongclaw"
 # ASCII-only match strings on purpose: PowerShell cannot pass non-ASCII argv or
 # env values on this machine (GBK), which silently turns Chinese into mojibake
 # and makes every lookup fail. "Claude UI" is the ASCII prefix of the entry row.

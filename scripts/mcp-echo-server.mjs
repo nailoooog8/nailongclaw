@@ -39,7 +39,7 @@ const TOOLS = [
   },
   {
     name: 'echo',
-    description: 'Echo back the given message (PokeClaw H27 confirmation test tool)',
+    description: 'Echo back the given message (NailongClaw H27 confirmation test tool)',
     inputSchema: {
       type: 'object',
       properties: {

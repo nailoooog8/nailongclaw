@@ -7,7 +7,7 @@
     android:focusableInTouchMode="true"
     android:orientation="vertical">
 
-    <io.agents.pokeclaw.widget.CommonToolbar
+    <io.agents.nailongclaw.widget.CommonToolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="44dp" />
@@ -42,12 +42,12 @@
             android:layout_height="wrap_content"
             android:orientation="vertical">
 
-            <io.agents.pokeclaw.widget.MenuGroup
+            <io.agents.nailongclaw.widget.MenuGroup
                 android:id="@+id/memoryGroup"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content" />
 
-            <io.agents.pokeclaw.widget.MenuGroup
+            <io.agents.nailongclaw.widget.MenuGroup
                 android:id="@+id/actionsGroup"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

@@ -142,7 +142,7 @@ python scripts/security_probe_configserver.py http://127.0.0.1:9527 <PIN>
 ```
 
 > A2 结束后该客户端会处于锁定退避中（30s << strikes，封顶 30min）。状态仅存内存，
-> `adb shell am force-stop io.agents.pokeclaw` 可清空，之后需重新开启局域网配置。
+> `adb shell am force-stop io.agents.nailongclaw` 可清空，之后需重新开启局域网配置。
 
 ### 已执行的部分：单元测试
 

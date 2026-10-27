@@ -1,4 +1,4 @@
-# PokeClaw AI Index
+# NailongClaw AI Index
 
 This is the repo map for coding agents. Keep canonical information in existing files; do not create new root docs when one of these files already owns the topic.
 

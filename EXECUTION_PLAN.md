@@ -4,7 +4,7 @@
 > Authored by `ithiria894` (Nicole / agents.io) on 2026-05-26 and **never modified since**.
 > It is the phased execution plan for the acquisition thesis in [`STRATEGY.md`](STRATEGY.md).
 >
-> **This fork does not inherit any of it.** `nailoooog8/PokeClaw` is an independent
+> **This fork does not inherit any of it.** `nailoooog8/nailongclaw` is an independent
 > distribution focused on Chinese localisation, security hardening, and its own signed
 > builds. We do not pursue acquisition, do not run acquirer outreach, and do not adopt the
 > milestones below. Phases referencing "signals an acquirer reads", YC applications, or
