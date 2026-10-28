@@ -53,6 +53,28 @@ Google 的移动 agent 永远是 Pixel-first 的；Samsung 的 Galaxy AI 战略�
 
 ---
 
+## 本地模式的现实（已知限制）
+
+本地模式跑 Gemma 4 E2B，上下文窗口 **8192 token**，而固定开销会吃掉几乎整个窗口，**任何用户消息都可能越界**——这不是偶发，记忆库条目越多、配置的 MCP 服务器越多越容易触发。实测错误：
+
+> `nativeSendMessage INVALID_ARGUMENT: Input token ids are too long (8202 >= 8192)`
+
+开销三块，每次任务全量重建：
+
+| 开销 | 量级 |
+|---|---|
+| 46 个内置工具的 JSON schema 全量注入 LiteRT-LM（最大头，`LangChain4jToolBridge.buildToolSpecifications()` 不过滤） | 主要 |
+| 任务提示词（`LOCAL_TASK_PROMPT`） | 约 2.9K 字符 |
+| 记忆简报（`MemoryStore.briefing`：规则块 + 最多 5 条记忆全文） | 约 1,400 token 起 |
+
+本地路径目前只对工具**结果**截断（400 字符），管不到声明和提示词；too-long 的原生错误也未经翻译，原文直怼聊天框。
+
+**不改代码的缓解**：删掉低价值记忆、停用不用的 MCP 服务器、或切云端模式。
+
+**修复方向**（按杠杆排序，**尚未动手**）：本地路径裁剪工具声明（allowlist / 预算，最大杠杆）、记忆简报设字符总量预算、把 too-long 错误转成用户能看懂的话、本地仅轻量对话的路由策略。文末上游 README 中本地模式的基准数据依 Apache-2.0 §4 逐字保留，请结合本节阅读。
+
+---
+
 ## 界面截图
 
 截图取自 vivo X300 Pro 真机，v0.9.0，米黄浅色主题。
@@ -114,6 +136,8 @@ cd nailongclaw
 构建环境见 [`MCP_INTEGRATION_PLAN.md`](MCP_INTEGRATION_PLAN.md) 末尾的「构建环境备忘」。
 
 **首次使用**：安装 APK → 授予无障碍权限 → 需要后台监听时再授予通知使用权 → 本地模式首次启动会下载模型（约 2.6 GB）。
+
+> ⚠️ **下载 2.6 GB 模型之前先读[「本地模式的现实」](#本地模式的现实已知限制)**：本地模式当前可能因上下文溢出而无法完成任何任务，云端模式不受影响。
 
 > ⚠️ **vivo / 部分 OEM 注意**：强制停止应用或在部分 ROM 上重装会连带清空无障碍开关，需要手动重新打开。判断无障碍是否真的活着请看 `dumpsys accessibility` 的 `Bound services`，不要只看设置里的开关状态。
 
