@@ -55,18 +55,18 @@ Google 的移动 agent 永远是 Pixel-first 的；Samsung 的 Galaxy AI 战略�
 
 ## 界面截图
 
-| 聊天首页 | 设置 · 通道分组 | 设置 · 工具与远程控制 |
-|:---:|:---:|:---:|
-| <img src="Screenshots/fork-chat-home.jpg" width="250" alt="聊天首页"> | <img src="Screenshots/fork-settings-channels.jpg" width="250" alt="设置页通道分组"> | <img src="Screenshots/fork-settings-tools.jpg" width="250" alt="设置页工具与远程控制分组"> |
-| 本地 / 云端双模式，<br>中文快捷任务模板 | 本项目恢复可达的**通道分组**：<br>Discord / Telegram / 微信 / QQ / 抖音<br>+ 安全配对 PIN + 局域网配置 | 技能管理、MCP 服务器、<br>记忆库、常驻后台、<br>外部自动化与 Web 控制台 |
+截图取自 vivo X300 Pro 真机，v0.9.0，米黄浅色主题。
 
-> **左图**：云端模式下接 MiniMax-M3.1-Flash-Preview 的实际对话界面，中文快捷任务模板直接可点。
+| 聊天首页 | 设置面板 | 侧边栏 |
+|:---:|:---:|:---:|
+| <img src="Screenshots/chat-home.jpg" width="250" alt="聊天首页"> | <img src="Screenshots/settings-panel.jpg" width="250" alt="设置面板"> | <img src="Screenshots/sidebar.jpg" width="250" alt="侧边栏"> |
+| 新对话 + composer 四档位：<br>模型 / 努力 / 允许操作 / 搜索 | 设置四区九行直达分区页：<br>配置 · 功能 · 外观 · 系统 | 会话列表 + 任务 / 定时入口；<br>侧边栏页头为 v0.9.0 新图标与新标识 |
+
+> **左图**：composer 四个 pill 都是真档位——「努力」对应单任务工具调用轮数上限，「允许操作」是敏感操作策略（每次询问 / 自动允许），两者经桥写 MMKV，与原生「模型与任务」页读同一份值。
 >
-> **中图**：这一整组入口此前被 `visibility="gone"` 隐藏——代码完整但**七个入口全部不可达**，是本项目修复的第一个可见问题。
+> **中图**：设置面板四区——配置（模型与任务 / 渠道接入 / 监听）、功能（工具 / MCP 服务器 / 网络搜索 / 技能 / 记忆库）、外观（主题）、系统（关于）。原生全设置页是纯导航枢纽，不再叠一个「全部设置」。
 >
-> **右图**：工具与远程控制分组，可见 MCP 鉴权选择器与记忆库入口。
->
-> ⚠️ 截图拍摄于 2026-10-27 独立化改名之前，图中启动器图标与部分界面文字仍是旧标识；图标已于 v0.9.0 更换（灰蓝紫—锈橙渐变 + 白色 N）。
+> **右图**：侧边栏承载会话列表与任务 / 定时入口；定时任务对 agent 说一句「每天早上七点半看我今天的日历」即可创建，排队、错过、取消都写在明面上。
 
 ---
 
