@@ -210,12 +210,13 @@ class SettingsActivity : BaseActivity() {
 
     private fun monitorLabel(): String {
         val snapshot = AppCapabilityCoordinator.snapshot(this)
-        return if (snapshot.accessibilityState == io.agents.nailongclaw.ServiceBindingState.READY &&
-            snapshot.notificationAccessState == io.agents.nailongclaw.ServiceBindingState.READY
-        ) {
-            "就绪"
-        } else {
-            "未就绪"
+        return when {
+            snapshot.accessibilityState == io.agents.nailongclaw.ServiceBindingState.READY &&
+                snapshot.notificationAccessState == io.agents.nailongclaw.ServiceBindingState.READY -> "就绪"
+            // Zombie: the switch reads "on" in system settings, so bare "未就绪"
+            // sends the user hunting for the wrong fix.
+            snapshot.accessibilityNeedsManualRebind -> "无障碍已开启 · 系统未连接"
+            else -> "未就绪"
         }
     }
 

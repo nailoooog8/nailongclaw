@@ -91,6 +91,7 @@ object DebugReportManager {
             appendLine()
             appendLine("Capabilities")
             appendLine("- Accessibility: ${capabilities.accessibilityStatusLabel}")
+            appendLine("- Accessibility needs manual rebind: ${capabilities.accessibilityNeedsManualRebind}")
             appendLine("- Notification access: ${capabilities.notificationAccessStatusLabel}")
             appendLine("- Notification permission: ${capabilities.notificationPermissionStatusLabel}")
             appendLine("- Overlay: ${if (capabilities.overlayGranted) "Enabled" else "Disabled"}")

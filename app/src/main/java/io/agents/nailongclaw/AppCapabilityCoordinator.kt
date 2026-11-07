@@ -37,6 +37,13 @@ enum class AppRequirement(val label: String) {
 
 data class AppCapabilitySnapshot(
     val accessibilityState: ServiceBindingState,
+    /**
+     * True when the service is switched on in system settings but the OS never
+     * (re)bound it — the "enabled yet dead" zombie the user experiences as
+     * "accessibility keeps failing to start". Only a manual off/on toggle in
+     * system settings revives it; reopening the app cannot.
+     */
+    val accessibilityNeedsManualRebind: Boolean,
     val notificationAccessState: ServiceBindingState,
     val notificationPermissionGranted: Boolean,
     val foregroundServiceRunning: Boolean,
@@ -52,11 +59,14 @@ data class AppCapabilitySnapshot(
             notificationAccessState == ServiceBindingState.READY
 
     val accessibilityStatusLabel: String
-        get() = when (accessibilityState) {
-            ServiceBindingState.READY -> "Enabled"
-            ServiceBindingState.CONNECTING -> "Connecting"
-            ServiceBindingState.DEGRADED -> "Disconnected"
-            ServiceBindingState.DISABLED -> "Disabled"
+        get() = when {
+            accessibilityNeedsManualRebind -> "Enabled (system not bound)"
+            else -> when (accessibilityState) {
+                ServiceBindingState.READY -> "Enabled"
+                ServiceBindingState.CONNECTING -> "Connecting"
+                ServiceBindingState.DEGRADED -> "Disconnected"
+                ServiceBindingState.DISABLED -> "Disabled"
+            }
         }
 
     val notificationAccessStatusLabel: String
@@ -84,8 +94,10 @@ object AppCapabilityCoordinator {
     }
 
     fun snapshot(context: Context): AppCapabilitySnapshot {
+        val accessibility = accessibilityBinding(context)
         return AppCapabilitySnapshot(
-            accessibilityState = accessibilityState(context),
+            accessibilityState = accessibility.state,
+            accessibilityNeedsManualRebind = accessibility.needsManualRebind,
             notificationAccessState = notificationAccessState(context),
             notificationPermissionGranted = isNotificationPermissionGranted(context),
             foregroundServiceRunning = ForegroundService.isRunning(),
@@ -95,8 +107,20 @@ object AppCapabilityCoordinator {
         )
     }
 
-    fun accessibilityState(context: Context): ServiceBindingState {
-        return bindingState(
+    /** Binding verdict plus the OEM "zombie" marker — see [BindingEval.needsManualRebind]. */
+    data class BindingEval(
+        val state: ServiceBindingState,
+        /**
+         * The service's goodbye (onDestroy/onInterrupt) never arrived after its last
+         * healthy moment, so the process was killed outright — and aggressive OEMs
+         * (Vivo in QA) often never rebind after that. Only a manual off/on toggle in
+         * system settings revives the service; reopening the app cannot.
+         */
+        val needsManualRebind: Boolean,
+    )
+
+    fun accessibilityBinding(context: Context): BindingEval {
+        return bindingEval(
             enabled = ClawAccessibilityService.isEnabledInSettings(context),
             running = ClawAccessibilityService.isRunning(),
             pendingRepair = KVUtils.hasPendingAccessibilityReturn(),
@@ -107,17 +131,23 @@ object AppCapabilityCoordinator {
         )
     }
 
+    fun accessibilityState(context: Context): ServiceBindingState =
+        accessibilityBinding(context).state
+
+    fun accessibilityNeedsManualRebind(context: Context): Boolean =
+        accessibilityBinding(context).needsManualRebind
+
     fun notificationAccessState(context: Context): ServiceBindingState {
-        return bindingState(
+        return bindingEval(
             enabled = ClawNotificationListener.isEnabledInSettings(context),
             running = ClawNotificationListener.isConnected(),
             pendingRepair = KVUtils.hasPendingNotificationAccessReturn(),
             lastConnectedAt = KVUtils.getNotificationListenerLastConnectedAt(),
             lastDisconnectedAt = KVUtils.getNotificationListenerLastDisconnectedAt(),
-        )
+        ).state
     }
 
-    private fun bindingState(
+    private fun bindingEval(
         enabled: Boolean,
         running: Boolean,
         pendingRepair: Boolean,
@@ -125,45 +155,55 @@ object AppCapabilityCoordinator {
         lastHeartbeatAt: Long = 0L,
         lastInterruptedAt: Long = 0L,
         lastDisconnectedAt: Long,
-    ): ServiceBindingState {
-        if (!enabled) return ServiceBindingState.DISABLED
-        if (pendingRepair) return ServiceBindingState.CONNECTING
+    ): BindingEval {
+        if (!enabled) return BindingEval(ServiceBindingState.DISABLED, needsManualRebind = false)
+        if (pendingRepair) return BindingEval(ServiceBindingState.CONNECTING, needsManualRebind = false)
 
         val now = System.currentTimeMillis()
         val lastHealthyAt = maxOf(lastConnectedAt, lastHeartbeatAt)
 
         if (running) {
             if (lastInterruptedAt > lastHealthyAt) {
-                return if (now - lastInterruptedAt <= ACCESSIBILITY_INTERRUPT_GRACE_MS) {
+                val state = if (now - lastInterruptedAt <= ACCESSIBILITY_INTERRUPT_GRACE_MS) {
                     ServiceBindingState.CONNECTING
                 } else {
                     ServiceBindingState.DEGRADED
                 }
+                return BindingEval(state, needsManualRebind = false)
             }
-            return ServiceBindingState.READY
+            return BindingEval(ServiceBindingState.READY, needsManualRebind = false)
         }
 
         // Process-young grace: after any process restart (manual force-stop, OS task-kill on
         // aggressive OEMs like Xiaomi/Samsung), the AccessibilityService singleton is null and
-        // onServiceConnected hasn't fired yet for the new process. The OS rebinds within seconds.
+        // onServiceConnected hasn't fired yet for the new process. The OS is *expected* to
+        // rebind within seconds — but on some OEM builds (Vivo in QA) it often never does,
+        // which is why the stale fall-through below carries the needsManualRebind marker.
         // Anchor the grace to PROCESS start time so a fresh process always gets a fair window
         // regardless of how stale lastHealthyAt is in MMKV.
         if (now - processStartTimestamp <= PROCESS_START_REBIND_GRACE_MS) {
-            return ServiceBindingState.CONNECTING
+            return BindingEval(ServiceBindingState.CONNECTING, needsManualRebind = false)
         }
 
-        if (lastHealthyAt <= 0L) return ServiceBindingState.CONNECTING
+        if (lastHealthyAt <= 0L) {
+            return BindingEval(ServiceBindingState.CONNECTING, needsManualRebind = false)
+        }
 
         if (now - lastHealthyAt <= SERVICE_REBIND_GRACE_MS) {
-            return ServiceBindingState.CONNECTING
+            return BindingEval(ServiceBindingState.CONNECTING, needsManualRebind = false)
         }
+
+        // Stale and unbound. The two branches above catch a clean goodbye (onDestroy or
+        // onInterrupt recorded after the last healthy moment — service stopped or crashed
+        // in place). Reaching here means neither goodbye ever arrived: the process was
+        // killed outright — the OEM zombie. needsManualRebind = true.
         if (lastDisconnectedAt > 0L && lastDisconnectedAt >= lastHealthyAt) {
-            return ServiceBindingState.DEGRADED
+            return BindingEval(ServiceBindingState.DEGRADED, needsManualRebind = false)
         }
         if (lastInterruptedAt > 0L && lastInterruptedAt >= lastHealthyAt) {
-            return ServiceBindingState.DEGRADED
+            return BindingEval(ServiceBindingState.DEGRADED, needsManualRebind = false)
         }
-        return ServiceBindingState.DEGRADED
+        return BindingEval(ServiceBindingState.DEGRADED, needsManualRebind = true)
     }
 
     fun missingMonitorRequirements(context: Context): List<AppRequirement> {

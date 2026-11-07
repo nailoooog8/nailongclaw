@@ -173,7 +173,15 @@ class MonitorActivity : BaseActivity() {
 
     private fun refreshStatuses() {
         val capabilities = AppCapabilityCoordinator.snapshot(this)
-        accessibilityItem?.setTrailingText(capabilities.accessibilityStatusLabel)
+        if (capabilities.accessibilityNeedsManualRebind) {
+            // OEM zombie: the switch in system settings is on, so a plain
+            // "Disconnected" reads as "switch is off" and sends the user hunting
+            // for the wrong fix. Say what actually happened instead.
+            accessibilityItem?.setTrailingText("已开启 · 系统未连接，点此开关修复")
+            accessibilityItem?.setTrailingTextColor(cds.danger)
+        } else {
+            accessibilityItem?.setTrailingText(capabilities.accessibilityStatusLabel)
+        }
         notificationAccessItem?.setTrailingText(capabilities.notificationAccessStatusLabel)
 
         val keepAlive = ForegroundService.isPersistentKeepAliveEnabled()

@@ -56,7 +56,11 @@ class ChannelSetup(
                         ServiceBindingState.CONNECTING ->
                             "Accessibility is still reconnecting. Please try again in a few seconds."
                         ServiceBindingState.DEGRADED ->
-                            "Accessibility disconnected. Please re-open NailongClaw or re-enable Accessibility."
+                            if (AppCapabilityCoordinator.accessibilityNeedsManualRebind(app)) {
+                                "Accessibility is switched on in system settings, but the system never reconnected it after the app was killed. Open Settings > Accessibility and toggle NailongClaw off, then back on."
+                            } else {
+                                "Accessibility disconnected. Please re-open NailongClaw or re-enable Accessibility."
+                            }
                         ServiceBindingState.READY ->
                             app.getString(R.string.channel_msg_no_accessibility)
                     }
