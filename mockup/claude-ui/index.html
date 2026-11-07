@@ -13,11 +13,15 @@
   <!-- ============================ 侧边栏 ============================ -->
   <aside class="sidebar">
     <div class="sidebar-head">
+      <!-- 品牌块：字母标 / 产品名 / 版本行。前两项与版本由 Kotlin 推送
+           （PokeClawChat.readBrandInfo，经 setBrandInfo 覆写）——版本号写死
+           在页面里就会漂，改名之前这一块就停在 v0.8.3 和字母 P 上。下面的是
+           纯浏览器预览的兜底值。 -->
       <div class="brand">
-        <div class="brand-mark">P</div>
+        <div class="brand-mark">N</div>
         <div>
-          <div>NailongClaw</div>
-          <div class="brand-sub">v0.8.3 · 附属发行版</div>
+          <div class="brand-name">NailongClaw</div>
+          <div class="brand-sub">v0.9.0 · 独立发行版</div>
         </div>
       </div>
       <!-- 新建对话。live 模式下点它经 PokeClawChat.newChat() 真的开一条

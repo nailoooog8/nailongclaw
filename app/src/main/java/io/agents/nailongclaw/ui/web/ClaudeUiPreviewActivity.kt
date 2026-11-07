@@ -554,6 +554,32 @@ class ClaudeUiPreviewActivity : BaseActivity() {
             ClaudeUiSessionBridge.modelStatusPayload(ModelConfigRepository.snapshot())
 
         /**
+         * JS → Kotlin: the sidebar brand block — product name, the letter in
+         * the mark, and the version line.
+         *
+         * Pushed rather than left in the markup because the markup cannot know
+         * any of the three, and the one time it was hardcoded it went stale in
+         * a way nobody notices: the sidebar kept showing 「P」 and 「v0.8.3 ·
+         * 附属发行版」 through the rename to NailongClaw 0.9.0. The version is
+         * the part that changes every release, so it comes from
+         * [BuildConfig.VERSION_NAME] instead of a string someone has to
+         * remember to bump.
+         */
+        @JavascriptInterface
+        fun readBrandInfo(): String {
+            val name = getString(R.string.app_name)
+            return ClaudeUiSessionBridge.serialize(
+                mapOf(
+                    "name" to name,
+                    // First letter of the product name: the mark follows the
+                    // name instead of being a second place to update.
+                    "mark" to name.take(1),
+                    "version" to BuildConfig.VERSION_NAME,
+                )
+            )
+        }
+
+        /**
          * JS → Kotlin: the model card's rows — every model this install can
          * select, each with the state that decides whether it can be.
          *
@@ -1026,6 +1052,22 @@ class ClaudeUiPreviewActivity : BaseActivity() {
     }
 
     /**
+     * Kotlin → JS: the sidebar brand block.
+     *
+     * Same reason as the model pill — the page is not reloaded, so anything the
+     * markup hardcodes has to be pushed or it silently goes stale. Here the
+     * stale part was the whole identity: the mark said 「P」 and the version
+     * line said 「v0.8.3 · 附属发行版」 for a 0.9.0 build named NailongClaw.
+     */
+    private fun publishBrandInfo() {
+        if (!::webView.isInitialized) return
+        val json = chatBridge.readBrandInfo()
+        webView.post {
+            webView.evaluateJavascript("window.__cds && window.__cds.setBrandInfo($json);", null)
+        }
+    }
+
+    /**
      * Every model this install can select, as card rows.
      *
      * Local first, then cloud in [CloudProvider] declaration order — the same
@@ -1407,12 +1449,14 @@ class ClaudeUiPreviewActivity : BaseActivity() {
 
                 override fun onPageFinished(view: WebView, url: String) {
                     // The page's own bootstrap has run by now, so window.__cds
-                    // exists. Push the three things the markup cannot know:
-                    // which conversation is open, which model is selected, and
-                    // which search provider is active (with its key state).
+                    // exists. Push the things the markup cannot know: which
+                    // conversation is open, which model is selected, which
+                    // search provider is active (with its key state), and the
+                    // brand block (name, mark letter, version).
                     publishConversations()
                     publishModelStatus()
                     publishWebSearchStatus()
+                    publishBrandInfo()
                 }
             }
             // Without a WebChromeClient the page's console output never leaves
@@ -1691,13 +1735,15 @@ class ClaudeUiPreviewActivity : BaseActivity() {
         // itself is not reloaded on resume, so push whatever changed — KVUtils
         // is the source of truth, the page's localStorage is only a cache.
         syncPrefsToPage()
-        // Same reasoning, three more things the markup used to hardcode: the
-        // model pill (switched on the native 模型 page), the session list
-        // (a conversation deleted from the chat screen's sidebar), and the
-        // smart-search card (a key saved on the native 网络搜索 page).
+        // Same reasoning, the things the markup used to hardcode: the model
+        // pill (switched on the native 模型 page), the session list (a
+        // conversation deleted from the chat screen's sidebar), the
+        // smart-search card (a key saved on the native 网络搜索 page), and the
+        // brand block (an upgrade that changed the version while stopped).
         publishModelStatus()
         publishConversations()
         publishWebSearchStatus()
+        publishBrandInfo()
     }
 
     /**

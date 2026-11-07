@@ -700,13 +700,81 @@
      turn。全部走 createElement + textContent，不用 innerHTML 拼消息正文 ——
      助手内容是模型生成的，拼字符串就是注入面。
 
-     整表重建而不是增量 diff：消息量以「一轮任务」计（个位数到几十），重建成本
-     远低于维护一套 key 对齐的 diff；而增量一旦漏掉一次就会错位，且错位之后
-     没有任何自愈路径。滚动钉住由 repin() 负责，重建不丢滚动位置。 */
+     Kotlin 推全量快照（防失步，快照本身便宜），但「整表清空重建」每帧拆光
+     DOM 就是「反复刷新屏幕、不流畅」的来源。所以这里做签名 diff：
+     - 一条没变 → 不碰 DOM；
+     - 纯追加 → 只补新回合，旧 DOM（连同上面挂着的 chips）原样保留；
+     - 只有最后一条原地变化（流式 token / typing 翻新）→ 原地换最后一回合；
+     - 结构变化（换会话 / 回退 / 编辑）→ 整表重建兜底，永远自愈。
+     签名只取 buildTurn 实际消费的字段；同长度同签名的极端漏判会被下一次
+     更新纠正，代价远小于每帧全拆。滚动钉住沿四机制（repin/冷却/守卫/跳钮）。 */
+  var _renderedSigs = [];
+
+  function turnSig(m) {
+    return (m.isTypingIndicator ? 'T' : m.role || '') + '|' +
+      (m.content || '').length + '|' +
+      (m.toolSteps || []).length + '|' +
+      (m.modelName || '');
+  }
+
+  /** 重建/增量渲染后的滚动处理：钉着贴底，接管中按距底距离回位。 */
+  function settleAfterRender(wasPinned, distFromBottom) {
+    if (wasPinned) {
+      toBottom(false);
+    } else {
+      programmaticScroll = true;
+      feed.scrollTop = Math.max(0, feed.scrollHeight - distFromBottom);
+      pinned = false;
+      showJump = feed.scrollHeight - feed.scrollTop - feed.clientHeight > JUMP_THRESHOLD;
+      syncJump();
+    }
+  }
+
   function renderLive(messages) {
+    var wasPinned = pinned;
+    var distFromBottom = feed.scrollHeight - feed.scrollTop;
+    var fresh = messages || [];
+    var sigs = [];
+    for (var i = 0; i < fresh.length; i++) sigs.push(turnSig(fresh[i]));
+
+    var common = 0;
+    var maxCommon = Math.min(_renderedSigs.length, sigs.length);
+    while (common < maxCommon && _renderedSigs[common] === sigs[common]) common++;
+
+    if (common === _renderedSigs.length && sigs.length === _renderedSigs.length) {
+      return; // 一个字节都没变
+    }
+
+    if (common === _renderedSigs.length - 1 && sigs.length === _renderedSigs.length) {
+      // 只有最后一条原地变化（流式 token / typing 翻新）——原地换最后一回合
+      var replacement = buildTurn(fresh[fresh.length - 1]);
+      if (feed.lastElementChild) {
+        feed.replaceChild(replacement, feed.lastElementChild);
+      } else {
+        feed.appendChild(replacement);
+      }
+      _renderedSigs = sigs;
+      settleAfterRender(wasPinned, distFromBottom);
+      return;
+    }
+
+    if (common === _renderedSigs.length && sigs.length > _renderedSigs.length) {
+      // 纯追加 —— 旧 DOM 不动，只补新回合
+      for (var j = _renderedSigs.length; j < fresh.length; j++) {
+        feed.appendChild(buildTurn(fresh[j]));
+      }
+      _renderedSigs = sigs;
+      settleAfterRender(wasPinned, distFromBottom);
+      return;
+    }
+
+    // 结构变化（换会话 / 回退 / 编辑）—— 整表重建兜底
     feed.textContent = '';
-    (messages || []).forEach(function (m) { feed.appendChild(buildTurn(m)); });
-    toBottom(false);
+    for (var k = 0; k < fresh.length; k++) {
+      feed.appendChild(buildTurn(fresh[k]));
+    }
+    _renderedSigs = sigs;
+    settleAfterRender(wasPinned, distFromBottom);
   }
 
   // Kotlin 侧已经把 JSON 字面量拼进调用点，所以这里拿到的是已解析的数组，
@@ -1051,6 +1119,32 @@
       closeNav();
       openSettingsView();
     });
+  }
+
+  /* --------------------------------------------- 侧栏品牌块
+     字母标 / 产品名 / 版本行。写死在页面里就会漂：改名那一轮它就是停在
+     「P」和「v0.8.3 · 附属发行版」上的——产品名改了、版本号每版都变，而
+     markup 谁都想不起来改。所以三项都经桥读（readBrandInfo），页面只画。
+     「独立发行版」这四个字是身份声明不是版本信息，留在页面里。 */
+  function setBrandInfo(info) {
+    if (!info) return; // 无桥预览：保留 markup 里的兜底值
+    var mark = document.querySelector('.brand-mark');
+    if (mark && info.mark) mark.textContent = String(info.mark);
+    var name = document.querySelector('.brand-name');
+    if (name && info.name) name.textContent = String(info.name);
+    var sub = document.querySelector('.brand-sub');
+    if (sub && info.version) sub.textContent = 'v' + String(info.version) + ' · 独立发行版';
+  }
+
+  function initBrandBlock() {
+    var b = bridge();
+    if (b && b.readBrandInfo) {
+      try {
+        setBrandInfo(JSON.parse(b.readBrandInfo() || 'null'));
+        return;
+      } catch (e) { console.warn('[cds] readBrandInfo failed:', e); }
+    }
+    setBrandInfo(null);
   }
 
   /* --------------------------------------------- 模型卡片
@@ -2861,6 +2955,7 @@
   initBase();
   initTaskGears();
   initSearchCard();
+  initBrandBlock();
   // 必须在主题初始化之后、且在首次读桥之前。addJavascriptInterface 在页面
   // 加载前就注入了，所以这里读到的一定是最终状态。
   if (hasNativeBridge()) enterLiveMode();
@@ -2910,6 +3005,7 @@
     setConversations: setConversations,
     setModelStatus: setModelStatus,
     setWebSearchStatus: setWebSearchStatus,
+    setBrandInfo: setBrandInfo,
     rateLimit: triggerBackoff,
     resetRateLimit: function () {
       clearInterval(backoff.timer); backoff.timer = null;
