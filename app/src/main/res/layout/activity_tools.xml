@@ -36,6 +36,11 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content" />
 
+            <io.agents.nailongclaw.widget.MenuGroup
+                android:id="@+id/shadowGroup"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+
             <TextView
                 android:id="@+id/tvFooter"
                 android:layout_width="match_parent"

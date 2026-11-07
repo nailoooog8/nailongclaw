@@ -5,6 +5,7 @@ package io.agents.nailongclaw.service;
 
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.GestureDescription;
+import android.app.ActivityOptions;
 import android.content.Context;
 import android.content.Intent;
 import android.provider.Settings;
@@ -21,6 +22,7 @@ import io.agents.nailongclaw.utils.KVUtils;
 import android.view.Display;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
+import android.view.accessibility.AccessibilityWindowInfo;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -30,6 +32,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.ConcurrentHashMap;
 
 import io.agents.nailongclaw.utils.UiTextMatchUtils;
 
@@ -138,6 +142,17 @@ public class ClawAccessibilityService extends AccessibilityService {
      */
     private final java.util.concurrent.atomic.AtomicLong contentVersion = new java.util.concurrent.atomic.AtomicLong(0);
 
+    /**
+     * Content-change counter for the SHADOW display only — see
+     * {@link ShadowDisplayManager}. Kept separate from {@link #contentVersion}
+     * so shadow windows can neither stall nor fake "the screen settled" for
+     * real-display tools, and so a busy shadow app cannot starve
+     * {@link #awaitUiStable(long, long)}. This split is the event half of the
+     * loop fencing: an unscoped counter across two displays is one of the ways
+     * Mika-style shadow automation walks into an infinite loop.
+     */
+    private final java.util.concurrent.atomic.AtomicLong shadowContentVersion = new java.util.concurrent.atomic.AtomicLong(0);
+
     @Override
     public void onAccessibilityEvent(AccessibilityEvent event) {
         KVUtils.INSTANCE.noteAccessibilityHeartbeat();
@@ -147,7 +162,11 @@ public class ClawAccessibilityService extends AccessibilityService {
             if (type == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED
                     || type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
                     || type == AccessibilityEvent.TYPE_VIEW_SCROLLED) {
-                contentVersion.incrementAndGet();
+                if (isShadowEvent(event)) {
+                    shadowContentVersion.incrementAndGet();
+                } else {
+                    contentVersion.incrementAndGet();
+                }
             }
         }
 
@@ -167,12 +186,25 @@ public class ClawAccessibilityService extends AccessibilityService {
         if (event != null && event.getEventType() == AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED) {
             XLog.d(TAG, "Notification event from: " + event.getPackageName());
         }
-        // Auto-reply: check incoming messaging notifications
-        try {
-            AutoReplyManager.getInstance().onAccessibilityEvent(event);
-        } catch (Exception e) {
-            XLog.e(TAG, "AutoReplyManager error in onAccessibilityEvent", e);
+        // Auto-reply: check incoming messaging notifications. Shadow-display
+        // events never reach it — a WeChat instance running on the shadow
+        // display would otherwise trigger auto-replies from its own echo.
+        if (event == null || !isShadowEvent(event)) {
+            try {
+                AutoReplyManager.getInstance().onAccessibilityEvent(event);
+            } catch (Exception e) {
+                XLog.e(TAG, "AutoReplyManager error in onAccessibilityEvent", e);
+            }
         }
+    }
+
+    /** True when [event] originates from the shadow display (API 33+, else false). */
+    private boolean isShadowEvent(AccessibilityEvent event) {
+        Integer shadowId = ShadowDisplayManager.getDisplayIdOrNull();
+        if (shadowId == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            return false;
+        }
+        return event.getDisplayId() == shadowId;
     }
 
     @Override
@@ -185,6 +217,38 @@ public class ClawAccessibilityService extends AccessibilityService {
     /** Current content version — see {@link #awaitUiStable(long, long)}. */
     public long getContentVersion() {
         return contentVersion.get();
+    }
+
+    /** Content version of the SHADOW display only — see {@link #shadowContentVersion}. */
+    public long getShadowContentVersion() {
+        return shadowContentVersion.get();
+    }
+
+    /**
+     * {@link #awaitUiStable(long, long)} for the SHADOW display: watches only
+     * shadow-display content changes, so real-screen activity (the user
+     * scrolling their own phone) can neither stall nor fake shadow stability.
+     */
+    public boolean awaitShadowUiStable(long timeoutMs, long quietPeriodMs) {
+        long deadline = System.currentTimeMillis() + timeoutMs;
+        long lastVersion = shadowContentVersion.get();
+        long lastChangeAt = System.currentTimeMillis();
+        while (System.currentTimeMillis() < deadline) {
+            try {
+                Thread.sleep(80);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+            long version = shadowContentVersion.get();
+            if (version != lastVersion) {
+                lastVersion = version;
+                lastChangeAt = System.currentTimeMillis();
+            } else if (System.currentTimeMillis() - lastChangeAt >= quietPeriodMs) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -223,6 +287,7 @@ public class ClawAccessibilityService extends AccessibilityService {
         instance = null;
         KVUtils.INSTANCE.noteAccessibilityDisconnected();
         XLog.i(TAG, "Accessibility service destroyed");
+        ShadowDisplayManager.release();
         ForegroundService.Companion.syncToBackgroundState(this);
     }
 
@@ -313,6 +378,41 @@ public class ClawAccessibilityService extends AccessibilityService {
                 new GestureDescription.StrokeDescription(path, 0, durationMs);
         GestureDescription gesture = new GestureDescription.Builder()
                 .addStroke(stroke)
+                .build();
+        return dispatchGestureSync(gesture);
+    }
+
+    // ======================== Shadow-display gestures ========================
+    // Coordinates here are in the TARGET display's own space. Never route a
+    // shadow node's bounds through the default-display performers above: the
+    // tap would land on the same spot of the REAL screen and the automation
+    // would see no progress and retry forever — the Mika-style loop trap.
+
+    /** Tap at (x, y) on [displayId] (API 30+; coordinates are that display's). */
+    public boolean performTapOnDisplay(int displayId, int x, int y, long durationMs) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            return false;
+        }
+        Path path = new Path();
+        path.moveTo(x, y);
+        GestureDescription gesture = new GestureDescription.Builder()
+                .setDisplayId(displayId)
+                .addStroke(new GestureDescription.StrokeDescription(path, 0, durationMs))
+                .build();
+        return dispatchGestureSync(gesture);
+    }
+
+    /** Swipe on [displayId] (API 30+; coordinates are that display's). */
+    public boolean performSwipeOnDisplay(int displayId, int startX, int startY, int endX, int endY, long durationMs) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            return false;
+        }
+        Path path = new Path();
+        path.moveTo(startX, startY);
+        path.lineTo(endX, endY);
+        GestureDescription gesture = new GestureDescription.Builder()
+                .setDisplayId(displayId)
+                .addStroke(new GestureDescription.StrokeDescription(path, 0, durationMs))
                 .build();
         return dispatchGestureSync(gesture);
     }
@@ -437,6 +537,44 @@ public class ClawAccessibilityService extends AccessibilityService {
     }
 
     /**
+     * Clicks a node on the SHADOW display. Same walk as {@link #clickNode}
+     * except the final fallback taps on the SHADOW display (scoped gesture),
+     * never on the default display — a default-display fallback here is the
+     * exact mechanism that makes shadow automation loop: the tap visibly
+     * changes nothing on the shadow display, so the caller retries forever.
+     */
+    public boolean clickShadowNode(AccessibilityNodeInfo node) {
+        if (node == null) {
+            return false;
+        }
+        if (node.isClickable()) {
+            if (node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                return true;
+            }
+            XLog.w(TAG, "Shadow ACTION_CLICK returned false, walking up");
+        }
+        AccessibilityNodeInfo parent = node.getParent();
+        while (parent != null) {
+            if (parent.isClickable()) {
+                if (parent.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                    parent.recycle();
+                    return true;
+                }
+            }
+            // No recycle in the walk — matching clickNode: recycle here would
+            // free the node before getParent() reads through it on API < 33.
+            parent = parent.getParent();
+        }
+        Integer shadowId = ShadowDisplayManager.getDisplayIdOrNull();
+        Rect bounds = new Rect();
+        node.getBoundsInScreen(bounds);
+        if (shadowId == null) {
+            return false;
+        }
+        return performTapOnDisplay(shadowId, bounds.centerX(), bounds.centerY(), 100);
+    }
+
+    /**
      * Collects a tree representation of the current screen for AI analysis.
      */
     /** Node ID → center coordinates mapping for tap_node tool */
@@ -460,6 +598,69 @@ public class ClawAccessibilityService extends AccessibilityService {
         return nodeIdMap.get(nodeId);
     }
 
+    // ======================== Shadow display perception ========================
+
+    /**
+     * Node ID → center coordinates within the SHADOW display, for the
+     * shadow_tap_node tool. Separate map from {@link #nodeIdMap}: the two
+     * trees' coordinate spaces are different displays, and mixing them sends
+     * taps to the wrong screen.
+     */
+    private final ConcurrentHashMap<String, int[]> shadowNodeIdMap = new ConcurrentHashMap<>();
+    private final AtomicInteger shadowNodeCounter = new AtomicInteger(0);
+
+    /**
+     * Collects a tree of the SHADOW display's focused window, or null when no
+     * shadow display exists / no window is on it. Strictly display-scoped:
+     * reads windows via {@link #getWindows()} filtered by display id, never
+     * {@link #getRootInActiveWindow()}, which is default-display bound.
+     */
+    public String getShadowScreenTree() {
+        AccessibilityNodeInfo root = getShadowWindowRoot();
+        if (root == null) {
+            return null;
+        }
+        shadowNodeIdMap.clear();
+        shadowNodeCounter.set(0);
+        StringBuilder sb = new StringBuilder();
+        buildNodeTree(root, sb, 0, shadowNodeIdMap, shadowNodeCounter);
+        root.recycle();
+        return sb.toString();
+    }
+
+    /** Center coordinates for a shadow-tree node ID (e.g. "n3"), or null. */
+    public int[] getShadowNodeCoordinates(String nodeId) {
+        return shadowNodeIdMap.get(nodeId);
+    }
+
+    /**
+     * The focused root node of a window on the shadow display, or the first
+     * accessible root there. Caller recycles. Requires API 33+ for
+     * {@link AccessibilityWindowInfo#getDisplayId()}.
+     */
+    private AccessibilityNodeInfo getShadowWindowRoot() {
+        Integer shadowId = ShadowDisplayManager.getDisplayIdOrNull();
+        if (shadowId == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            return null;
+        }
+        AccessibilityWindowInfo fallback = null;
+        for (AccessibilityWindowInfo window : getWindows()) {
+            if (window == null || window.getDisplayId() != shadowId) {
+                continue;
+            }
+            if (window.isFocused()) {
+                AccessibilityNodeInfo root = window.getRoot();
+                if (root != null) {
+                    return root;
+                }
+            }
+            if (fallback == null) {
+                fallback = window;
+            }
+        }
+        return fallback != null ? fallback.getRoot() : null;
+    }
+
     /**
      * Collects a FULL tree representation of the current screen (debug only).
      * Includes ALL nodes with all properties, no filtering.
@@ -476,6 +677,11 @@ public class ClawAccessibilityService extends AccessibilityService {
     }
 
     private void buildNodeTree(AccessibilityNodeInfo node, StringBuilder sb, int depth) {
+        buildNodeTree(node, sb, depth, nodeIdMap, nodeCounter);
+    }
+
+    private void buildNodeTree(AccessibilityNodeInfo node, StringBuilder sb, int depth,
+            ConcurrentHashMap<String, int[]> idMap, AtomicInteger counter) {
         if (node == null) {
             return;
         }
@@ -486,7 +692,7 @@ public class ClawAccessibilityService extends AccessibilityService {
             for (int i = 0; i < node.getChildCount(); i++) {
                 AccessibilityNodeInfo child = node.getChild(i);
                 if (child != null) {
-                    buildNodeTree(child, sb, depth);
+                    buildNodeTree(child, sb, depth, idMap, counter);
                     child.recycle();
                 }
             }
@@ -510,8 +716,8 @@ public class ClawAccessibilityService extends AccessibilityService {
             int cy = (bounds.top + bounds.bottom) / 2;
 
             // Assign node ID for tap_node tool
-            String nodeId = "n" + nodeCounter.incrementAndGet();
-            nodeIdMap.put(nodeId, new int[]{cx, cy});
+            String nodeId = "n" + counter.incrementAndGet();
+            idMap.put(nodeId, new int[]{cx, cy});
 
             // Format: [n1] "text" tap edit (cx,cy)
             StringBuilder line = new StringBuilder();
@@ -541,7 +747,7 @@ public class ClawAccessibilityService extends AccessibilityService {
         for (int i = 0; i < node.getChildCount(); i++) {
             AccessibilityNodeInfo child = node.getChild(i);
             if (child != null) {
-                buildNodeTree(child, sb, childDepth);
+                buildNodeTree(child, sb, childDepth, idMap, counter);
                 child.recycle();
             }
         }
@@ -827,6 +1033,26 @@ public class ClawAccessibilityService extends AccessibilityService {
      * Returns the bitmap or null on failure.
      */
     public Bitmap takeScreenshot(long timeoutMs) {
+        return takeScreenshot(Display.DEFAULT_DISPLAY, timeoutMs);
+    }
+
+    /**
+     * Takes a screenshot of the SHADOW display (requires API 30+ and a live
+     * shadow display; null otherwise).
+     */
+    public Bitmap takeShadowScreenshot(long timeoutMs) {
+        Integer shadowId = ShadowDisplayManager.getDisplayIdOrNull();
+        if (shadowId == null) {
+            return null;
+        }
+        return takeScreenshot(shadowId, timeoutMs);
+    }
+
+    /**
+     * Takes a screenshot of [displayId] (requires API 30+).
+     * Returns the bitmap or null on failure.
+     */
+    public Bitmap takeScreenshot(int displayId, long timeoutMs) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
             return null;
         }
@@ -836,7 +1062,7 @@ public class ClawAccessibilityService extends AccessibilityService {
         // Use a background executor for the callback to avoid deadlock
         // when takeScreenshot is called from the main thread (Tier 1 tools).
         java.util.concurrent.Executor bgExecutor = java.util.concurrent.Executors.newSingleThreadExecutor();
-        takeScreenshot(Display.DEFAULT_DISPLAY, bgExecutor,
+        takeScreenshot(displayId, bgExecutor,
                 new TakeScreenshotCallback() {
                     @Override
                     public void onSuccess(ScreenshotResult result) {
@@ -900,6 +1126,31 @@ public class ClawAccessibilityService extends AccessibilityService {
         } catch (Exception e) {
             XLog.e(TAG, "Failed to open app: " + packageName, e);
             return false;
+        }
+    }
+
+    /**
+     * Launches an app onto [displayId] (e.g. the shadow display). Returns
+     * null on success, or the failure reason (exception class + message, or
+     * "no launch intent") — callers surface it verbatim instead of guessing,
+     * because display-targeted launches are refused for several distinct
+     * ROM-side reasons and the remedy differs per reason.
+     */
+    public String openAppOnDisplay(String packageName, int displayId) {
+        try {
+            Intent intent = getPackageManager().getLaunchIntentForPackage(packageName);
+            if (intent == null) {
+                XLog.e(TAG, "Cannot resolve launch intent for " + packageName);
+                return "no launch intent for " + packageName;
+            }
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            ActivityOptions options = ActivityOptions.makeBasic();
+            options.setLaunchDisplayId(displayId);
+            startActivity(intent, options.toBundle());
+            return null;
+        } catch (Exception e) {
+            XLog.e(TAG, "Failed to open app " + packageName + " on display " + displayId, e);
+            return e.getClass().getSimpleName() + ": " + e.getMessage();
         }
     }
 }

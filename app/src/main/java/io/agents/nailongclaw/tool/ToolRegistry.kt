@@ -9,6 +9,7 @@ import io.agents.nailongclaw.agent.memory.MemoryRecallTool
 import io.agents.nailongclaw.agent.memory.MemorySaveTool
 import io.agents.nailongclaw.tool.impl.*
 import io.agents.nailongclaw.tool.impl.mobile.*
+import io.agents.nailongclaw.tool.impl.mobile.shadow.*
 import io.agents.nailongclaw.tool.impl.tv.*
 
 object ToolRegistry {
@@ -96,6 +97,12 @@ object ToolRegistry {
         register(ReadConversationTool())
         register(SendMessageTool())
         register(AutoReplyTool())
+        // Shadow display (虚拟屏) — display-scoped automation; ids from
+        // shadow_get_screen_info never mix with default-display ones.
+        register(ShadowGetScreenInfoTool())
+        register(ShadowOpenAppTool())
+        register(ShadowTapNodeTool())
+        register(ShadowSwipeTool())
     }
 
     fun register(tool: BaseTool) {

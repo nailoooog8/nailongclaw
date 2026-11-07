@@ -8,12 +8,14 @@ import android.app.*
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
+import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import io.agents.nailongclaw.AppCapabilityCoordinator
 import io.agents.nailongclaw.R
@@ -233,6 +235,35 @@ class ForegroundService : Service() {
                 PackageManager.PERMISSION_GRANTED
         }
 
+        private const val EXTRA_PROJECTION_RESULT_CODE = "extra_projection_result_code"
+        private const val EXTRA_PROJECTION_DATA = "extra_projection_data"
+
+        /**
+         * Starts (or upgrades) this service to hold a MediaProjection for the
+         * shadow display. Call from the Activity that just received the
+         * screen-capture consent result — the fresh consent is what makes an
+         * FGS start with the mediaProjection type legal, and Android 14+
+         * refuses `MediaProjection.createVirtualDisplay` until a foreground
+         * service of that type is running. Null = the display is up.
+         */
+        fun startWithProjection(context: Context, resultCode: Int, data: Intent): String? {
+            return try {
+                val intent = Intent(context, ForegroundService::class.java).apply {
+                    putExtra(EXTRA_PROJECTION_RESULT_CODE, resultCode)
+                    putExtra(EXTRA_PROJECTION_DATA, data)
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+                null
+            } catch (e: Exception) {
+                XLog.w(TAG, "Projection foreground-service start failed", e)
+                "${e.javaClass.simpleName}: ${e.message}"
+            }
+        }
+
         fun stop(context: Context) {
             _mode = ForegroundMode.IDLE
             val intent = Intent(context, ForegroundService::class.java)
@@ -288,9 +319,15 @@ class ForegroundService : Service() {
         _isRunning = true
         createNotificationChannel()
         if (hasNotificationPermission(this)) {
-            startForeground(
+            // Typed explicitly: with mediaProjection added to the manifest
+            // types, the two-arg startForeground on API 34+ would claim EVERY
+            // manifest type and demand mediaProjection eligibility on ordinary
+            // restarts. Normal operation only ever claims specialUse.
+            ServiceCompat.startForeground(
+                this,
                 NOTIFICATION_ID,
-                buildNotification(this, DEFAULT_TASK_TITLE, DEFAULT_TASK_TEXT)
+                buildNotification(this, DEFAULT_TASK_TITLE, DEFAULT_TASK_TEXT),
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
             )
         } else {
             stopSelf()
@@ -309,9 +346,65 @@ class ForegroundService : Service() {
         super.onTaskRemoved(rootIntent)
     }
 
+    /**
+     * Acquires the projection with the fresh consent token and creates the
+     * shadow display through it (trusted → other packages can be launched
+     * onto the display). Runs after the mediaProjection FGS type is live.
+     */
+    private fun handleProjection(resultCode: Int, data: Intent) {
+        val message = try {
+            val mpm = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as android.media.projection.MediaProjectionManager
+            val projection = mpm.getMediaProjection(resultCode, data)
+            if (projection == null) {
+                "授权令牌无效（getMediaProjection 返回空）"
+            } else {
+                ShadowDisplayManager.attachProjection(projection)
+                val id = ShadowDisplayManager.ensureCreated(applicationContext)
+                if (id != null) null
+                else "投影已授权但影子屏创建失败（见日志）"
+            }
+        } catch (e: Exception) {
+            XLog.w(TAG, "MediaProjection acquisition failed", e)
+            "${e.javaClass.simpleName}: ${e.message}"
+        }
+        runCatching {
+            Toast.makeText(
+                this,
+                message ?: "影子屏已就绪（投影授权成功）",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val notification = createNotification(intent)
-        startForeground(NOTIFICATION_ID, notification)
+        val projectionResultCode = intent?.getIntExtra(EXTRA_PROJECTION_RESULT_CODE, Int.MIN_VALUE)
+        val projectionData = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            intent?.getParcelableExtra(EXTRA_PROJECTION_DATA, Intent::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            intent?.getParcelableExtra(EXTRA_PROJECTION_DATA)
+        }
+        if (projectionResultCode != null && projectionResultCode != Int.MIN_VALUE && projectionData != null) {
+            // Escalate to the mediaProjection type FIRST — Android 14+ refuses
+            // getMediaProjection/createVirtualDisplay until a foreground
+            // service of that type is running.
+            ServiceCompat.startForeground(
+                this,
+                NOTIFICATION_ID,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE or
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+            )
+            handleProjection(projectionResultCode, projectionData)
+        } else {
+            ServiceCompat.startForeground(
+                this,
+                NOTIFICATION_ID,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+            )
+        }
         if (intent == null) {
             // System restarted the service after a process kill (START_STICKY).
             // Re-sync to actual state: keep running only if monitoring or a

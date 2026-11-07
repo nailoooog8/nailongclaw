@@ -3,12 +3,17 @@
 
 package io.agents.nailongclaw.ui.settings
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.ViewGroup
 import android.widget.TextView
+import android.widget.Toast
 import io.agents.nailongclaw.R
 import io.agents.nailongclaw.agent.skill.SkillRegistry
 import io.agents.nailongclaw.base.BaseActivity
+import io.agents.nailongclaw.service.ClawAccessibilityService
+import io.agents.nailongclaw.service.ForegroundService
+import io.agents.nailongclaw.service.ShadowDisplayManager
 import io.agents.nailongclaw.tool.ToolRegistry
 import io.agents.nailongclaw.ui.cds.CdsUi
 import io.agents.nailongclaw.widget.CommonToolbar
@@ -34,6 +39,28 @@ class ToolsActivity : BaseActivity() {
     private lateinit var builtinGroup: MenuGroup
     private lateinit var mcpGroup: MenuGroup
     private lateinit var skillGroup: MenuGroup
+    private lateinit var shadowGroup: MenuGroup
+
+    private companion object {
+        const val DOUYIN_PACKAGE = "com.ss.android.ugc.aweme"
+        const val REQ_PROJECTION_CONSENT = 4101
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != REQ_PROJECTION_CONSENT) return
+        if (data == null) {
+            Toast.makeText(this, "未获得授权结果", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val error = ForegroundService.startWithProjection(this, resultCode, data)
+        Toast.makeText(
+            this,
+            error ?: "已授权，正在创建影子屏…",
+            Toast.LENGTH_LONG
+        ).show()
+        renderAll()
+    }
 
     private val cds by lazy { CdsUi.palette(this) }
 
@@ -53,7 +80,8 @@ class ToolsActivity : BaseActivity() {
         builtinGroup = findViewById(R.id.builtinGroup)
         mcpGroup = findViewById(R.id.mcpGroup)
         skillGroup = findViewById(R.id.skillGroup)
-        listOf(builtinGroup, mcpGroup, skillGroup).forEach { it.applyCds(cds) }
+        shadowGroup = findViewById(R.id.shadowGroup)
+        listOf(builtinGroup, mcpGroup, skillGroup, shadowGroup).forEach { it.applyCds(cds) }
 
         findViewById<TextView>(R.id.tvFooter).apply {
             CdsUi.styleChromeText(this, cds, 11f)
@@ -122,6 +150,110 @@ class ToolsActivity : BaseActivity() {
                     setTrailingIconColor(cds.textMuted)
                 }
             }
+        }
+
+        // 影子屏（虚拟屏）调试入口 — Stage A device QA: create/tear down the
+        // display and launch a target app onto it, then exercise the
+        // shadow_* tools over a channel or the chat.
+        renderGroup(shadowGroup, "影子屏（调试）", false) {
+            val id = ShadowDisplayManager.getDisplayIdOrNull()
+            shadowGroup.addMenuItem(
+                leadingIcon = android.R.drawable.ic_secure,
+                title = "授权屏幕捕获（MediaProjection）",
+                onClick = {
+                    // The consent dialog must be driven by an Activity. The
+                    // result goes to ForegroundService.startWithProjection,
+                    // which upgrades to the mediaProjection FGS type and
+                    // creates the display through the projection — a trusted
+                    // display, the only kind that hosts OTHER packages.
+                    val mpm = getSystemService(android.content.Context.MEDIA_PROJECTION_SERVICE)
+                        as android.media.projection.MediaProjectionManager
+                    startActivityForResult(mpm.createScreenCaptureIntent(), REQ_PROJECTION_CONSENT)
+                },
+                showDivider = true
+            ).apply {
+                setTitleColor(cds.textPrimary)
+                setTrailingText("拉抖音前先授权")
+                setTrailingTextColor(cds.textMuted)
+                setLeadingIconColor(cds.textPrimary)
+                setTrailingIconColor(cds.textMuted)
+            }
+            shadowGroup.addMenuItem(
+                leadingIcon = android.R.drawable.ic_menu_view,
+                title = if (id == null) "创建影子屏" else "销毁影子屏（id=$id）",
+                onClick = {
+                    if (ShadowDisplayManager.isCreated()) {
+                        ShadowDisplayManager.release()
+                        Toast.makeText(this, "影子屏已销毁", Toast.LENGTH_SHORT).show()
+                    } else {
+                        val created = ShadowDisplayManager.ensureCreated(this)
+                        Toast.makeText(
+                            this,
+                            if (created != null) "影子屏已创建 displayId=$created" else "创建失败（需 Android 13+，见日志）",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                    renderAll()
+                },
+                showDivider = true
+            ).apply {
+                setTitleColor(cds.textPrimary)
+                setTrailingText(if (id == null) "未创建" else "运行中")
+                setTrailingTextColor(if (id == null) cds.textMuted else cds.accent)
+                setLeadingIconColor(cds.textPrimary)
+                setTrailingIconColor(cds.textMuted)
+            }
+            shadowGroup.addMenuItem(
+                leadingIcon = android.R.drawable.ic_menu_send,
+                title = "拉抖音上影子屏",
+                onClick = {
+                    val target = ShadowDisplayManager.getDisplayIdOrNull()
+                    if (target == null) {
+                        Toast.makeText(this, "先创建影子屏", Toast.LENGTH_SHORT).show()
+                    } else {
+                        // Try the production path (a11y service) first, then the
+                        // foreground-activity path (no BAL question at all).
+                        // Both failure reasons go to the Toast verbatim — the
+                        // ROM refuses display-targeted launches for several
+                        // distinct reasons and the text decides the remedy.
+                        val serviceError = ClawAccessibilityService.getInstance()
+                            ?.openAppOnDisplay(DOUYIN_PACKAGE, target)
+                        val activityError = serviceError?.let { launchOnDisplay(DOUYIN_PACKAGE, target) }
+                        val msg = when {
+                            serviceError == null -> "服务路径：已发起启动，真机屏幕应保持不变"
+                            activityError == null -> "服务路径失败($serviceError)；前台路径成功"
+                            else -> "两条路径均失败：服务=$serviceError 前台=$activityError"
+                        }
+                        Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
+                    }
+                },
+                showDivider = false
+            ).apply {
+                setTitleColor(cds.textPrimary)
+                setTrailingText("com.ss.android.ugc.aweme")
+                setTrailingTextColor(cds.textMuted)
+                setLeadingIconColor(cds.textPrimary)
+                setTrailingIconColor(cds.textMuted)
+            }
+        }
+    }
+
+    /**
+     * Launch from this foreground Activity — the most permissive path (no
+     * background-activity-launch question at all). Null = success, else the
+     * failure reason verbatim.
+     */
+    private fun launchOnDisplay(packageName: String, displayId: Int): String? {
+        return try {
+            val intent = packageManager.getLaunchIntentForPackage(packageName)
+                ?: return "no launch intent for $packageName"
+            intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            val options = android.app.ActivityOptions.makeBasic()
+            options.setLaunchDisplayId(displayId)
+            startActivity(intent, options.toBundle())
+            null
+        } catch (e: Exception) {
+            "${e.javaClass.simpleName}: ${e.message}"
         }
     }
 
