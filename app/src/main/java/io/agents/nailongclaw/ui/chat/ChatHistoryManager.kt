@@ -69,13 +69,16 @@ object ChatHistoryManager {
     fun save(context: Context, conversationId: String, messages: List<ChatMessage>, model: String) {
         if (messages.isEmpty()) return
 
-        // Generate title from first user message
-        val firstUserMsg = messages.firstOrNull { it.role == ChatMessage.Role.USER }
-        val title = firstUserMsg?.content?.take(50)?.replace(Regex("[^a-zA-Z0-9\\s]"), "")?.trim()?.replace("\\s+".toRegex(), "-")?.lowercase() ?: "untitled"
-        val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(messages.first().timestamp))
-        val fileName = "$dateStr-$title.md"
+        // The file IS the conversation, so it is named by the stable
+        // conversation id. The old date+title filename collapsed every
+        // same-day conversation whose first message was Chinese into one
+        // overwritten file: the title regex strips everything outside
+        // [a-zA-Z0-9\s], leaving "" — "2026-11-07-.md" for all of them — and
+        // the sidebar then only ever showed a single record. The title lives
+        // in the frontmatter, where listConversations already reads it.
+        val file = File(getChatDir(context), "$conversationId.md")
 
-        val file = File(getChatDir(context), fileName)
+        val firstUserMsg = messages.firstOrNull { it.role == ChatMessage.Role.USER }
 
         val sb = StringBuilder()
         appendFrontmatter(sb, conversationId, firstUserMsg?.content, messages.first().timestamp, model)
@@ -116,6 +119,15 @@ object ChatHistoryManager {
 
         file.writeText(sb.toString())
 
+        // Migration: conversations saved under the old date+title scheme leave
+        // a stale file with the same frontmatter id; the canonical file above
+        // supersedes it. Only exact id matches are removed.
+        try {
+            getChatDir(context).listFiles()
+                ?.filter { it.extension == "md" && it.name != file.name && frontmatterId(it) == conversationId }
+                ?.forEach { it.delete() }
+        } catch (_: Exception) { /* cleanup is best-effort */ }
+
         // Index in SQLite for fast search
         try {
             ChatDatabase(context).indexConversation(
@@ -127,6 +139,27 @@ object ChatHistoryManager {
                 messages = messages
             )
         } catch (_: Exception) { /* index failure is non-fatal */ }
+    }
+
+    /** The `id:` line of a transcript's frontmatter, or "" when absent. */
+    private fun frontmatterId(file: File): String {
+        return try {
+            file.useLines { lines ->
+                var inFm = false
+                for (line in lines) {
+                    if (line == "---") {
+                        if (!inFm) {
+                            inFm = true
+                            continue
+                        } else break
+                    }
+                    if (inFm && line.startsWith("id: ")) return@useLines line.removePrefix("id: ").trim()
+                }
+                ""
+            }
+        } catch (_: Exception) {
+            ""
+        }
     }
 
     /**

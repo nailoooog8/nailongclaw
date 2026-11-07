@@ -658,9 +658,20 @@ private fun MessageList(
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
+    // Auto-follow only when the user is already at (or near) the bottom, and
+    // jump instantly instead of animating: an animated scroll from a reset or
+    // reading position visibly sweeps the whole history top-to-bottom on
+    // every task event — reported during shadow-display QA as "每执行一次任务
+    // 就会把聊天框从上到下滑一遍". Layout not ready yet (fresh composition)
+    // counts as "at bottom" so the chat still opens pinned to the newest
+    // message, just without the animated sweep.
     LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) {
-            scope.launch { listState.animateScrollToItem(messages.size - 1) }
+        if (messages.isEmpty()) return@LaunchedEffect
+        val info = listState.layoutInfo
+        val nearBottom = info.visibleItemsInfo.isEmpty() ||
+            info.visibleItemsInfo.last().index >= info.totalItemsCount - 2
+        if (nearBottom) {
+            listState.scrollToItem(messages.size - 1)
         }
     }
 
