@@ -664,6 +664,52 @@ public class ClawAccessibilityService extends AccessibilityService {
     }
 
     /**
+     * Whether the user is visibly using {@code packageName} on the default
+     * (real) display right now: {@link Boolean#TRUE} in use, FALSE not, null
+     * when the main display cannot be inspected. Borrowed from Mika's
+     * pre-launch in-use gate — starting an app onto the shadow display while
+     * the user has it open on the real screen would yank their task out from
+     * under them. Window presence on the main display is the closest a11y-side
+     * proxy for Mika's TaskInfo.isVisible (no shell here); a FLAG_SECURE
+     * window with an unreadable root is the known blind spot. Callers decide
+     * fail-open vs fail-closed — the shadow launch tool fails closed.
+     * Requires API 33+ for {@link AccessibilityWindowInfo#getDisplayId()};
+     * null is also the answer there.
+     */
+    public Boolean mainScreenUsage(String packageName) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            return null;
+        }
+        try {
+            List<AccessibilityWindowInfo> windows = getWindows();
+            if (windows == null || windows.isEmpty()) {
+                return null;
+            }
+            boolean sawMainDisplay = false;
+            for (AccessibilityWindowInfo window : windows) {
+                if (window == null || window.getDisplayId() != Display.DEFAULT_DISPLAY) {
+                    continue;
+                }
+                sawMainDisplay = true;
+                AccessibilityNodeInfo root = window.getRoot();
+                if (root == null) {
+                    continue;
+                }
+                CharSequence pkg = root.getPackageName();
+                boolean match = pkg != null && packageName.contentEquals(pkg);
+                root.recycle();
+                if (match) {
+                    return Boolean.TRUE;
+                }
+            }
+            return sawMainDisplay ? Boolean.FALSE : null;
+        } catch (Exception e) {
+            XLog.w(TAG, "mainScreenUsage: window scan failed", e);
+            return null;
+        }
+    }
+
+    /**
      * The focused root node of a window on the shadow display, or the first
      * accessible root there. Caller recycles. Requires API 33+ for
      * {@link AccessibilityWindowInfo#getDisplayId()}.

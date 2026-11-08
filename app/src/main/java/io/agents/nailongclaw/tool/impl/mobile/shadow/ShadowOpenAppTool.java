@@ -62,6 +62,19 @@ public class ShadowOpenAppTool extends BaseTool {
             return ToolResult.error("Accessibility service is not running");
         }
         String packageName = requireString(params, "package_name");
+        // Mika's anti-disturb gate, borrowed: the user holding this app on the
+        // real screen must not get it yanked to the shadow display mid-use.
+        // Unscannable main screen refuses too — fail closed, matching the
+        // DESTRUCTIVE-until-reviewed stance in the class KDoc.
+        Boolean inUse = service.mainScreenUsage(packageName);
+        if (inUse == null) {
+            return ToolResult.error("Cannot inspect the real screen right now — refusing to launch "
+                    + packageName + " to avoid disturbing the user. Retry shortly.");
+        }
+        if (inUse) {
+            return ToolResult.error("Refused: " + packageName + " is open on the real screen and may be in use."
+                    + " Pick a different app, or tell the user to close it first.");
+        }
         String error = service.openAppOnDisplay(packageName, displayId);
         if (error != null) {
             return ToolResult.error("Failed to launch " + packageName + " on shadow display " + displayId + ": " + error);
