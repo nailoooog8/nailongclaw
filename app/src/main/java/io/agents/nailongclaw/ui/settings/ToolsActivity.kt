@@ -224,6 +224,7 @@ class ToolsActivity : BaseActivity() {
                             activityError == null -> "服务路径失败($serviceError)；前台路径成功"
                             else -> "两条路径均失败：服务=$serviceError 前台=$activityError"
                         }
+                        logLaunchDebug("display=$target service=$serviceError activity=$activityError")
                         Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
                     }
                 },
@@ -254,6 +255,22 @@ class ToolsActivity : BaseActivity() {
             null
         } catch (e: Exception) {
             "${e.javaClass.simpleName}: ${e.message}"
+        }
+    }
+
+    /**
+     * Persists launch attempts (display id + both paths' verbatim outcomes) to
+     * external storage where adb can read them without root — this ROM filters
+     * the app's logcat, and the vivo denial message is the one artifact that
+     * names the actual missing permission. Diagnostics only, no cleanup yet.
+     */
+    private fun logLaunchDebug(line: String) {
+        runCatching {
+            val dir = getExternalFilesDir(null) ?: return
+            java.io.File(dir, "shadow_launch_debug.log").appendText(
+                java.text.SimpleDateFormat("MM-dd HH:mm:ss", java.util.Locale.US)
+                    .format(java.util.Date()) + " " + line + "\n"
+            )
         }
     }
 

@@ -359,7 +359,10 @@ class ForegroundService : Service() {
                 "授权令牌无效（getMediaProjection 返回空）"
             } else {
                 ShadowDisplayManager.attachProjection(projection)
-                val id = ShadowDisplayManager.ensureCreated(applicationContext)
+                // recreate, not ensureCreated: a display created BEFORE the
+                // consent (plain untrusted screen) must not short-circuit the
+                // projection rung — that was the "创建后再授权仍被拒" trap.
+                val id = ShadowDisplayManager.recreate(applicationContext)
                 if (id != null) null
                 else "投影已授权但影子屏创建失败（见日志）"
             }

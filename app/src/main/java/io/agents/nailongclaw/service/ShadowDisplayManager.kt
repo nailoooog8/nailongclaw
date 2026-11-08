@@ -20,8 +20,11 @@ import io.agents.nailongclaw.utils.XLog
 
 /**
  * Owns the shadow display (虚拟屏): a virtual display the app creates so target
- * apps can be launched onto it and automated off the real screen — the same
- * technique Mika uses, with the loop hazards fenced at birth.
+ * apps can be launched onto it and automated off the real screen, with the loop
+ * hazards fenced at birth. The trusted end-state matches Mika's, but the path
+ * does not: Mika builds its display from a shell-uid helper over wireless
+ * debugging (hidden TRUSTED/OWN_FOCUS flag ladder), ours from the
+ * user-consented MediaProjection below.
  *
  * The display itself is NOT what causes automation loops; unscoped events and
  * gestures are (an event from the shadow display bumping the real display's
@@ -147,16 +150,19 @@ object ShadowDisplayManager {
             }
         }, Handler(thread.looper))
 
-        // Rung 0: through the user-consented projection. A projection-created
-        // display is trusted, which is what unlocks launching OTHER packages'
-        // activities onto it — the whole point of the shadow screen. Skipped
-        // when no consent has been given this process lifetime.
+        // Rung 0: through the user-consented projection. The projection must
+        // carry PUBLIC: with OWN_CONTENT_ONLY alone MediaProjection wraps the
+        // display into PRIVATE|PRESENTATION with canHostTasks=false — no task
+        // can root there, not even from shell (V2502DA measured). A public
+        // projection display is the cast-to-external-screen shape, and it is
+        // the only projection shape that can host other packages' activities.
         projection?.let { proj ->
             try {
                 val vd = proj.createVirtualDisplay(
                     DISPLAY_NAME,
                     metrics.widthPixels, metrics.heightPixels, metrics.densityDpi,
-                    DisplayManager.VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY,
+                    DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC
+                        or DisplayManager.VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY,
                     reader.surface, null, null,
                 )
                 if (vd != null) {
@@ -209,7 +215,26 @@ object ShadowDisplayManager {
     @Synchronized
     @JvmStatic
     fun release() {
-        if (displayId == null && virtualDisplay == null && imageReader == null && projection == null) return
+        releaseDisplayOnly()
+        try {
+            // Stops capture and fires our own callback, which calls release()
+            // again — guarded by the null-out below, so it terminates.
+            projection?.stop()
+        } catch (e: Exception) {
+            XLog.w(TAG, "MediaProjection stop failed", e)
+        }
+        projection = null
+        XLog.i(TAG, "Shadow display released")
+    }
+
+    /**
+     * Tears down only the display (and its reader/drain thread), keeping the
+     * consented projection. Caller holds the monitor via the @Synchronized
+     * wrappers; the projection callback's identity check makes any async
+     * onStop from a dead display harmless.
+     */
+    private fun releaseDisplayOnly() {
+        if (displayId == null && virtualDisplay == null && imageReader == null) return
         try {
             virtualDisplay?.release()
         } catch (e: Exception) {
@@ -220,20 +245,25 @@ object ShadowDisplayManager {
         } catch (e: Exception) {
             XLog.w(TAG, "Shadow ImageReader close failed", e)
         }
-        try {
-            // Stops capture and fires our own callback, which calls release()
-            // again — guarded by the null-out below, so it terminates.
-            projection?.stop()
-        } catch (e: Exception) {
-            XLog.w(TAG, "MediaProjection stop failed", e)
-        }
-        projection = null
         drainThread?.quitSafely()
         virtualDisplay = null
         imageReader = null
         drainThread = null
         displayId = null
         XLog.i(TAG, "Shadow display released")
+    }
+
+    /**
+     * Rebuilds the display through the consented projection, discarding any
+     * display that pre-dates the consent. ensureCreated alone would
+     * short-circuit on the existing id and the user would stay on a plain
+     * untrusted display forever — the exact order trap of "创建后再授权".
+     */
+    @Synchronized
+    @JvmStatic
+    fun recreate(context: Context): Int? {
+        releaseDisplayOnly()
+        return ensureCreated(context)
     }
 
     /** The shadow display id for Java callers, or null when none exists. */
