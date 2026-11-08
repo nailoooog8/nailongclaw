@@ -6,8 +6,10 @@ package io.agents.nailongclaw.service;
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.GestureDescription;
 import android.app.ActivityOptions;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.provider.Settings;
 import android.graphics.Bitmap;
 import android.graphics.Path;
@@ -79,6 +81,34 @@ public class ClawAccessibilityService extends AccessibilityService {
         } catch (Exception e) {
             XLog.e(TAG, "Failed to check accessibility settings", e);
             return false;
+        }
+    }
+
+    /**
+     * Keeps this service's component in the enabled state. Two reasons this
+     * guard exists: (1) some ROMs' accessibility handling is destructive —
+     * once the component lands in the disabled state,
+     * AccessibilityManagerService strips the service from the enabled-services
+     * list on every write, and shell cannot flip the component back
+     * (SecurityException), so only the app itself can undo it; (2) the
+     * component must never be disabled for the zombie-state recovery path to
+     * have anything to rebind. Idempotent: only writes when actually
+     * disabled. Call once from process start.
+     */
+    public static void ensureComponentEnabled(Context context) {
+        try {
+            PackageManager pm = context.getPackageManager();
+            ComponentName cn = new ComponentName(context, ClawAccessibilityService.class);
+            int state = pm.getComponentEnabledSetting(cn);
+            if (state == PackageManager.COMPONENT_ENABLED_STATE_DISABLED
+                    || state == PackageManager.COMPONENT_ENABLED_STATE_DISABLED_USER) {
+                pm.setComponentEnabledSetting(cn,
+                        PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
+                        PackageManager.DONT_KILL_APP);
+                XLog.i(TAG, "ensureComponentEnabled: service component was disabled — re-enabled");
+            }
+        } catch (Exception e) {
+            XLog.e(TAG, "ensureComponentEnabled failed", e);
         }
     }
 

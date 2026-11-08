@@ -7,6 +7,7 @@ import io.agents.nailongclaw.agent.DefaultAgentService
 import io.agents.nailongclaw.agent.llm.LocalBackendHealth
 import io.agents.nailongclaw.base.BaseApp
 import io.agents.nailongclaw.channel.ChannelManager
+import io.agents.nailongclaw.service.ClawAccessibilityService
 import io.agents.nailongclaw.tool.ToolRegistry
 import io.agents.nailongclaw.utils.AppLogStore
 import io.agents.nailongclaw.utils.KVUtils
@@ -31,6 +32,11 @@ class ClawApplication : BaseApp() {
         super.onCreate()
         AppCapabilityCoordinator.markProcessStart()
         instance = this
+        // The a11y component must never sit disabled: some ROMs then strip the
+        // service from the enabled-services list on every write, and only the
+        // app itself can flip the component back (shell gets a
+        // SecurityException). See ClawAccessibilityService.ensureComponentEnabled.
+        ClawAccessibilityService.ensureComponentEnabled(this)
         AppLogStore.init(this)
         XLog.setDEBUG(BuildConfig.DEBUG)
         registerNetworkCallback()

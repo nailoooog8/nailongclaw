@@ -5,6 +5,7 @@ package io.agents.nailongclaw.ui.chat
 
 import android.Manifest
 import android.content.Intent
+import android.provider.Settings
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -237,12 +238,18 @@ class TaskFlowController(
                 if (canRunWithoutAccessibility(text)) {
                     XLog.i(TAG, "sendTask: allowing non-interactive task while Accessibility is degraded")
                 } else {
-                    Toast.makeText(activity, "Accessibility service disconnected. Open Settings and toggle it back on.", Toast.LENGTH_LONG).show()
-                    addSystem("Accessibility service disconnected. Open Settings and toggle it off then on.")
-                    openSettings()
-                    sendTaskRetryCount = 0
-                    onTaskTerminal?.invoke(TaskEvent.Failed("Accessibility service is disconnected."))
-                    return
+                // 「已开启但系统未连接」僵尸态：force-stop 之后有的系统不会自己重绑
+                // 无障碍服务。应用没有 WRITE_SECURE_SETTINGS，替用户重绑没有钥匙；
+                // 组件开关那招在 vivo 上反而有害（AMS 会把禁用组件从 enabled 列表
+                // 里摘掉，2026-11-08 QA 实测），所以只做对一件事：把用户送到真正
+                // 有那颗开关的页面——系统的无障碍设置，而不是应用内的设置枢纽
+                // （那里找不到开关，用户会被无限吞发送地拽回来）。
+                Toast.makeText(activity, "Accessibility is enabled but not connected. Toggle it in the system Accessibility settings.", Toast.LENGTH_LONG).show()
+                addSystem("Accessibility is enabled but the system didn't reconnect it. Open the system Accessibility page and switch NailongClaw off then on.")
+                openSystemAccessibilitySettings()
+                sendTaskRetryCount = 0
+                onTaskTerminal?.invoke(TaskEvent.Failed("Accessibility service is disconnected."))
+                return
                 }
             }
             ServiceBindingState.READY -> Unit
@@ -679,6 +686,20 @@ class TaskFlowController(
 
     private fun openSettings() {
         activity.startActivity(Intent(activity, SettingsActivity::class.java))
+    }
+
+    /**
+     * The rebind toggle for the "enabled yet disconnected" zombie lives in the
+     * system's Accessibility page, not in this app's settings hub — the original
+     * [openSettings] fallback sent users somewhere the fix does not exist.
+     */
+    private fun openSystemAccessibilitySettings() {
+        runCatching {
+            activity.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        }.onFailure {
+            XLog.w(TAG, "system accessibility settings page unavailable", it)
+            openSettings()
+        }
     }
 
     private fun buildAgentPromptOverride(rawTask: String): String? {

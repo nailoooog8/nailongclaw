@@ -102,6 +102,13 @@ object TaskRecordStore {
     @JvmStatic
     fun init(context: Context) {
         appContext = context.applicationContext
+        // Crash honesty needs a reader: the sweep inside readFromDisk only runs
+        // when something touches the ledger, and after a force-stop nothing may —
+        // a task killed mid-run would then keep claiming RUNNING across restarts
+        // (H60's "re-enter and it reads FAILED" acceptance, missed on the QA
+        // device 2026-11-08). Load once here so the orphan is closed out on the
+        // first launch after the kill.
+        synchronized(lock) { loadLocked() }
     }
 
     /** Drops the in-memory cache; the next read re-parses the file. Test-only. */
