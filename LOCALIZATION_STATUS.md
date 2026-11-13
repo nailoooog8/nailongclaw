@@ -1,8 +1,8 @@
 # 汉化补丁状态（交接文档）
 
-> 2026-10-07 更新。装机+权限+MCP e2e+MCP 管理 UI+**Skills 二期**（YAML recipe+捕获+管理 UI，已装机验证）全部完成（见下）。剩余：13 处低频汉化、MCP 管理页可选增强。
-> 扫描脚本 `PokeClaw/.tmp_scan_ui.py` 可重跑（列出所有硬编码 UI 英文串的文件+行号+内容）。
-> MCP 测试服务器已入库：`PokeClaw/scripts/mcp_test_server.py`（python 直接跑，端口 8765，工具 echo/server_uptime）。
+> 2026-10-07 更新。装机+权限+MCP e2e+MCP 管理 UI+**Skills 二期**（YAML recipe+捕获+管理 UI，已装机验证）全部完成（见下）。剩余硬编码英文串见下方「待办」第 1 条（2026-11-13 复核后重写）。
+> MCP 测试服务器已入库：`scripts/mcp_test_server.py`（python 直接跑，端口 8765，工具 echo/server_uptime）。
+> （原 `.tmp_scan_ui.py` 一次性扫描脚本未入库；重跑可用 `grep -rn '"[A-Z][a-zA-Z ]\{6,\}"' app/src/main/java/io/agents/nailongclaw/ui/`。）
 
 ## 已完成（2026-10-07 实测验证）
 
@@ -15,19 +15,18 @@
 ## 已完成（编译通过，APK 已产出）
 
 - **LlmConfigActivity.kt**：31 处全部汉化 ✓（API Key 输入、模型选择、下载状态、云端连接状态、存储统计）
-- **SettingsActivity.kt**：主设置菜单 24 项中的 24 处已替换（外部自动化、通知使用权、任务预算、主题、管理工具、Telegram、Web 控制台、报告问题等）——其中最后一批编辑因会话劣化存在不确定性，编译已通过（语法/语义有效），建议装机后目视复核
+- **SettingsActivity.kt**：2026-10-24 已重写为纯导航枢纽（见 `BACKLOG.md`「第三轮」），原 24 项平铺菜单拆到 `ModelSettingsActivity` / `ChannelsActivity` / `MonitorActivity` / `ToolsActivity` / `AboutActivity`；当前文件无硬编码英文串。本条原有的「建议装机后目视复核」随页面重写作废。
 - 另有少量多行对话框正文（reportBug 的 AlertDialog message）未汉化
 
 ## 待办（新会话接手）
 
-1. 剩余 13 处低频字符串：
-   - `ui/chat/TaskFlowController.kt`（5 处：无障碍服务错误提示 ×4 + 请先配置 LLM）
-   - `ui/chat/ChatScreen.kt`（4 处：Stop / Stop All / Monitor Messages / Send Message）
-   - `ui/settings/ChannelConfigActivity.kt`（2 处："Bot Token"）
-   - `ui/settings/ThemeActivity.kt`（1 处："Current: $label"）
-   - `ui/chat/ComposeChatActivity.kt`（1 处："Image upload coming soon"）
+1. 剩余硬编码英文串（2026-11-13 复核，原「13 处」清单已不准）：
+   - `ui/chat/TaskFlowController.kt` 10 处（:187 Enable Accessibility Service… / :206-224 四条 accessibility 连接提示 / :251 is disconnected / :264 Configure LLM in Settings first）
+   - `ui/chat/ComposeChatActivity.kt` 1 处（:191 Image upload coming soon）
+   - `ui/settings/ChannelConfigActivity.kt` 3 处（:126/:134/:146 Bot Token）
+   - `ui/chat/ChatScreen.kt` 与 `ui/settings/ThemeActivity.kt` **已无**硬编码串（原清单里的 4+1 处已清）
 2. ~~MCP tools/call 实调验证~~ ✅ 2026-10-07 完成（agent 循环实调 echo 成功）
-3. ~~MCP 服务器管理 UI~~ ✅ 2026-10-07 完成（`ui/settings/McpServersActivity`：设置页 Tools 组入口，列表/添加/编辑/长按删除/启停，实时连接状态 StateFlow；`McpConnectionManager` 扩展 saveConfigs/connectOne/removeServer + 状态跟踪；`ToolRegistry` 加 unregister/unregisterByPrefix。装机实测：列表显示 "e2e · 2 tools"，编辑保存→落盘→重连→重注册全通。注意：系统 AlertDialog 白底，表单文字用固定深色而非主题色）
+3. ~~MCP 服务器管理 UI~~ ✅ 2026-10-07 完成（`ui/settings/McpServersActivity`：设置页功能组入口，列表/添加/编辑/长按删除/启停，实时连接状态 StateFlow；`McpConnectionManager` 扩展 saveConfigs/connectOne/removeServer + 状态跟踪；`ToolRegistry` 加 unregister/unregisterByPrefix。装机实测：列表显示 "e2e · 2 tools"，编辑保存→落盘→重连→重注册全通。弹窗已迁到 CdsDialog（原系统 AlertDialog 白底问题随迁移消失））
 4. ~~Skills 层二期（YAML recipe）~~ ✅ 2026-10-07 完成（见文末"Skills 二期"）
 
 ## Skills 二期（2026-10-07 本轮完成，已装机验证）
@@ -37,7 +36,7 @@
 - **管理 UI**：`ui/settings/UserSkillsActivity`（设置 → Tools → 自定义技能）：配方列表（点击编辑 YAML、长按删除）、从上次任务创建（无捕获时置灰）、手动新建（内置模板）、保存即注册生效
 - **装机 e2e**（2026-10-07 实测）：`adb push scripts/sample_skill.yaml` → 重启 → logcat `User skills: 1 loaded, 0 error(s)`；管理页截图正常（配方"打开设置 · 2 步"）
 - 格式文档 `docs/SKILL_FORMAT.md`，示例 `scripts/sample_skill.yaml`
-- 未做（可选增强）：配方自动触发仅 PipelineTier2 正则（继承内置逻辑）；技能面板 Workflows 卡片由 `getUserFacing()` 自动带出，未单独截图验证；MCP 管理 UI 的"测试连接"按钮和工具来源标记仍为待办
+- 未做（可选增强）：配方自动触发仅 PipelineTier2 正则（继承内置逻辑）；技能面板 Workflows 卡片由 `getUserFacing()` 自动带出，未单独截图验证；MCP 管理 UI 的「测试连接」按钮仍未做（`WebSearchActivity` 有一个不同实现的同名按钮可参考）。**工具来源标记已交付**——`ToolsActivity` 按 builtin / MCP / 技能 / 影子屏分组展示。
 - 坑：Kotlin 块注释支持嵌套——KDoc 里写 `/skills/*.yaml` 的 `/*` 会开启嵌套注释吃掉整个文件（"Unclosed comment"），注释里写路径带 `*` 要注意
 
 ## 相关文件
