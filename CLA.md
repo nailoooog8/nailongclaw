@@ -1,6 +1,6 @@
 # Developer Certificate of Origin (DCO), Version 1.1
 
-**Project:** PokeClaw  
+**Project:** NailongClaw (`nailoooog8/nailongclaw`)  
 **Upstream:** [`agents-io/PokeClaw`](https://github.com/agents-io/PokeClaw) — Copyright 2026 agents.io  
 **This fork:** [`nailoooog8/nailongclaw`](https://github.com/nailoooog8/nailongclaw)
 

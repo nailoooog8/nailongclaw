@@ -68,7 +68,7 @@
 
 `litertlm-android` 我们已经依赖，ONNX Runtime 那条路是通的。**但仍然不做**，三条理由按权重排序：
 
-1. **语料只有 200 条上限**（`MemoryStore.MAX_ENTRIES = 200`，[MemoryStore.kt:42](app/src/main/java/io/agents/pokeclaw/agent/memory/MemoryStore.kt#L42)）。对 200 条做暴力检索是**亚毫秒级**。用 22MB 模型换亚毫秒，净亏。
+1. **语料只有 200 条上限**（`MemoryStore.MAX_ENTRIES = 200`，[MemoryStore.kt:42](app/src/main/java/io/agents/nailongclaw/agent/memory/MemoryStore.kt#L42)）。对 200 条做暴力检索是**亚毫秒级**。用 22MB 模型换亚毫秒，净亏。
 
 2. **embedding 出端即破定位**。社区自己讲得很直白：embedding「看起来是匿名数字，但仍包含含义」，可暴露主题、意图，甚至被再识别。这与本项目「数据不出手机」的核心定位直接冲突，也会与 `SECURITY_AUDIT` 的叙事自相矛盾。
 
@@ -97,8 +97,8 @@
 | 环节 | 我们的实现 | 成本 |
 |---|---|---|
 | 判断「要不要记」 | 模型在**它本来就要跑的工具循环里**决定调不调 `memory_save` | 无额外 LLM 调用 |
-| 执行写入 | `MemorySaveTool.execute` → `MemoryStore.remember()`（[MemoryStore.kt:176](app/src/main/java/io/agents/pokeclaw/agent/memory/MemoryStore.kt#L176)）→ 纯本地 JSON 写盘 | 毫秒级，同步无阻塞 |
-| 读入提示 | `MemoryStore.briefing()`（[DefaultAgentService.kt:485](app/src/main/java/io/agents/pokeclaw/agent/DefaultAgentService.kt#L485)）→ 纯本地打分 | 亚毫秒级 |
+| 执行写入 | `MemorySaveTool.execute` → `MemoryStore.remember()`（[MemoryStore.kt:176](app/src/main/java/io/agents/nailongclaw/agent/memory/MemoryStore.kt#L176)）→ 纯本地 JSON 写盘 | 毫秒级，同步无阻塞 |
+| 读入提示 | `MemoryStore.briefing()`（[DefaultAgentService.kt:485](app/src/main/java/io/agents/nailongclaw/agent/DefaultAgentService.kt#L485)）→ 纯本地打分 | 亚毫秒级 |
 
 **抽取即决策、由同一轮生成顺带完成**——这正是我们相对 Mem0 / LangMem 的**优势**，不是需要修掉的缺陷。
 引入异步队列只会增加「记忆什么时候落盘」的不确定性，而换不来延迟收益。
@@ -177,11 +177,11 @@ active(f, t) = 1   if  t_from ≤ t < t_to
 <cache-path name="cache" path="." />
 ````
 
-而 `MemoryStore.storageDir()`（[MemoryStore.kt:562](app/src/main/java/io/agents/pokeclaw/agent/memory/MemoryStore.kt#L562)）写入的是 `getExternalFilesDir(null)` **根目录**，
+而 `MemoryStore.storageDir()`（[MemoryStore.kt:562](app/src/main/java/io/agents/nailongclaw/agent/memory/MemoryStore.kt#L562)）写入的是 `getExternalFilesDir(null)` **根目录**，
 即 `memories-export.md` 落在 `<ext-files>/`，**既不在 `Download` 下、也不在 cacheDir 下** → 两个 root 都不覆盖。
 另外 `storageDir()` 会 fallback 到 `ctx.filesDir`（内部目录），而 `file_paths.xml` **完全没有 `<files-path>`**。
 
-Debug 报告之所以没暴露这个问题：它写进 `cacheDir/debug_reports/`（[DebugTaskReceiver.kt:312](app/src/main/java/io/agents/pokeclaw/debug/DebugTaskReceiver.kt#L312)），正好被 `cache-path` 覆盖。
+Debug 报告之所以没暴露这个问题：它写进 `cacheDir/debug_reports/`（[DebugTaskReceiver.kt:312](app/src/main/java/io/agents/nailongclaw/debug/DebugTaskReceiver.kt#L312)），正好被 `cache-path` 覆盖。
 
 **当前状态**：尚未崩溃——导出只弹一个 Toast 显示路径，没有走 `FileProvider`。
 **将来谁照着 `SettingsActivity.shareReportFile()` 加分享按钮，`getUriForFile` 会直接抛 `IllegalArgumentException`。**

@@ -1,4 +1,4 @@
-# Contributing to PokeClaw
+# Contributing to NailongClaw
 
 本 fork 欢迎 PR。任何形式的贡献都受欢迎：bug 修复、新 skill / 示例任务、翻译、文档改进。
 
@@ -28,8 +28,8 @@ i have read the dco document and i hereby sign the dco
 ## 本地构建
 
 ```bash
-git clone -b fork/personal-fork-release https://github.com/nailoooog8/nailongclaw.git
-cd PokeClaw
+git clone -b main https://github.com/nailoooog8/nailongclaw.git
+cd nailongclaw
 ./gradlew assembleDebug
 ```
 

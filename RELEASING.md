@@ -1,4 +1,4 @@
-# Releasing PokeClaw
+# Releasing NailongClaw
 
 This repo now assumes a single stable release signing key.
 
@@ -43,7 +43,7 @@ Without these secrets, `.github/workflows/release.yml` will fail closed and refu
 
 ## 3. Prepare a release
 
-1. Update `versionCode` and `versionName` in `app/build.gradle.kts`
+1. Set `versionCode` / `versionName` — either edit the defaults in `app/build.gradle.kts` (keys `NAILONGCLAW_VERSION_CODE` / `NAILONGCLAW_VERSION_NAME`, currently 34 / "0.9.0") or override them via environment variable / `local.properties`. Note the precedence: env vars win, then `local.properties`, then the in-file default — editing the default alone silently does nothing while an override is set.
 2. Add the changelog entry in `README.md`
 3. Build locally first:
 
@@ -58,7 +58,7 @@ sha256sum app/build/outputs/apk/release/*.apk
 
 ```bash
 git tag -a vX.Y.Z -m "vX.Y.Z"
-git push pokeclaw vX.Y.Z
+git push origin vX.Y.Z
 ```
 
 The GitHub Actions workflow will then create the GitHub Release, upload the signed APK, and attach `SHA256SUMS.txt`.
@@ -68,8 +68,8 @@ The GitHub Actions workflow will then create the GitHub Release, upload the sign
 To verify that the next public build can upgrade in place over the current signed build, create a temporary local build with the same key and a higher version:
 
 ```bash
-export NAILONGCLAW_VERSION_CODE=15
-export NAILONGCLAW_VERSION_NAME=0.5.1-upgrade-test
+export NAILONGCLAW_VERSION_CODE=35
+export NAILONGCLAW_VERSION_NAME=0.9.1-upgrade-test
 ./gradlew --no-daemon :app:assembleRelease -x lintVitalRelease -x lintVitalAnalyzeRelease -x lintVitalReportRelease
 ```
 
@@ -84,4 +84,4 @@ That mismatch is already shipped, so Android cannot retroactively upgrade those 
 - show the in-app update prompt
 - explain that Android may require a one-time uninstall + reinstall
 
-Stable signing for the public `v0.6.x` line prevents this problem from repeating.
+Stable signing for the current public release line (v0.9.x) prevents this problem from repeating.

@@ -19,11 +19,11 @@ This is the repo map for coding agents. Keep canonical information in existing f
 
 | Path | Purpose |
 |------|---------|
-| `app/src/main/java/io/agents/pokeclaw/` | Android app source |
+| `app/src/main/java/io/agents/nailongclaw/` | Android app source |
 | `app/src/main/assets/playbooks/` | Built-in playbooks used by the agent harness |
 | `app/src/test/` | JVM/unit regression tests |
 | `scripts/` | QA and automation scripts |
-| `.github/workflows/` | CI, CLA check, signed release workflow |
+| `.github/workflows/` | Build + unit tests, CLA/DCO check, emulator-matrix QA, Firebase Test Lab, signed release |
 | `docs/` | GitHub Pages site and public site assets |
 | `docs/MEMORY_BANK.md` | How the memory bank works: retention curve, suppression fingerprints, contradiction detection, file format |
 | `docs/MEMORY_DESIGN.md` | Why the memory bank is built this way: community survey, rejected alternatives, known gaps |
@@ -36,7 +36,7 @@ This is the repo map for coding agents. Keep canonical information in existing f
 
 ## Direction Rules
 
-- PokeClaw is a generic Android mobile-agent harness with a product shell on top.
+- NailongClaw is a generic Android mobile-agent harness with a product shell on top.
 - Prefer fixing deterministic harness/runtime/device problems before tuning one stochastic task.
 - Keep prompts, tools, skills, and playbooks generic.
 - Treat Cloud/Local exploratory task success as a repeated-trial metric, not a single-run truth.
