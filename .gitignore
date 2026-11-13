@@ -19,6 +19,7 @@ app/src/main/assets/.pcfp
 
 # Claude Code local session state (not for git)
 CLAUDE.local.md
+CLAUDE.history.md
 thoughts/
 .claudeignore
 /.kotlin/
