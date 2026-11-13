@@ -109,6 +109,8 @@
 > **落地记录(2026-10-25)**:P0-1/2/3 与 P1-4/6 已实现——`reply_via_notification`、`read_conversation` 两个新工具 + 注册与风险分类(HIGH_IMPACT / READ_ONLY)、`awaitUiStable` 内容版本等待、SendMessageTool 四处固定 sleep 替换、任务预热通知摘要与快照过期提示、AutoReplyManager 通知直回复快速路径(锁屏可用、微信/QQ 自动回退 UI 路径)、AgentConfig 与 LOCAL_TASK_PROMPT 提示词更新。QA 用例见 `QA_CHECKLIST.md` H51–H56(C2/C5 预期流程同步更新)。P1-5 Steer 未动。
 >
 > **P2 落地(2026-10-25)**:①悬浮窗超级岛化——运行胶囊实时显示当前动作(工具名),完成/失败浮出带摘要的结果胶囊、点按回聊天、可随时点停(QA H58/H59);②AppFunctions 探针落在 `get_device_info(category="app_functions")`(全反射,QA H57)。**重要查证**:AOSP 中 `EXECUTE_APP_FUNCTIONS` protectionLevel 为 `internal|role`(仅 ASSISTANT 角色预装应用可得),平台 `AppFunctionManager` 无公开发现 API——第三方 app 当前既不能发现也不能执行他人函数,故只做探针;待 API 37(CINNAMON_BUN)的 `DISCOVER_APP_FUNCTIONS` 落地后探针结论自动翻转,再建执行路径。
+>
+> **落地记录(2026-11-13)**:P1-4 的作用域从 SendMessageTool/read_conversation 扩到**主操作路径全线**——tap/tap_node/swipe/open_app/scroll_to_find/find_and_tap 动作后等 `awaitUiStable` 收敛而非固定 sleep,Opt-3 拉屏前的 500ms 硬睡同样替换;"版本没变=动作无效"升级为各动作工具的 before/after tripwire(附 WARNING、禁止盲目重试),影子屏侧另加逃逸看门狗(目标包溢到真机主屏→拉回+警告)。随 Mika/dsh-Go 对比批落地,真机 QA 见 `QA_CHECKLIST.md` H78。
 
 **P0 — 提示词与工具调度层(小改动,直接消灭大部分截图)**
 

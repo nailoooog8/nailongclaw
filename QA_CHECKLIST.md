@@ -1367,6 +1367,15 @@ When in doubt, rerun the smaller bundle first, then expand only if something dri
 - [ ] **H77. 模型切换真的生效 [RELEASE-OK]**: 在卡片里从本地切到一个已配密钥的云端模型 → 顶栏与 composer 两个 pill **同时**变成该模型名 + 提供商（不等重进应用）；发一条消息 → 用新模型作答（cloud 路径重建了 client）。再切回本地 → 两个 pill 回本地，下一条消息走本地。任务运行中切换 → 当前任务不受影响（它持有自己那份 client），下一条消息才换；本地路径在任务运行中会明说「Local task using model」而不是默默重载。判据：pill 文本 + `KVUtils` 的 provider/modelName 值 + 回答来源；不认截图。
 - [ ] **H75. 新建对话 [RELEASE-OK]**: 主界面发几条消息 → 打开侧栏 → 点「新建对话」→ feed 清空、顶栏标题变「新对话」、输入框可用来开新话题；**上一段历史没有丢**——侧栏列表里出现它（按「今天」分组）。杀进程重进 → 落在那段新对话上（不是旧的）。落盘判据：`getExternalFilesDir(null)/chats` 下 `.md` 文件数 +1。
 - [ ] **H76. 会话列表 / 打开 / 重命名 / 删除 [RELEASE-OK]**: 侧栏列表按「今天 / 昨天 / 月日」分组，当前会话行高亮；点另一行 → feed 换成那段历史、顶栏标题跟着变，模型仍可用（不是冷启动）。hover 行尾出现重命名/删除两颗（默认隐形）：重命名 → 对话框改标题 → 列表与顶栏同步；删除 → 确认框列出标题 → 确认后列表移除该行。**删当前会话** → feed 清空并落到一条新 id（不是指向已删文件的幽灵）。搜索框输入 → 列表按标题过滤，无匹配显示「没有匹配的会话」。空列表显示「还没有对话。点上面的『新建对话』开始。」。最后一条硬判据：这些会话**也出现在 Compose 聊天页的侧栏**里（2026-10-27 起是刻意如此，见 BACKLOG 第五轮）。
+- [ ] **H78. 影子屏 vs Mika/dsh-Go 调整批（2026-11-13，代码就绪，真机待验）[RELEASE-OK]** [LOGCAT-DEBUG 部分用 Share Debug Report 读，release 构建 logcat 被 BuildConfig.DEBUG 门控]。八个子项，全过才算这批落地：
+  - **a. flag 梯子胜出级**：工具页授权屏幕捕获 → 创建影子屏 → Share Debug Report 里找 `Shadow display created: ... rung=N(label)`。rung0=`projection+focus-isolation`（隐藏焦点旗标被平台收下）是满分；落到 rung1=`projection+extended` 说明隐藏旗标被拒——**记录拒绝原因，结论写进 BACKLOG（焦点隔离需 shell uid，与 Mika 降级模式同级），不算失败**；rung2/3 说明投影路径都挂了，要查。
+  - **b. 焦点隔离（仅 a 落到 rung0 时可测）**：影子屏开抖音且它在前台 → 在真机上打字/切输入框 → 真机 IME 与焦点不被抢、不弹到别处。
+  - **c. 逃逸看门狗**：影子屏开抖音后，从通知栏/别的入口把抖音弄到真机主屏（或直接在主屏打开抖音）→ 下一个 `shadow_tap_node` / `shadow_get_screen_info` 结果带 `WARNING: ... escaped to the real screen and was pulled back`，且影子屏重新显示抖音。反例：在真机主屏自己开着抖音时影子工具**不**报逃逸（5s 用户触摸静默窗 + 双屏都要不在影子屏才判逃逸）。
+  - **d. DESTROY_CONTENT_ON_REMOVAL**：影子屏开着抖音 → 工具页销毁影子屏 → 抖音**不在**真机主屏前台（activity 随屏销毁，不溢回真机）。
+  - **e. shadow_input_text**：影子屏开抖音 → `shadow_get_screen_info` 找到搜索框节点 → `shadow_input_text` → 成功消息带 `(verified by read-back)`，影子屏搜索框里是刚输入的文字；再验一个拒绝场景（对不可编辑节点调用）返回明确错误而不是假成功。
+  - **f. ROTATES_WITH_CONTENT 几何**：影子屏开一个会转横屏的应用（视频全屏）→ 对影子屏节点 tap，落点仍在预期元素上（坐标空间随显示旋转没错位）。若错位，回退该旗标并记录。
+  - **g. 死循环硬闸**：构造或复现「同屏同动作连续 4 次」（如同一节点反复 tap 无变化）→ 任务以 `Task stopped: the same action on the same screen repeated 4 times in a row (dead loop)` 终止，而不是跑到 maxIterations。
+  - **h. 提速计时**：同一云端任务改造前后各跑一次，对比每轮工具执行耗时（日志时间戳 / Share Debug Report）：`open_app` 不再付 3×500ms（无弹窗时应 ~0.6s 级），动作轮不再有固定 500ms 硬睡，`scroll_to_find` 每轮不再拉两次整树。
 ## CI. Emulator Smoke Harness
 The runner itself is code. When it reports red for a reason that has nothing to do with
 the app, it burns triage time and trains everyone to ignore the matrix — which is worse

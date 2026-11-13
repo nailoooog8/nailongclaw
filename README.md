@@ -63,7 +63,7 @@ Google 的移动 agent 永远是 Pixel-first 的；Samsung 的 Galaxy AI 战略�
 
 | 开销 | 量级 |
 |---|---|
-| 43 个内置工具的 JSON schema 全量注入 LiteRT-LM（最大头，`LangChain4jToolBridge.buildToolSpecifications()` 不过滤） | 主要 |
+| 44 个内置工具的 JSON schema 全量注入 LiteRT-LM（最大头；`LangChain4jToolBridge.buildToolSpecifications()` 本身不过滤，2026-11-13 起仅在请求侧裁掉「无影子屏时的 5 个 shadow 声明」这一种情形） | 主要 |
 | 任务提示词（`LOCAL_TASK_PROMPT`） | 约 3.2K 字符 |
 | 记忆简报（`MemoryStore.briefing`：规则块 + 最多 12 条记忆全文，置顶条目不计入上限） | 正文合计 1,400 字符预算 |
 
@@ -71,7 +71,7 @@ Google 的移动 agent 永远是 Pixel-first 的；Samsung 的 Galaxy AI 战略�
 
 **不改代码的缓解**：删掉低价值记忆、停用不用的 MCP 服务器、或切云端模式。
 
-**修复方向**（按杠杆排序，**尚未动手**）：本地路径裁剪工具声明（allowlist / 预算，最大杠杆）、把 too-long 错误转成用户能看懂的话、本地仅轻量对话的路由策略。文末上游 README 中本地模式的基准数据依 Apache-2.0 §4 逐字保留，请结合本节阅读。
+**修复方向**（按杠杆排序）：本地路径裁剪工具声明（allowlist / 预算，最大杠杆——2026-11-13 只落地了最小一档：无影子屏时按请求裁掉 5 个 shadow 声明，`DefaultAgentService.requestToolSpecs()`；按任务类型的全量裁剪仍未动手）、把 too-long 错误转成用户能看懂的话（未动手）、本地仅轻量对话的路由策略（未动手）。文末上游 README 中本地模式的基准数据依 Apache-2.0 §4 逐字保留，请结合本节阅读。
 
 ---
 

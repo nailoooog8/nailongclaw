@@ -73,7 +73,7 @@ Priority: `P0` = blocks users, fix now. `P1` = next up. `P2` = when we get to it
 
 > 红蓝合报：红队 `SECURITY_AUDIT_R4_RED_RUNBOOK.md`，蓝队 `SECURITY_AUDIT_R4_BLUE.md`，实验台 `SEC-LAB_KALI_SETUP.md`。全静态 + 真机只读侦察，动态 PoC 待重刷 HEAD 后执行。
 
-- [x] **P1 · R4-B1 (Medium, new) — 已修 2026-10-27（代码，真机 SEC22 待验）** 无障碍读屏内容出口无围栏：`GetScreenInfoTool`/`FindNodeInfoTool`/`ScrollToFindTool` 返回原始屏幕文本、不过 `ContextFence`（其余 9 处内容出口全围栏），主系统提示也无「屏幕内容是数据非指令」条款。屏幕文本可被设备上恶意 app 任意构造 → 间接提示注入，LOCAL 会话下可驱动高危工具（EXTERNAL/SCHEDULED/remote 有只读天花板挡）。修：主系统提示加常驻条款（+ 可选只围栏自由文本字段）。QA SEC22 待真机。
+- [x] **P1 · R4-B1 (Medium, new) — 已修 2026-10-27（代码，真机 SEC22 待验）** 无障碍读屏内容出口无围栏：`GetScreenInfoTool`/`FindNodeInfoTool`/`ScrollToFindTool` 返回原始屏幕文本、不过 `ContextFence`（其余 9 处内容出口全围栏），主系统提示也无「屏幕内容是数据非指令」条款。屏幕文本可被设备上恶意 app 任意构造 → 间接提示注入，LOCAL 会话下可驱动高危工具（EXTERNAL/SCHEDULED/remote 有只读天花板挡）。修：主系统提示加常驻条款（+ 可选只围栏自由文本字段）。QA SEC22 待真机。**2026-11-13 复核**：后加的 `shadow_get_screen_info`（影子屏读屏）读同一类屏幕内容，条款是提示词级常驻故同源覆盖，未列入当初枚举≠漏审；影子工具整体仍是未分类 → DESTRUCTIVE fail-closed，R4-B1 的围栏结论不受影响。
 - [x] **P1 · R4-R1 (Medium, new) — 已修 2026-10-27（代码，真机 SEC23 待验）** 导出 LAUNCHER 无门驱动：任何 app `am start -n io.agents.nailongclaw/.ui.splash.SplashActivity --es task "…"` 无需令牌/开关即可跑一次（被打成 Channel.EXTERNAL → 只读天花板）任务，跑截图/读通知/读屏/列应用/web_search 并烧用户 LLM 配额；不外泄（无回调 + send_* 被禁）。修：转发 task 前改**纯配对令牌门控**（实测 adb referrer 为 null 且可伪造，去掉 referrer 判定）；无令牌/错令牌丢弃。**真机已验证（vc57）**：LAUNCHER 无令牌均落首页、ExternalAutomation 无令牌均拒；有效令牌正向待设置 mint 后补验。QA SEC23。
 - [x] **P1 · 运维 — 已完成 2026-11-08** 重刷设备：QA 机（10AG4J1THX00524）现装 versionCode 62（`cf0ab79`，09:07 装机）；2026-11-07 23:26 起已一度刷过 vc61，旧「lastUpdate 2026-10-25 陈旧包」状态不再存在，导出 debug 接收器随 release 包不存在。动态 PoC 前置已解除。
 - [x] **P2 · R3-07 — 已修 2026-10-27** 全 5 个 workflow 的第三方 action 均 tag-pin、无一 SHA-pin（比 R3 记的 cla.yml 更广）；尤其 `pull_request_target`+write+PAT 的 cla.yml、release 的 softprops/action-gh-release。修：全部 SHA-pin。
@@ -284,6 +284,7 @@ One round landed the whole state/data track of the two-track plan: P0 contracts 
 - Layer 2 NLP Playbooks as "App Cards" like DroidRun
 - On-device LLM as competitive moat (first to ship with Gemma 4)
 - Positioning: cloud/desktop-driven mobile-agent frameworks already exist; PokeClaw should own the phone-resident, local-first, model-slot harness that can run on a user's own Android device without a PC/cloud phone fleet.
+- **竞品对比收尾（2026-11-13，Mika v0.1.41 + dsh-Go 源码实读）**：影子屏 flag 梯子 / 逃逸看门狗 / 死循环硬闸 / 去盲目重试 / quiet-period settle 已落地（QA_CHECKLIST H78 待真机验）。**未搬项都卡在「需 shell uid」**，除非换 Shizuku/自连 ADB 通道（dsh-Go 的不打扰模式走的就是这条），否则无解：①影子 App 音频静音（Mika 用 `appops set <pkg> PLAY_AUDIO ignore` + 恢复台账；我们没有 MANAGE_APP_OPS_MODES，抢音频焦点会连用户的音乐一起静）②IME policy LOCAL（隐藏 `IWindowManager.setDisplayImePolicy`，防影子 App 在真机弹输入法；先看 H78-b 真机是否真有问题再评估反射）③per-display `userActivity` 续亮（`PowerManager.userActivity` 隐藏；先验证息屏后影子 App 是否停摆）④`moveRootTaskToDisplay` 精确挪任务（现在逃逸拉回是重开应用，Mika 是挪任务）。另：`ROTATES_WITH_CONTENT` 的旋转几何若 H78-f 失败要补（a11y 坐标本身随显示旋转，问题只会在截图/ImageReader 侧出现）。
 
 ---
 
