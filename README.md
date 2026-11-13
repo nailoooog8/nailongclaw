@@ -4,7 +4,7 @@
 >
 > 上游 README 的商标条款要求 fork 分发前改名，本次改名即依该条款执行；上游归属依 Apache-2.0 §4 完整保留（见 `NOTICE` 与下方逐字未动的上游原始 README）。
 >
-> 🟢 活跃维护中 · 最新 **v0.9.0** · CI 全绿 · 欢迎 [issue](https://github.com/nailoooog8/nailongclaw/issues) / [PR](https://github.com/nailoooog8/nailongclaw/pulls)
+> 🟢 活跃维护中 · 最新 **v0.9.0** · 欢迎 [issue](https://github.com/nailoooog8/nailongclaw/issues) / [PR](https://github.com/nailoooog8/nailongclaw/pulls)
 
 [![license](https://img.shields.io/badge/license-Apache--2.0-3DDC84?style=flat-square)](https://github.com/nailoooog8/nailongclaw/blob/main/LICENSE)
 [![android](https://img.shields.io/badge/Android-9%2B-3DDC84?logo=android&logoColor=white)](https://developer.android.com)
@@ -63,15 +63,15 @@ Google 的移动 agent 永远是 Pixel-first 的；Samsung 的 Galaxy AI 战略�
 
 | 开销 | 量级 |
 |---|---|
-| 46 个内置工具的 JSON schema 全量注入 LiteRT-LM（最大头，`LangChain4jToolBridge.buildToolSpecifications()` 不过滤） | 主要 |
-| 任务提示词（`LOCAL_TASK_PROMPT`） | 约 2.9K 字符 |
-| 记忆简报（`MemoryStore.briefing`：规则块 + 最多 5 条记忆全文） | 约 1,400 token 起 |
+| 43 个内置工具的 JSON schema 全量注入 LiteRT-LM（最大头，`LangChain4jToolBridge.buildToolSpecifications()` 不过滤） | 主要 |
+| 任务提示词（`LOCAL_TASK_PROMPT`） | 约 3.2K 字符 |
+| 记忆简报（`MemoryStore.briefing`：规则块 + 最多 12 条记忆全文，置顶条目不计入上限） | 正文合计 1,400 字符预算 |
 
 本地路径目前只对工具**结果**截断（400 字符），管不到声明和提示词；too-long 的原生错误也未经翻译，原文直怼聊天框。
 
 **不改代码的缓解**：删掉低价值记忆、停用不用的 MCP 服务器、或切云端模式。
 
-**修复方向**（按杠杆排序，**尚未动手**）：本地路径裁剪工具声明（allowlist / 预算，最大杠杆）、记忆简报设字符总量预算、把 too-long 错误转成用户能看懂的话、本地仅轻量对话的路由策略。文末上游 README 中本地模式的基准数据依 Apache-2.0 §4 逐字保留，请结合本节阅读。
+**修复方向**（按杠杆排序，**尚未动手**）：本地路径裁剪工具声明（allowlist / 预算，最大杠杆）、把 too-long 错误转成用户能看懂的话、本地仅轻量对话的路由策略。文末上游 README 中本地模式的基准数据依 Apache-2.0 §4 逐字保留，请结合本节阅读。
 
 ---
 
@@ -82,7 +82,7 @@ Google 的移动 agent 永远是 Pixel-first 的；Samsung 的 Galaxy AI 战略�
 | 聊天首页 | 设置面板 | 侧边栏 |
 |:---:|:---:|:---:|
 | <img src="Screenshots/chat-home.jpg" width="250" alt="聊天首页"> | <img src="Screenshots/settings-panel.jpg" width="250" alt="设置面板"> | <img src="Screenshots/sidebar.jpg" width="250" alt="侧边栏"> |
-| 新对话 + composer 四档位：<br>模型 / 努力 / 允许操作 / 搜索 | 设置四区九行直达分区页：<br>配置 · 功能 · 外观 · 系统 | 会话列表 + 任务 / 定时入口；<br>侧边栏页头为 v0.9.0 新图标与新标识 |
+| 新对话 + composer 四档位：<br>模型 / 努力 / 允许操作 / 搜索 | 设置四区十行直达分区页：<br>配置 · 功能 · 外观 · 系统 | 会话列表 + 任务 / 定时入口；<br>侧边栏页头为 v0.9.0 新图标与新标识 |
 
 > **左图**：composer 四个 pill 都是真档位——「努力」对应单任务工具调用轮数上限，「允许操作」是敏感操作策略（每次询问 / 自动允许），两者经桥写 MMKV，与原生「模型与任务」页读同一份值。
 >
@@ -350,7 +350,7 @@ These are tasks we have already run end-to-end during on-device QA.
 
 ## Benchmark & Real-Device QA
 
-Every number below comes from repeated trials on a physical Pixel 8 Pro running release builds. No cherry-picked runs, no emulators. The full verified task list and tier breakdown is in [thoughts/verified-task-capabilities.md](thoughts/verified-task-capabilities.md).
+Every number below comes from repeated trials on a physical Pixel 8 Pro running release builds. No cherry-picked runs, no emulators.
 
 ### Cloud (GPT-4.1) — 18/20 pass, real tasks on real phone
 
@@ -501,7 +501,7 @@ The setting is off by default. Enable it from `Settings -> Remote Control -> Ext
 
 The external automation contract is designed for Tasker, MacroDroid, Locale, and similar Android automation apps. The verified end-to-end path today is MacroDroid.
 
-Verified on a Pixel 8 Pro on 2026-04-30:
+Verified on a Pixel 8 Pro on 2026-04-30（intent action 字符串已于 2026-10-27 随改名更新为 `io.agents.nailongclaw.*`；用新 action 的 MacroDroid E2E **尚未复测**，下方配置以当前代码与 manifest 为准）：
 
 - MacroDroid macro trigger: `Shortcut Launched`
 - MacroDroid action: `Send Intent`
@@ -510,12 +510,12 @@ Verified on a Pixel 8 Pro on 2026-04-30:
 - Package: `io.agents.nailongclaw`
 - Class: `io.agents.nailongclaw.automation.ExternalAutomationActivity`
 - Extra: `task = how much battery left`
-- Result: MacroDroid launched PokeClaw's automation activity, PokeClaw accepted it, executed the deterministic battery tool, and returned a live battery result in the PokeClaw chatroom.
+- Result: MacroDroid launched NailongClaw's automation activity, NailongClaw accepted it, executed the deterministic battery tool, and returned a live battery result in the NailongClaw chatroom.
 
 MacroDroid setup:
 
-1. In PokeClaw, enable `Settings -> Remote Control -> External Automation`.
-2. In PokeClaw, open `Settings -> Channels -> 入口 -> Pairing token` and copy the token.
+1. In NailongClaw, enable `Settings -> Remote Control -> External Automation`.
+2. In NailongClaw, open `Settings -> Channels -> 入口 -> Pairing token` and copy the token.
 3. In MacroDroid, create a new macro.
 4. Add any trigger you want. For a simple smoke test, use `User Input -> Shortcut Launched`.
 5. Add action `Device Actions -> Send Intent`.
@@ -529,9 +529,9 @@ MacroDroid setup:
 13. Set `Extra 2` value to the task text, for example `how much battery left`.
 14. Save the macro, then run MacroDroid's `Test macro`.
 
-Expected result: PokeClaw opens, records the task in the chatroom, runs the task through the normal harness, and shows the result. The intent does not bypass PokeClaw safety, permissions, or tool rules.
+Expected result: NailongClaw opens, records the task in the chatroom, runs the task through the normal harness, and shows the result. The intent does not bypass NailongClaw safety, permissions, or tool rules.
 
-Both entry points are exported to every app on the device, so the token is what proves the caller is allowed to use them. A request without it — or with a wrong one — is refused before anything happens, and six wrong attempts pause the entry point for 30 seconds, a pause that a correct token does not cut short. Reset the token from the same settings row to invalidate every app still holding the old one.
+Both entry points are exported to every app on the device, so the token is what proves the caller is allowed to use them. A request without it — or with a wrong one — is refused before anything happens, and five wrong attempts pause the entry point — 30 seconds the first time, doubling on each further lockout up to 30 minutes — a pause that a correct token does not cut short. Reset the token from the same settings row to invalidate every app still holding the old one.
 
 For chat instead of task mode, use:
 
@@ -539,7 +539,7 @@ For chat instead of task mode, use:
 - Extra name: `chat`
 - Extra value: the chat message
 
-The same pattern should work from Tasker or Locale-style tools as long as they launch the exported PokeClaw automation activity with an explicit package/class. The broadcast receiver is still available for ADB and compatible callers, but Android can block a background broadcast receiver from opening an activity on modern target SDKs.
+The same pattern should work from Tasker or Locale-style tools as long as they launch the exported NailongClaw automation activity with an explicit package/class. The broadcast receiver is still available for ADB and compatible callers, but Android can block a background broadcast receiver from opening an activity on modern target SDKs.
 
 Task example:
 
@@ -609,7 +609,7 @@ Every star helps more people find the project. Every issue helps shape the next 
 
 **新启动图标**：自适应图标重构为「渐变背景层 + N 字形前景层」——对角三段渐变（灰蓝紫 `#8A89AD` → 雾紫 `#C2B6B8` → 锈橙 `#AD6E57`，采样自参考设计）+ 白色粗体 N（帽高 31%，与原 P 同位同重）；monochrome 层由火箭改为 N 字形。应用内 splash / 悬浮球 / 小组件所用 `ic_launcher.png` 同步更换。
 
-**构建配置**：`POKECLAW_*` 环境变量键更名为 `NAILONGCLAW_*`（`local.properties` 配过旧键的需同步改名）；版本默认值升至 0.9.0 / versionCode 34；应用内更新检查与 issue 链接默认指向新仓库 `nailoooog8/nailongclaw`。**新仓库尚未创建**——创建前不要发版，否则更新检查会 404。
+**构建配置**：`POKECLAW_*` 环境变量键更名为 `NAILONGCLAW_*`（`local.properties` 配过旧键的需同步改名）；版本默认值升至 0.9.0 / versionCode 34；应用内更新检查与 issue 链接默认指向新仓库 `nailoooog8/nailongclaw`。**新仓库已创建**（2026-10-27 建库），v0.9.0 已于 2026-10-28 在该仓库发布，更新检查链路已打通。
 
 **验证**：614 项单元测试 / 62 套件 / 0 失败（`./gradlew testDebugUnitTest assembleDebug`，BUILD SUCCESSFUL）。图标未做真机渲染验证（设备未连接）；三语界面文字未逐语种过目。
 
@@ -887,3 +887,5 @@ PokeClaw is a trademark of Nicole / agents.io. The name "PokeClaw" and the PokeC
 Apache 2.0
 
 Contributors sign our [CLA](CLA.md) before their first PR is merged.
+
+> **Fork note（本 fork 实际规则）**：本仓库使用 **DCO 1.1** 签署（commit 带 `Signed-off-by`），不是上游的版权转让 CLA——贡献者保留自己版权，见上方「贡献者保留版权」一节与 [`CLA.md`](CLA.md)。上面这行是上游原文，依 Apache-2.0 §4 逐字保留。
