@@ -17,6 +17,7 @@ import io.agents.nailongclaw.agent.llm.StreamingListener
 import io.agents.nailongclaw.agent.skill.ToolCallRecorder
 import io.agents.nailongclaw.service.ClawAccessibilityService
 import io.agents.nailongclaw.service.ClawNotificationListener
+import io.agents.nailongclaw.service.ShadowDisplayManager
 import io.agents.nailongclaw.tool.ToolRegistry
 import io.agents.nailongclaw.tool.impl.GetScreenInfoTool
 import io.agents.nailongclaw.tool.ToolResult
@@ -91,8 +92,6 @@ class DefaultAgentService : AgentService {
 
         /** Maximum number of retries on LLM API call failure */
         private const val MAX_API_RETRIES = 3
-        /** Dead-loop detection: sliding window size */
-        private const val LOOP_DETECT_WINDOW = 4
 
         /**
          * Opt-3: Action tools — after any of these execute we auto-attach a fresh
@@ -107,9 +106,14 @@ class DefaultAgentService : AgentService {
             "volume_up", "volume_down", "press_menu", "press_power",
             "clipboard", "send_file", "repeat_actions", "wait"
         )
-        /** ms to wait for UI to settle before capturing screen after an action */
-        private const val SCREEN_SETTLE_MS = 500L
-
+        /**
+         * Shadow-display action tools. They never touch the real screen, so
+         * their change signal is the shadow content version rather than a
+         * real-screen text diff — see lastShadowVersion in the task loop.
+         */
+        private val SHADOW_ACTION_TOOLS = setOf(
+            "shadow_open_app", "shadow_tap_node", "shadow_swipe", "shadow_input_text"
+        )
         /** Whether to write raw network request/response data to sandbox cache files for debugging */
         @JvmField
         var FILE_LOGGING_ENABLED = false
@@ -131,6 +135,18 @@ class DefaultAgentService : AgentService {
         this.toolSpecs = LangChain4jToolBridge.buildToolSpecifications()
         this.executor = Executors.newSingleThreadExecutor()
         XLog.i(TAG, "Agent initialized: provider=${config.provider}, model=${config.modelName}, streaming=${config.streaming}")
+    }
+
+    /**
+     * Tool specs for the request about to go out. Shadow-display tools are
+     * pruned while no shadow display exists: five tool specs re-sent every
+     * round to describe a screen the model cannot touch yet, where every call
+     * would error. The registry keeps them registered, so a display created
+     * later is picked up by the next request — no restart, no stale pruning.
+     */
+    private fun requestToolSpecs(): List<dev.langchain4j.agent.tool.ToolSpecification> {
+        if (ShadowDisplayManager.isCreated()) return toolSpecs
+        return toolSpecs.filterNot { it.name().startsWith("shadow_") }
     }
 
     override fun updateConfig(config: AgentConfig) {
@@ -316,7 +332,7 @@ class DefaultAgentService : AgentService {
             try {
                 return if (config.streaming) {
                     val textBuilder = StringBuilder()
-                    llmClient.chatStreaming(messages, toolSpecs, object : StreamingListener {
+                    llmClient.chatStreaming(messages, requestToolSpecs(), object : StreamingListener {
                         override fun onPartialText(token: String) {
                             textBuilder.append(token)
                             callback.onContent(iteration, token)
@@ -325,7 +341,7 @@ class DefaultAgentService : AgentService {
                         override fun onError(error: Throwable) {}
                     })
                 } else {
-                    llmClient.chat(messages, toolSpecs)
+                    llmClient.chat(messages, requestToolSpecs())
                 }
             } catch (e: Exception) {
                 lastException = e
@@ -349,13 +365,9 @@ class DefaultAgentService : AgentService {
 
     // ==================== Dead Loop Detection ====================
 
-    private data class RoundFingerprint(val screenHash: Int, val toolCall: String)
-
-    private fun isStuckInLoop(history: LinkedList<RoundFingerprint>): Boolean {
-        if (history.size < LOOP_DETECT_WINDOW) return false
-        val first = history.first()
-        return history.all { it == first }
-    }
+    // RoundFingerprint / isStuckInLoop now live in LoopHistory, where the
+    // circuit breaker's policy is unit-testable (it used to sit here as a
+    // private method that was never called).
 
     // ==================== Context Compression ====================
 
@@ -603,9 +615,15 @@ class DefaultAgentService : AgentService {
         var totalTokens = 0
         var actualModelName: String? = null  // Track the real model name from API response
         val maxIterations = config.maxIterations
-        val loopHistory = LinkedList<RoundFingerprint>()
+        val loopHistory = LoopHistory()
         var lastScreenHash = 0
         var previousScreenTexts: Set<String> = emptySet()
+        // Shadow-display loop state: the shadow screen has no text diff, so
+        // its change signal is ClawAccessibilityService's shadowContentVersion
+        // (see SHADOW_ACTION_TOOLS). Without these the shadow half of
+        // automation is invisible to StuckDetector's ScreenUnchanged signal.
+        var lastShadowVersion = Long.MIN_VALUE
+        var lastRoundScreenDiff = 0
         val tokenMonitor = TokenMonitor(config.modelName)
         val stuckDetector = StuckDetector()
         val taskBudget = TaskBudget.fromSettings()
@@ -742,6 +760,8 @@ class DefaultAgentService : AgentService {
             consecutiveNoToolCalls = 0
 
             // Execute tool calls
+            lastRoundScreenDiff = 0
+            var roundToolError: String? = null
             for (toolRequest in llmResponse.toolExecutionRequests) {
                 if (cancelled.get()) {
                     callback.onComplete(iterations, ClawApplication.instance.getString(R.string.agent_task_cancel), totalTokens, actualModelName)
@@ -793,6 +813,12 @@ class DefaultAgentService : AgentService {
                 val result = ToolRegistry.getInstance().executeTool(toolName, params)
                 val paramsString = if (params.isEmpty()) "" else params.toString()
                 callback.onToolResult(iterations, toolName, displayName, paramsString, result)
+                if (!result.isSuccess) {
+                    // Real tool errors feed StuckDetector's RepeatedError
+                    // signal — it used to be hardwired null, which kept that
+                    // signal permanently dead.
+                    roundToolError = result.error
+                }
                 if (result.isSuccess) {
                     inAppSearchGuard.recordSuccessfulTool(toolName, params)
                     emailComposeGuard.recordSuccessfulTool(toolName)
@@ -818,7 +844,12 @@ class DefaultAgentService : AgentService {
                 // immediately without spending an extra 5 s inference round on get_screen_info.
                 val combinedResultData: String = if (toolName in ACTION_TOOLS) {
                     try {
-                        Thread.sleep(SCREEN_SETTLE_MS) // let UI animate/settle
+                        // Event-driven settle instead of a fixed 500ms sleep:
+                        // returns as soon as the screen has been quiet for
+                        // 300ms (dsh-Go's ChangeWait pattern), so a fast phone
+                        // pays ~300ms while a slow one still gets its window —
+                        // and a mid-transition tree never reaches the model.
+                        ClawAccessibilityService.getInstance()?.awaitUiStable(1500, 300)
                         val screenTool = ToolRegistry.getInstance().getTool("get_screen_info")
                         val screenAfter = screenTool?.execute(emptyMap())
                         if (screenAfter != null && screenAfter.isSuccess && !screenAfter.data.isNullOrBlank()) {
@@ -831,6 +862,11 @@ class DefaultAgentService : AgentService {
                             val added = currentTexts - previousScreenTexts
                             val removed = previousScreenTexts - currentTexts
                             previousScreenTexts = currentTexts
+                            // Real diff size (added + removed lines), not the
+                            // total line count — StuckDetector's ZeroDiff
+                            // signal needs "nothing changed", and the old
+                            // value could never be zero on a non-empty screen.
+                            lastRoundScreenDiff = added.size + removed.size
                             val diffSection = buildString {
                                 if (added.isNotEmpty()) append("\nNew on screen: ${added.take(10).joinToString(", ")}")
                                 if (removed.isNotEmpty()) append("\nGone from screen: ${removed.take(10).joinToString(", ")}")
@@ -848,6 +884,24 @@ class DefaultAgentService : AgentService {
                         XLog.w(TAG, "Opt3: exception fetching screen after $toolName", e)
                         GSON.toJson(result)
                     }
+                } else if (toolName == "shadow_get_screen_info" && result.isSuccess && result.data != null) {
+                    // The shadow screen's text is its own fingerprint; the
+                    // real-screen hash must not be overwritten with it.
+                    lastScreenHash = result.data.hashCode()
+                    GSON.toJson(result)
+                } else if (toolName in SHADOW_ACTION_TOOLS) {
+                    // Shadow actions carry no text diff: the shadow content
+                    // version IS the change signal (each shadow tool's own
+                    // WARNING says the same to the model). Same version as the
+                    // previous shadow action = nothing moved on the shadow
+                    // screen, which is what StuckDetector's ZeroDiff and
+                    // ScreenUnchanged signals need to see.
+                    val version = ClawAccessibilityService.getInstance()?.shadowContentVersion
+                        ?: lastShadowVersion
+                    lastRoundScreenDiff = if (version == lastShadowVersion) 0 else 1
+                    lastShadowVersion = version
+                    lastScreenHash = version.toInt()
+                    GSON.toJson(result)
                 } else {
                     // Record fingerprint for dead-loop detection (non-action tools path)
                     if (toolName == "get_screen_info" && result.isSuccess && result.data != null) {
@@ -859,11 +913,9 @@ class DefaultAgentService : AgentService {
                 // For action tools the loop detection hash was already updated above;
                 // for non-get_screen_info action tools also record the fingerprint.
                 if (toolName in ACTION_TOOLS) {
-                    loopHistory.addLast(RoundFingerprint(lastScreenHash, "$toolName:$toolArgs"))
-                    if (loopHistory.size > LOOP_DETECT_WINDOW) loopHistory.removeFirst()
+                    loopHistory.add(RoundFingerprint(lastScreenHash, "$toolName:$toolArgs"))
                 } else if (toolName.isNotEmpty() && toolName != "get_screen_info") {
-                    loopHistory.addLast(RoundFingerprint(lastScreenHash, "$toolName:$toolArgs"))
-                    if (loopHistory.size > LOOP_DETECT_WINDOW) loopHistory.removeFirst()
+                    loopHistory.add(RoundFingerprint(lastScreenHash, "$toolName:$toolArgs"))
                 }
 
                 // Add tool result to messages
@@ -871,16 +923,30 @@ class DefaultAgentService : AgentService {
                 XLog.d(TAG, "displayName:$displayName toolName:$toolName")
             }
 
-            // Stuck detection (5-signal, 3-level recovery)
-            val lastAction = llmResponse.toolExecutionRequests?.firstOrNull()?.let {
-                "${it.name()}:${it.arguments()?.take(50)}"
-            } ?: ""
-            val screenDiffCount = (previousScreenTexts as? Set<*>)?.size ?: 0
-            val toolError = llmResponse.toolExecutionRequests?.firstOrNull()?.let { req ->
-                val result = ToolRegistry.getInstance().getTool(req.name() ?: "")
-                null // error tracked per-tool above; simplified here
+            // Hard circuit breaker: a full window of identical fingerprints
+            // (same screen state AND same tool call) ends the task right now,
+            // without waiting for StuckDetector's slower escalation.
+            if (loopHistory.isStuckInLoop()) {
+                XLog.w(TAG, "Dead-loop breaker fired at iteration $iterations after ${loopHistory.size} identical rounds")
+                val status = tokenMonitor.getStatus()
+                callback.onComplete(
+                    iterations,
+                    "Task stopped: the same action on the same screen repeated ${loopHistory.size} times in a row "
+                        + "(dead loop). Used ${status.formattedTokens} tokens (${status.formattedCost}).",
+                    totalTokens,
+                    actualModelName
+                )
+                return
             }
-            val detection = stuckDetector.record(lastAction, lastScreenHash, screenDiffCount, null)
+
+            // Stuck detection (5-signal, 3-level recovery)
+            // One fingerprint per round covering EVERY tool call in it, not
+            // just the first — a round of two tools repeating is as loopy as
+            // one tool repeating.
+            val lastAction = llmResponse.toolExecutionRequests
+                ?.joinToString(";") { "${it.name()}:${it.arguments()?.take(50)}" }
+                ?: ""
+            val detection = stuckDetector.record(lastAction, lastScreenHash, lastRoundScreenDiff, roundToolError)
             if (detection != null) {
                 when (detection.level) {
                     StuckDetector.RecoveryLevel.AUTO_KILL -> {
