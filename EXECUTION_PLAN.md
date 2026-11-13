@@ -73,6 +73,8 @@ After 4 tickets done:
 - Tag `v0.7.0`, push, GitHub release auto-fires via `release.yml`
 - Reply to each closed ticket: "v0.7.0 ships this — please retest"
 
+> **版本号已作废（2026-11-13 复核）**：本 fork 当前为 `versionCode 34` / `versionName 0.9.0`（`app/build.gradle.kts`，env `NAILONGCLAW_VERSION_CODE` / `NAILONGCLAW_VERSION_NAME`）。下文 v0.8.0 / v0.9.0 / v1.0.0 均指 upstream 的计划版本，与本 fork 版本线无关。
+
 ---
 
 ## Phase 2 — Next 2 Weeks (~25 hours)
@@ -108,13 +110,13 @@ After Phase 2: `v0.8.0` — "Missed-call automation + architecture docs"
 
 ### Cross-OEM QA infrastructure
 
-- [ ] Wire Firebase Test Lab into emulator-matrix.yml workflow
+- [x] Wire Firebase Test Lab into emulator-matrix.yml workflow — **已交付**（`.github/workflows/firebase-test-lab.yml`，`gcloud firebase test android run`；git `68ce004`）
   - Free tier: 15 virtual + 10 physical runs / day
   - Covers Samsung S24/S23, Xiaomi 13, Pixel real devices
 - [ ] Samsung Remote Test Lab session for #17 + #16 reproduction
 - [ ] BrowserStack App Live $40/mo trial month for Xiaomi reproduction
 - [ ] eBay 二手 Xiaomi Redmi Note 12 ~$120 — permanent vendor coverage
-- [ ] OEM Compatibility Matrix doc — `docs/oem-coverage.md`
+- [x] OEM Compatibility Matrix doc — `docs/OEM_COVERAGE_TIERS.md`（已交付，原计划的 `docs/oem-coverage.md` 改名）
   - Columns: Pixel / Samsung / Xiaomi / OPPO / realme / Infinix
   - Rows: critical flows (chat, task, monitor, model download, accessibility, notifications)
   - PASS / PARTIAL / FAIL per cell with evidence link
@@ -141,7 +143,7 @@ After Phase 3: `v0.9.0` — "Multi-OEM hardening"
 
 ### Major work
 
-- [ ] **Mobile Agent Protocol Spec draft** (`docs/MAP-spec.md`)
+- [ ] ~~**Mobile Agent Protocol Spec draft** (`docs/MAP-spec.md`)~~ — 未做，且本 fork 不采用（见 `STRATEGY.md`「不再投入 protocol spec push」）
   - Define `[INTENT:...]` markers, tool envelope, monitor lifecycle
   - Even one paper = protocol-owner narrative for acquirer
 - [ ] **BACKLOG P1 Tinder automation** — proves "same monitor architecture, any app"
@@ -196,7 +198,7 @@ Decision gate per STRATEGY.md §10:
 For each OEM bug we can't repro:
 1. Leave **visible reply within 24 hr**：「v0.X.Y diagnostics ship 緊，請 attach fresh debug-report.zip」
 2. **Issue template enforcement** — require OEM + Android version + Build number + debug-report.zip
-3. **Vendor-specific code directories** — `vendor/xiaomi/`、`vendor/samsung/`
+3. ~~**Vendor-specific code directories** — `vendor/xiaomi/`、`vendor/samsung/`~~ — 未采用：仓库无 `vendor/` 源根（`app/build.gradle.kts` 只认 `app/src`）；跨 OEM 差异按 `docs/OEM_COVERAGE_TIERS.md` 分层记录，不走 per-vendor 子目录
 4. **「PokeClaw OEM Verified」badge** in README — community-maintained matrix
 
 ### Active commit signal
@@ -244,6 +246,6 @@ ADRs are **the single highest signal** for acqui-hire candidates: shows you thin
 
 ---
 
-## Right now → Phase 1 Ticket 1 = #44 Voice Input
+## Right now → (upstream 的历史起点，已过时) #44 Voice Input 已于 2026-05-26 交付
 
-Starting QA-first design + implementation immediately.
+本 fork 的当前优先级见 `BACKLOG.md`。

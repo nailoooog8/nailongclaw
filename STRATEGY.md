@@ -71,7 +71,7 @@ PokeClaw 嘅技術 surface area 包括：
 - On-device LiteRT-LM + Gemma optimization (CPU/GPU 路徑、OpenCL 兼容)
 - Cross-OEM UI automation (1000s of app UI variations)
 - Battery / memory optimization at runtime
-- 21 generic tools × 13 core rules × LLM playbook architecture
+- 52 內置工具（`ToolRegistry.register*Tools()`，另加運行時註冊的 `mcp_*` 與用戶技能工具）× 14 core rules × LLM playbook architecture
 
 **呢啲唔係兩日寫得出嘅嘢**。AI 寫得出單個 component，但 hold 唔住成個系統嘅 coherence。
 
@@ -130,9 +130,9 @@ Google 整嘅 mobile agent 永遠係 **Pixel-first、多年後先 expand**。Sam
 1. **AI 寫得出 code，hold 唔住 3 年 system ownership** — 22 個 OEM issues × 每次 Android 更新 × backwards compat × battery optimization = lifecycle 唔係 generation
 2. **Hallucination cost at infra layer 係 catastrophic** — agent 撳錯 button 可以洗錢、洗數據、發錯 message。需要 human-reviewed safety primitives
 3. **Idiomatic Android 深度** — Accessibility Service 喺 Samsung 同 Xiaomi 嘅行為差好遠；呢啲 know-how AI 而家 model 唔到
-4. **Schema / spec 邊界處理** — Real-world app UI 係 messy（dialog 結構、button label、scroll behavior 都唔 standard）；PokeClaw 嘅 21 tools + 13 rules 就係 normalization layer
+4. **Schema / spec 邊界處理** — Real-world app UI 係 messy（dialog 結構、button label、scroll behavior 都唔 standard）；NailongClaw 嘅 52 內置工具 + 14 rules 就係 normalization layer
 5. **買家 opportunity cost** — Anthropic 工程師時薪極貴，唔會花 6 個月起 mobile harness（同 Stainless 邏輯一樣）
-6. **Systems thinking across 5000 decision points** — AI 而家做唔到「同時 hold 21 tools × 13 rules × 多 OEM × 多 model × monitor + agent 雙模式」嘅 coherence
+6. **Systems thinking across 5000 decision points** — AI 而家做唔到「同時 hold 52 內置工具 × 14 rules × 多 OEM × 多 model × monitor + agent 雙模式」嘅 coherence
 
 **Window erosion timeline: 3-5 年 AI 追上系統 ownership。** Anthropic 用 $300M 買 Stainless 部分原因係買 3 年 window。PokeClaw 嘅 window 應該 similar — **next 18 個月係 decisive window**。
 
@@ -255,7 +255,7 @@ Stainless 有 20 個 specialized engineers。Nicole 係 1 個人 + **多個 AI a
 | 1 | **Re-publish v0.5.1** — break 30-day silence，signal alive | Momentum |
 | 2 | **GitHub Actions emulator matrix** — CI 自動化 PR-level coverage | QA scale |
 | 3 | **OEM Compatibility Matrix** README + issue templates | Community delegation |
-| 4 | **Publish Mobile Agent Protocol Spec** (PokeClaw-MAP-Spec.md) | Convention ownership |
+| 4 | ~~**Publish Mobile Agent Protocol Spec** (PokeClaw-MAP-Spec.md)~~ — 已放棄（見上文「不再投入 protocol spec push」） | Convention ownership |
 | 5 | **Buy 1 Samsung + 1 Xiaomi 二手** | Cover 80% real-world OEM bugs |
 | 6 | **「Defensive」blog post**: "Why mobile agent harness needs to stay open" | Anchor narrative for buyers |
 | 7 | **YC application** (Winter 2026 batch) | Forcing function + buyer attention |
@@ -266,6 +266,9 @@ Stainless 有 20 個 specialized engineers。Nicole 係 1 個人 + **多個 AI a
 ---
 
 ## 10. The decision framework
+
+> **时间戳（2026-11-13 复核）**：本条 decision gate 的上游 6 个月窗口（自 2026-05-25 快照起算）已到期；
+> 里程碑数据（872 stars / 22 issues）为 2026-05-25 快照，不是当前值。本 fork 不执行本 gate——见文件顶部声明。
 
 如果未來 6 個月 hit 唔到呢三個 milestone，就要重新 evaluate 係咪繼續 push：
 

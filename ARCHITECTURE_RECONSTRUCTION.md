@@ -327,7 +327,7 @@ Pull task-specific UI flow out of the Activity so task orchestration work stops 
 
 ### Status
 
-- Landed locally, pending commit
+- Landed on `main` (committed)
 - Current landing scope: `ActiveTaskShellController` now owns active monitor/task shell state, periodic `AutoReplyManager` polling, and Stop / Stop All actions instead of leaving `ComposeChatActivity` to poll and mutate task-shell state directly
 
 ### Goal
@@ -447,7 +447,7 @@ Split monitor setup into a structured target model that carries:
 
 ### Early smoke evidence
 
-- `MonitorDialog` now surfaces the same supported app list used by monitor routing: `WhatsApp`, `Telegram`, `Messages`, `LINE`, `WeChat`
+- The monitor-setup composable in `ui/chat/ChatScreen.kt` (`onStart: (MonitorTargetSpec) -> Unit`) now surfaces `MonitorTargetSpec.supportedApps` — currently `WhatsApp, Telegram, Messages, LINE, WeChat, QQ, Douyin`（7 个；原文档说的 `MonitorDialog` 已不存在，列表也比当时长）
 - live device screenshot confirms the dialog keeps `Telegram` selected instead of collapsing back to WhatsApp
 - `MonitorTargetParserTest` now guards:
   - `monitor Mom on Telegram` -> `Mom + Telegram`
@@ -494,7 +494,7 @@ This is the phase that makes lower-RAM support and more local models safer to ad
 
 ### Early smoke evidence
 
-- Cold launch after the Phase 4 refactor still lands on `ComposeChatActivity` with truthful local backend status `● gemma4_2b_v09_obfus_fix_all_modalities_thinking · CPU`
+- (2026-10-24 之前) Cold launch after the Phase 4 refactor still lands on `ComposeChatActivity` with truthful local backend status `● gemma4_2b_v09_obfus_fix_all_modalities_thinking · CPU`。⚠️ **已变**：2026-10-24 起 Splash 落地面是 `ClaudeUiPreviewActivity`（见 `BACKLOG.md`「升格主界面」）；Compose 聊天页改为从主界面抽屉/会话模型进入。
 - Real Local UI send still works after runtime consolidation:
   - typed `say pong`
   - tapped the live send-button bounds
@@ -509,8 +509,8 @@ This is the phase that makes lower-RAM support and more local models safer to ad
   - `LlmConfigActivity` and `ChatSessionController` now read the same RAM/support/downloaded state instead of maintaining parallel calculations
   - `LocalModelManager.downloadModel()` no longer mutates MMKV model selection as a side effect; caller boundaries now own "downloaded file" vs "selected local model"
 - Current limitation:
-  - the Phase 5 device smoke rerun is temporarily blocked by ADB attach state (`adb devices -l` returned no device after the landing)
-  - do not infer a product regression from that block; rerun `H4/H4-b`, `Q3-1`, `Q5-1`, `Q5-1b`, and `LQ1-LQ13` as soon as the Pixel is visible again
+  - 当时受阻：ADB 未附着（`adb devices -l` 无设备）。**已解除**——2026-11-08 QA 机已重刷至 vc62（见 `BACKLOG.md` 运维条）；Phase 4/5 状态由「In progress」改为「Landed on `main`」（`LocalModelRuntime` / `MonitorTargetSpec` 均在树内）
+  - rerun `H4/H4-b`, `Q3-1`, `Q5-1`, `Q5-1b`, and `LQ1-LQ13` for the record
 - Practical QA note:
   - stale absolute tap coordinates are not a valid regression signal once the IME shifts the input bar
   - for Compose chat smoke, collapse any notification shade / foreground interruption first, then re-dump live bounds before tapping send
