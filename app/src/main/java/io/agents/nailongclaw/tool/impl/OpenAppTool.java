@@ -88,6 +88,9 @@ public class OpenAppTool extends BaseTool {
             }
         }
 
+        // Loop tripwire (see TapTool): a launch that dispatches but never
+        // brings a window up is reported as such, not as a silent success.
+        long before = service.getContentVersion();
         boolean success = service.openApp(packageName);
         if (!success) {
             return ToolResult.error("Failed to open app: " + packageName + ". Make sure the app is installed.");
@@ -96,47 +99,59 @@ public class OpenAppTool extends BaseTool {
         // Wait for possible chain-launch intercept dialog and auto-click "Allow"
         dismissChainLaunchDialog(service);
 
-        return ToolResult.success("Opened app: " + packageName);
+        String message = "Opened app: " + packageName;
+        if (service.getContentVersion() == before) {
+            return ToolResult.success(message + noChangeWarning("the launch"));
+        }
+        return ToolResult.success(message);
     }
 
     /**
      * Some manufacturers (Xiaomi, Huawei, OPPO, vivo, etc.) show an intercept dialog
      * ("Allow xxx to open yyy?") when launching an app from the background.
      * This method waits for the dialog and auto-clicks the "Allow" button.
-     * Checks up to 3 times, 500ms apart; silently returns if no dialog appears.
+     *
+     * The wait is event-driven: settle first (the dialog arrives around the
+     * app's own window), then scan twice. The old shape slept 500ms three
+     * times unconditionally — every open_app paid 1.5s plus a dozen tree
+     * scans even on devices with no such dialog at all.
      */
     private void dismissChainLaunchDialog(ClawAccessibilityService service) {
-        for (int attempt = 0; attempt < 3; attempt++) {
+        service.awaitUiStable(1500, 300);
+        if (tapPositiveDialogButton(service) || tapAllowKeywordButton(service)) {
+            return;
+        }
+        // Dialogs sometimes land a beat after the app window settles.
+        try {
+            Thread.sleep(300);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return;
+        }
+        if (!tapPositiveDialogButton(service)) {
+            tapAllowKeywordButton(service);
+        }
+    }
+
+    private boolean tapAllowKeywordButton(ClawAccessibilityService service) {
+        for (String keyword : ALLOW_KEYWORDS) {
+            List<AccessibilityNodeInfo> nodes = service.findNodesByText(keyword);
             try {
-                Thread.sleep(500);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return;
-            }
-
-            if (tapPositiveDialogButton(service)) {
-                return;
-            }
-
-            for (String keyword : ALLOW_KEYWORDS) {
-                List<AccessibilityNodeInfo> nodes = service.findNodesByText(keyword);
-                try {
-                    for (AccessibilityNodeInfo node : nodes) {
-                        CharSequence text = node.getText();
-                        if (text != null && matchesAllowButton(text.toString())) {
-                            boolean clicked = service.clickNode(node);
-                            XLog.i(TAG, "Chain launch dialog: tapped \"" + text + "\" " + (clicked ? "success" : "failed"));
-                            if (clicked) {
-                                ClawAccessibilityService.recycleNodes(nodes);
-                                return;
-                            }
+                for (AccessibilityNodeInfo node : nodes) {
+                    CharSequence text = node.getText();
+                    if (text != null && matchesAllowButton(text.toString())) {
+                        boolean clicked = service.clickNode(node);
+                        XLog.i(TAG, "Chain launch dialog: tapped \"" + text + "\" " + (clicked ? "success" : "failed"));
+                        if (clicked) {
+                            return true;
                         }
                     }
-                } finally {
-                    ClawAccessibilityService.recycleNodes(nodes);
                 }
+            } finally {
+                ClawAccessibilityService.recycleNodes(nodes);
             }
         }
+        return false;
     }
 
     private boolean tapPositiveDialogButton(ClawAccessibilityService service) {

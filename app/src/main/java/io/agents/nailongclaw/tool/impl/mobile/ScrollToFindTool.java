@@ -97,21 +97,22 @@ public class ScrollToFindTool extends BaseTool {
         }
 
         // Loop: scroll → find
-        String lastScreenContent = getScreenSnapshot(service);
         for (int i = 0; i < maxScrolls; i++) {
+            // Bottom/top detection rides the content version, not a second
+            // full tree pull: a swipe that produced no accessibility event
+            // moved no content. The old shape pulled the whole tree twice per
+            // scroll (once before the swipe, once after) just to compare
+            // strings — that is where this tool's minutes went.
+            long beforeScroll = service.getContentVersion();
             // Perform swipe
             boolean swiped = service.performSwipe(centerX, scrollStartY, centerX, scrollEndY, 400);
             if (!swiped) {
                 return ToolResult.error("Swipe failed at scroll #" + (i + 1));
             }
 
-            // Wait for page to settle
-            try {
-                Thread.sleep(500);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return ToolResult.error("Interrupted during scroll");
-            }
+            // Wait for page to settle (event-driven: returns as soon as the
+            // screen has been quiet, instead of a blind 500ms)
+            service.awaitUiStable(2000, 400);
 
             // Search for target
             found = findElement(service, text);
@@ -120,13 +121,11 @@ public class ScrollToFindTool extends BaseTool {
             }
 
             // Detect if we reached the bottom/top (screen content no longer changes)
-            String currentScreen = getScreenSnapshot(service);
-            if (currentScreen != null && currentScreen.equals(lastScreenContent)) {
+            if (service.getContentVersion() == beforeScroll) {
                 return ToolResult.error("Element with text \"" + text + "\" not found. "
                         + "Reached the " + ("up".equals(direction) ? "top" : "bottom")
                         + " after " + (i + 1) + " scroll(s).");
             }
-            lastScreenContent = currentScreen;
         }
 
         return ToolResult.error("Element with text \"" + text + "\" not found after " + maxScrolls + " scroll(s).");
@@ -163,17 +162,6 @@ public class ScrollToFindTool extends BaseTool {
             return null;
         } finally {
             ClawAccessibilityService.recycleNodes(nodes);
-        }
-    }
-
-    /**
-     * Get a quick summary of screen content, used to detect whether the page has scrolled to the bottom/top.
-     */
-    private String getScreenSnapshot(ClawAccessibilityService service) {
-        try {
-            return service.getScreenTree();
-        } catch (Exception e) {
-            return null;
         }
     }
 

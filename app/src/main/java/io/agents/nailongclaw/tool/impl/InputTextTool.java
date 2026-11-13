@@ -104,7 +104,7 @@ public class InputTextTool extends BaseTool {
 
         // Strategy 1: try ACTION_SET_TEXT (standard approach)
         // Note: ACTION_SET_TEXT overwrites existing text; for append mode we must concatenate
-        if (trySetTextWithRetries(targetNode, text, clearFirst)) {
+        if (trySetTextAndVerify(targetNode, text, clearFirst)) {
             return ToolResult.success(clearFirst ? "Input text: " + text : "Appended text: " + text);
         }
 
@@ -156,23 +156,42 @@ public class InputTextTool extends BaseTool {
         node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, clearArgs);
     }
 
-    private boolean trySetTextWithRetries(AccessibilityNodeInfo node, String text, boolean clearFirst) {
-        for (int attempt = 0; attempt < 3; attempt++) {
-            CharSequence existing = node.getText();
-            String candidateText = clearFirst ? text : ((existing != null ? existing.toString() : "") + text);
-            Bundle args = new Bundle();
-            args.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, candidateText);
-            if (node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)) {
+    /** Read-back poll for the SET_TEXT verification: 100ms interval, 1s deadline. */
+    private static final int READ_BACK_ATTEMPTS = 10;
+    private static final long READ_BACK_INTERVAL_MS = 100L;
+
+    /**
+     * One SET_TEXT request, then verify by reading the node back — dsh-Go's
+     * discipline ("one actual request only, no fallback/retry"): a single
+     * actual write, and success only when the exact requested text is on the
+     * node. The old shape fired the same request three times with sleeps,
+     * which turned a refusing field into 600ms of noise and still trusted the
+     * API's return value alone — a "success" the model would act on while the
+     * field stayed empty. Failure here falls through to the clipboard channel,
+     * which is a different mechanism rather than a repeat.
+     */
+    private boolean trySetTextAndVerify(AccessibilityNodeInfo node, String text, boolean clearFirst) {
+        CharSequence existing = node.getText();
+        String candidateText = clearFirst ? text : ((existing != null ? existing.toString() : "") + text);
+        Bundle args = new Bundle();
+        args.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, candidateText);
+        if (!node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)) {
+            return false;
+        }
+        for (int attempt = 0; attempt < READ_BACK_ATTEMPTS; attempt++) {
+            if (!node.refresh()) {
+                return false; // node went stale mid-verification
+            }
+            CharSequence current = node.getText();
+            if (current != null && candidateText.contentEquals(current)) {
                 return true;
             }
             try {
-                Thread.sleep(200);
-            } catch (InterruptedException ignored) {
+                Thread.sleep(READ_BACK_INTERVAL_MS);
+            } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 return false;
             }
-            node.performAction(AccessibilityNodeInfo.ACTION_FOCUS);
-            node.performAction(AccessibilityNodeInfo.ACTION_CLICK);
         }
         return false;
     }

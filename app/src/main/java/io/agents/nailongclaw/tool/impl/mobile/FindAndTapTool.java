@@ -81,27 +81,24 @@ public class FindAndTapTool extends BaseTool {
             scrollEndY = (int) (screenSize[1] * 0.3);
         }
 
-        String lastScreen = null;
-        try { lastScreen = service.getScreenTree(); } catch (Exception ignored) {}
-
         for (int i = 0; i < maxScrolls; i++) {
+            // End-of-scroll detection rides the content version, not a second
+            // full tree pull per iteration (see ScrollToFindTool): a swipe
+            // that produced no accessibility event moved no content, which is
+            // the "no progress → stop" signal.
+            long beforeScroll = service.getContentVersion();
             service.performSwipe(centerX, scrollStartY, centerX, scrollEndY, 400);
-            try { Thread.sleep(500); } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                return ToolResult.error("Interrupted");
-            }
+            // Event-driven settle instead of a blind 500ms.
+            service.awaitUiStable(2000, 400);
 
             tapResult = findAndTap(service, text);
             if (tapResult != null) return tapResult;
 
             // Detect end of scroll
-            String currentScreen = null;
-            try { currentScreen = service.getScreenTree(); } catch (Exception ignored) {}
-            if (currentScreen != null && currentScreen.equals(lastScreen)) {
+            if (service.getContentVersion() == beforeScroll) {
                 return ToolResult.error("\"" + text + "\" not found. Reached " +
                         ("up".equals(direction) ? "top" : "bottom") + " after " + (i + 1) + " scrolls.");
             }
-            lastScreen = currentScreen;
         }
 
         return ToolResult.error("\"" + text + "\" not found after " + maxScrolls + " scrolls.");

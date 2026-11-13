@@ -140,6 +140,23 @@ abstract class BaseTool {
         return ClawAccessibilityService.getConnectedInstance(timeoutMs)
     }
 
+    // === Loop tripwire ===
+
+    /**
+     * The standard "the action was dispatched but the screen did not move"
+     * suffix, borrowed from the shadow tools: compare the accessibility
+     * service's content version before and after an action (waiting for
+     * quiet via awaitUiStable) and append this when it did not change. It
+     * gives the model — and StuckDetector — a hard signal that the action was
+     * a no-op, instead of a silent "success" that invites a blind retry.
+     * [action] describes what was tried, e.g. "the tap".
+     */
+    protected fun noChangeWarning(action: String): String = (
+        "\nWARNING: screen content did not change after $action — the target may be unresponsive, "
+            + "the coordinates may have missed, or the action is a no-op. "
+            + "Do not blind-retry; re-read with get_screen_info and choose a different target."
+        )
+
     // === Screen bounds helpers ===
 
     /**

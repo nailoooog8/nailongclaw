@@ -54,8 +54,20 @@ public class TapTool extends BaseTool {
         int y = requireInt(params, "y");
         String boundsError = validateCoordinates(x, y);
         if (boundsError != null) return ToolResult.error(boundsError);
+        // Loop tripwire (same discipline as the shadow tools): the gesture can
+        // be dispatched "successfully" onto a screen that then does not move.
+        // Compare content versions around the action and say so, instead of
+        // reporting a success that invites a blind retry.
+        long before = service.getContentVersion();
         boolean success = service.performTap(x, y);
-        return success ? ToolResult.success("Tapped at (" + x + ", " + y + ")")
-                : ToolResult.error("Failed to tap at (" + x + ", " + y + ")");
+        if (!success) {
+            return ToolResult.error("Failed to tap at (" + x + ", " + y + ")");
+        }
+        service.awaitUiStable(2000, 400);
+        String message = "Tapped at (" + x + ", " + y + ")";
+        if (service.getContentVersion() == before) {
+            return ToolResult.success(message + noChangeWarning("the tap"));
+        }
+        return ToolResult.success(message);
     }
 }

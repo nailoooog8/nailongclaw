@@ -68,8 +68,18 @@ public class TapNodeTool extends BaseTool {
         int y = coords[1];
         String boundsError = validateCoordinates(x, y);
         if (boundsError != null) return ToolResult.error(boundsError);
+        // Loop tripwire — see TapTool: a dispatched tap onto a screen that
+        // does not move is reported as such, not as a silent success.
+        long before = service.getContentVersion();
         boolean success = service.performTap(x, y);
-        return success ? ToolResult.success("Tapped node " + nodeId + " at (" + x + ", " + y + ")")
-                : ToolResult.error("Failed to tap node " + nodeId + " at (" + x + ", " + y + ")");
+        if (!success) {
+            return ToolResult.error("Failed to tap node " + nodeId + " at (" + x + ", " + y + ")");
+        }
+        service.awaitUiStable(2000, 400);
+        String message = "Tapped node " + nodeId + " at (" + x + ", " + y + ")";
+        if (service.getContentVersion() == before) {
+            return ToolResult.success(message + noChangeWarning("the tap"));
+        }
+        return ToolResult.success(message);
     }
 }

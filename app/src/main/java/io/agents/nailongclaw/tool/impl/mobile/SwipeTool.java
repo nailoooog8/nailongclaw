@@ -62,8 +62,18 @@ public class SwipeTool extends BaseTool {
         boundsError = validateCoordinates(endX, endY);
         if (boundsError != null) return ToolResult.error(boundsError);
         long duration = optionalLong(params, "duration_ms", 500);
+        // Loop tripwire — see TapTool: a dispatched swipe onto a screen that
+        // does not move is reported as such, not as a silent success.
+        long before = service.getContentVersion();
         boolean success = service.performSwipe(startX, startY, endX, endY, duration);
-        return success ? ToolResult.success("Swiped from (" + startX + ", " + startY + ") to (" + endX + ", " + endY + ")")
-                : ToolResult.error("Failed to swipe");
+        if (!success) {
+            return ToolResult.error("Failed to swipe");
+        }
+        service.awaitUiStable(2000, 400);
+        String message = "Swiped from (" + startX + ", " + startY + ") to (" + endX + ", " + endY + ")";
+        if (service.getContentVersion() == before) {
+            return ToolResult.success(message + noChangeWarning("the swipe"));
+        }
+        return ToolResult.success(message);
     }
 }
