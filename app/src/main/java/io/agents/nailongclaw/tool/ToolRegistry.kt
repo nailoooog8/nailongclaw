@@ -103,6 +103,7 @@ object ToolRegistry {
         register(ShadowOpenAppTool())
         register(ShadowTapNodeTool())
         register(ShadowSwipeTool())
+        register(ShadowInputTextTool())
     }
 
     fun register(tool: BaseTool) {

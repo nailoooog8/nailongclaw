@@ -77,6 +77,11 @@ public class ShadowSwipeTool extends BaseTool {
         service.awaitShadowUiStable(4000, 500);
         long after = service.getShadowContentVersion();
         String message = "Swiped on shadow display (" + x1 + "," + y1 + ") → (" + x2 + "," + y2 + ")";
+        // Mika's watchMainScreen, pull-based — see ShadowTapNodeTool.
+        String escape = service.shadowEscapeWarning();
+        if (escape != null) {
+            message = message + "\n" + escape;
+        }
         if (after == before) {
             return ToolResult.success(message + "\nWARNING: shadow content did not change after the swipe — " +
                     "re-read with shadow_get_screen_info instead of blind-retrying.");

@@ -79,6 +79,13 @@ public class ShadowTapNodeTool extends BaseTool {
         service.awaitShadowUiStable(4000, 500);
         long after = service.getShadowContentVersion();
         String message = "Tapped shadow node " + nodeId + " at (" + coords[0] + ", " + coords[1] + ")";
+        // Mika's watchMainScreen, pull-based: the target may have surfaced on
+        // the real screen (background service / notification jump), in which
+        // case this tap hit a shadow screen that no longer shows it.
+        String escape = service.shadowEscapeWarning();
+        if (escape != null) {
+            message = message + "\n" + escape;
+        }
         if (after == before) {
             return ToolResult.success(message + "\nWARNING: shadow content did not change after the tap — " +
                     "possible dead shadow app or wrong-display routing. Do not blind-retry; re-read with shadow_get_screen_info.");

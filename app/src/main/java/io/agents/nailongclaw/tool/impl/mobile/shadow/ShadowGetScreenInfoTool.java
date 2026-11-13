@@ -92,6 +92,13 @@ public class ShadowGetScreenInfoTool extends BaseTool {
                 }
             }
         }
+        // Escape watchdog (Mika's watchMainScreen): reading the shadow tree is
+        // also an action, and an app that spilled to the real screen makes the
+        // next tap a no-op loop — say so before the model acts on this tree.
+        String escape = service.shadowEscapeWarning();
+        if (escape != null) {
+            result.append("\n").append(escape);
+        }
         return ToolResult.success(result.toString());
     }
 }

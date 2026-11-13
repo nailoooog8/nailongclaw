@@ -18,6 +18,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import io.agents.nailongclaw.ClawApplication;
 import io.agents.nailongclaw.utils.XLog;
 import io.agents.nailongclaw.utils.KVUtils;
@@ -198,6 +199,17 @@ public class ClawAccessibilityService extends AccessibilityService {
                     contentVersion.incrementAndGet();
                 }
             }
+            // The user touching the REAL screen. Mika's MainScreenSpill reads
+            // the same three event types as proof of hands-on user activity:
+            // whatever surfaces on the main display afterwards is the user's
+            // own doing, and the shadow escape watchdog must not fight them
+            // for it. Shadow-display clicks are excluded — our own automation
+            // must never count as a user touch.
+            if (!isShadowEvent(event) && (type == AccessibilityEvent.TYPE_VIEW_CLICKED
+                    || type == AccessibilityEvent.TYPE_VIEW_LONG_CLICKED
+                    || type == AccessibilityEvent.TYPE_TOUCH_INTERACTION_START)) {
+                lastUserTouchAt = SystemClock.uptimeMillis();
+            }
         }
 
         long now = System.currentTimeMillis();
@@ -247,6 +259,25 @@ public class ClawAccessibilityService extends AccessibilityService {
     /** Current content version — see {@link #awaitUiStable(long, long)}. */
     public long getContentVersion() {
         return contentVersion.get();
+    }
+
+    /**
+     * True when the service sees NO windows at all. Distinct from "windows
+     * exist but their roots are unreadable" (a genuine block): the root is
+     * null for a beat during every window switch and whenever the foreground
+     * app went to the background, and callers use this to tell a retryable
+     * transition from a real block — dsh-Go's hidden-vs-unreadable window
+     * split. Fails closed (false) when the scan itself throws, so an
+     * unreadable window list is never mistaken for "nothing there".
+     */
+    public boolean hasNoWindows() {
+        try {
+            List<AccessibilityWindowInfo> windows = getWindows();
+            return windows == null || windows.isEmpty();
+        } catch (Exception e) {
+            XLog.w(TAG, "hasNoWindows: window scan failed", e);
+            return false;
+        }
     }
 
     /** Content version of the SHADOW display only — see {@link #shadowContentVersion}. */
@@ -318,6 +349,7 @@ public class ClawAccessibilityService extends AccessibilityService {
         KVUtils.INSTANCE.noteAccessibilityDisconnected();
         XLog.i(TAG, "Accessibility service destroyed");
         ShadowDisplayManager.release();
+        shadowTaskPackage = null;
         ForegroundService.Companion.syncToBackgroundState(this);
     }
 
@@ -658,7 +690,96 @@ public class ClawAccessibilityService extends AccessibilityService {
         return sb.toString();
     }
 
-    /** Center coordinates for a shadow-tree node ID (e.g. "n3"), or null. */
+    /**
+     * Whether a node is "meaningful" for the text tree: has text/desc, is
+     * interactive/scrollable/editable/progress/slider. Single source of truth
+     * for {@link #buildNodeTree} and {@link #findShadowNodeById} — the latter
+     * must hand out the SAME id the tree assigned, so this predicate (and the
+     * walk order) may never diverge between the two.
+     */
+    private boolean isMeaningfulNode(AccessibilityNodeInfo node) {
+        boolean hasText = node.getText() != null && node.getText().length() > 0;
+        boolean hasDesc = node.getContentDescription() != null && node.getContentDescription().length() > 0;
+        boolean isInteractive = node.isClickable() || node.isScrollable() || node.isEditable()
+                || node.isCheckable() || node.isLongClickable();
+        boolean isSlider = isSliderNode(node);
+        CharSequence cn = node.getClassName();
+        boolean isProgress = cn != null && cn.toString().contains("ProgressBar");
+        return hasText || hasDesc || isInteractive || isSlider || isProgress;
+    }
+
+    /**
+     * Finds the shadow-tree node that shadow_get_screen_info labeled [nodeId],
+     * by re-walking the shadow window with the same predicate and walk order
+     * as {@link #buildNodeTree} — ids are assigned in walk order, so they
+     * reproduce as long as the tree has not changed. Returns a FRESH node
+     * (caller recycles), never a stored reference: holding node objects across
+     * UI changes is how stale-node bugs start. Null when the id no longer
+     * resolves (the tree changed) or no shadow window exists — the caller must
+     * then re-read the tree.
+     */
+    public AccessibilityNodeInfo findShadowNodeById(String nodeId) {
+        if (nodeId == null || nodeId.isEmpty()) {
+            return null;
+        }
+        AccessibilityNodeInfo root = getShadowWindowRoot();
+        if (root == null) {
+            return null;
+        }
+        AtomicInteger counter = new AtomicInteger(0);
+        AccessibilityNodeInfo found = findNodeInTree(root, nodeId, counter);
+        if (found != root) {
+            root.recycle();
+        }
+        return found;
+    }
+
+    /**
+     * Depth-first walk mirroring {@link #buildNodeTree}'s id assignment:
+     * invisible parents still get their children walked (as in the tree
+     * builder), meaningful nodes consume ids in the same order. Ancestors of a
+     * found node are NOT recycled — the caller owns the found node's whole
+     * ancestor chain from here.
+     */
+    private AccessibilityNodeInfo findNodeInTree(AccessibilityNodeInfo node, String nodeId, AtomicInteger counter) {
+        if (node == null) {
+            return null;
+        }
+        if (!node.isVisibleToUser()) {
+            for (int i = 0; i < node.getChildCount(); i++) {
+                AccessibilityNodeInfo child = node.getChild(i);
+                if (child != null) {
+                    AccessibilityNodeInfo found = findNodeInTree(child, nodeId, counter);
+                    if (found != null) {
+                        return found;
+                    }
+                    child.recycle();
+                }
+            }
+            return null;
+        }
+        if (isMeaningfulNode(node)) {
+            String id = "n" + counter.incrementAndGet();
+            if (id.equals(nodeId)) {
+                return node; // caller recycles
+            }
+        }
+        for (int i = 0; i < node.getChildCount(); i++) {
+            AccessibilityNodeInfo child = node.getChild(i);
+            if (child != null) {
+                AccessibilityNodeInfo found = findNodeInTree(child, nodeId, counter);
+                if (found != null) {
+                    return found;
+                }
+                child.recycle();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Center coordinates for a shadow-tree node ID (e.g. "n3"), or null.
+     */
     public int[] getShadowNodeCoordinates(String nodeId) {
         return shadowNodeIdMap.get(nodeId);
     }
@@ -707,6 +828,119 @@ public class ClawAccessibilityService extends AccessibilityService {
             XLog.w(TAG, "mainScreenUsage: window scan failed", e);
             return null;
         }
+    }
+
+    // ==================== Shadow escape watchdog ====================
+
+    /**
+     * The package currently automated on the shadow display, recorded by
+     * shadow_open_app after a successful launch (null when no shadow task is
+     * running). Mika's watchMainScreen needs to know which package "belongs"
+     * to the shadow display to recognize it spilling onto the real one.
+     */
+    private volatile String shadowTaskPackage = null;
+
+    public void setShadowTaskPackage(String packageName) {
+        this.shadowTaskPackage = packageName;
+    }
+
+    public String getShadowTaskPackage() {
+        return shadowTaskPackage;
+    }
+
+    /**
+     * Uptime of the last touch the USER made on the real screen — see the
+     * event tracking in {@link #onAccessibilityEvent(AccessibilityEvent)}.
+     */
+    private volatile long lastUserTouchAt = 0L;
+
+    /**
+     * How long after a real-screen user touch the escape watchdog stays quiet.
+     * Mika's MainScreenSpill counts a user tap inside the action window as
+     * proof the main-screen appearance is the user's own doing.
+     */
+    private static final long ESCAPE_USER_TAP_WINDOW_MS = 5_000L;
+
+    /** True when [packageName] has a window on the shadow display right now. */
+    private boolean shadowDisplayHasPackage(String packageName) {
+        Integer shadowId = ShadowDisplayManager.getDisplayIdOrNull();
+        if (shadowId == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            return false;
+        }
+        try {
+            for (AccessibilityWindowInfo window : getWindows()) {
+                if (window == null || window.getDisplayId() != shadowId) {
+                    continue;
+                }
+                AccessibilityNodeInfo root = window.getRoot();
+                if (root == null) {
+                    continue;
+                }
+                CharSequence pkg = root.getPackageName();
+                root.recycle();
+                if (pkg != null && packageName.contentEquals(pkg)) {
+                    return true;
+                }
+            }
+        } catch (Exception e) {
+            XLog.w(TAG, "shadowDisplayHasPackage: window scan failed", e);
+        }
+        return false;
+    }
+
+    /**
+     * Mika's watchMainScreen, pull-based. An app being automated on the shadow
+     * display can surface on the REAL screen anyway — a background service, a
+     * notification jump, or a system selector all default to the default
+     * display. The shadow screen then shows nothing while the model keeps
+     * tapping it: the Mika-style dead loop. Detected here as "visible on the
+     * real screen AND gone from the shadow display", and answered with a
+     * pull-back plus a warning, never a retry of the caller's action.
+     *
+     * Not an escape: the user holding the app on both screens (their own copy
+     * — Mika's InUse verdict), or a real-screen user touch inside
+     * {@link #ESCAPE_USER_TAP_WINDOW_MS} (their own doing). Returns the
+     * warning to append to a tool result, or null when there is nothing to
+     * report. Cheap enough to call after every shadow action: two window
+     * scans, no tree walk.
+     */
+    public String shadowEscapeWarning() {
+        Integer shadowId = ShadowDisplayManager.getDisplayIdOrNull();
+        if (shadowId == null) {
+            return null;
+        }
+        String pkg = shadowTaskPackage;
+        if (pkg == null || pkg.isEmpty()) {
+            return null;
+        }
+        if (SystemClock.uptimeMillis() - lastUserTouchAt < ESCAPE_USER_TAP_WINDOW_MS) {
+            return null; // the user is driving the real screen right now
+        }
+        if (!isShadowEscape(mainScreenUsage(pkg), shadowDisplayHasPackage(pkg))) {
+            return null;
+        }
+        XLog.w(TAG, "Shadow escape: " + pkg + " surfaced on the real screen; pulling back to display " + shadowId);
+        String pullError = openAppOnDisplay(pkg, shadowId);
+        if (pullError != null) {
+            return "WARNING: " + pkg + " escaped to the real screen and the pull-back failed (" + pullError
+                    + "). The shadow screen no longer shows it — re-read with shadow_get_screen_info before acting again.";
+        }
+        return "WARNING: " + pkg + " had escaped to the real screen and was pulled back to the shadow display. "
+                + "The previous action may have landed on the wrong screen — re-read with shadow_get_screen_info "
+                + "before acting again.";
+    }
+
+    /**
+     * The escape verdict as a pure predicate, so the policy is unit-testable
+     * without an accessibility service: an escape is the task's package being
+     * on the REAL screen ([onMain] TRUE) and gone from the shadow display
+     * ([onShadow] false). [onMain] null — the real screen cannot be inspected —
+     * fails closed: an unreadable main screen is never mistaken for an escape.
+     * The recent-user-touch gate lives in {@link #shadowEscapeWarning()} (it
+     * needs a clock), not here.
+     */
+    static boolean isShadowEscape(Boolean onMain, boolean onShadow) {
+        return onMain != null && onMain && !onShadow;
     }
 
     /**
@@ -778,12 +1012,7 @@ public class ClawAccessibilityService extends AccessibilityService {
         // Determine whether the current node is "meaningful" (has text/desc, is interactive/scrollable/editable/progress/slider)
         boolean hasText = node.getText() != null && node.getText().length() > 0;
         boolean hasDesc = node.getContentDescription() != null && node.getContentDescription().length() > 0;
-        boolean isInteractive = node.isClickable() || node.isScrollable() || node.isEditable()
-                || node.isCheckable() || node.isLongClickable();
-        boolean isSlider = isSliderNode(node);
-        CharSequence cn = node.getClassName();
-        boolean isProgress = cn != null && cn.toString().contains("ProgressBar");
-        boolean isMeaningful = hasText || hasDesc || isInteractive || isSlider || isProgress;
+        boolean isMeaningful = isMeaningfulNode(node);
 
         if (isMeaningful) {
             Rect bounds = new Rect();

@@ -33,10 +33,15 @@ import io.agents.nailongclaw.utils.XLog
  * display-scoped surface in [ClawAccessibilityService] — never through
  * `getRootInActiveWindow()` or plain `performTap`.
  *
- * No MediaProjection is needed: an app-owned virtual display requires no
- * special permission. The flag ladder below starts at PUBLIC|OWN_CONTENT_ONLY
- * (other packages can be launched onto a public display) and falls back to a
- * private own-content display; whichever rung the platform accepts is logged.
+ * The flag ladder mirrors Mika's ShellService: Mika's base five
+ * (PUBLIC|OWN_CONTENT_ONLY|SUPPORTS_TOUCH|ROTATES_WITH_CONTENT|
+ * DESTROY_CONTENT_ON_REMOVAL), then — through the consented projection, the
+ * only shape that can host other packages on this ROM — Mika's hidden
+ * focus-isolation bits (TRUSTED|OWN_DISPLAY_GROUP|ALWAYS_UNLOCKED on 33+,
+ * OWN_FOCUS|STEAL_TOP_FOCUS_DISABLED on 34+), degrading rung by rung the way
+ * Mika degrades trusted → untrusted. Whichever rung the platform accepts is
+ * logged with its label; a device that refuses the hidden bits keeps full
+ * function, just without the shadow display's own focus.
  *
  * Gated on API 33+: perception of shadow windows needs
  * [android.view.accessibility.AccessibilityWindowInfo.getDisplayId], which
@@ -49,16 +54,96 @@ object ShadowDisplayManager {
     private const val DISPLAY_NAME = "NailongClawShadow"
 
     /**
-     * Flag rungs in preference order. PUBLIC|OWN_CONTENT_ONLY first: a public
-     * display can host other packages' activities, and OWN_CONTENT_ONLY keeps
-     * it from mirroring the default display — mirroring would duplicate every
-     * window-change event, which is exactly the Mika-style loop trap.
+     * Mika-parity display flags. The public SDK (checked against android-36's
+     * android.jar) exposes only [DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC]
+     * (1) and [DisplayManager.VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY] (8);
+     * every other rung bit is a hidden constant the platform enforces by
+     * permission rather than by SDK visibility, so it is written as a shift —
+     * the same technique Mika's ShellService uses. Bit values are AOSP's,
+     * cross-checked against Mika's ShellService: the two public ones match
+     * its shifts exactly.
      */
-    private val FLAG_RUNGS = intArrayOf(
+    private const val FLAG_SUPPORTS_TOUCH = 1 shl 6
+    private const val FLAG_ROTATES_WITH_CONTENT = 1 shl 7
+    private const val FLAG_DESTROY_CONTENT_ON_REMOVAL = 1 shl 8
+    private const val FLAG_TRUSTED = 1 shl 10
+    private const val FLAG_OWN_DISPLAY_GROUP = 1 shl 11
+    private const val FLAG_ALWAYS_UNLOCKED = 1 shl 12
+    private const val FLAG_OWN_FOCUS = 1 shl 14
+    private const val FLAG_STEAL_TOP_FOCUS_DISABLED = 1 shl 16
+
+    /**
+     * Mika's base five. PUBLIC lets other packages be launched onto the
+     * display; OWN_CONTENT_ONLY keeps it from mirroring the default display —
+     * mirroring would duplicate every window-change event, which is exactly
+     * the Mika-style loop trap. SUPPORTS_TOUCH makes the display report touch
+     * support, ROTATES_WITH_CONTENT lets it follow its content's orientation
+     * instead of letterboxing, and DESTROY_CONTENT_ON_REMOVAL closes the
+     * activities on it when the display goes away instead of spilling them
+     * onto the default display (one of the escape vectors).
+     */
+    private val BASE_FLAGS: Int = (
         DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC
-            or DisplayManager.VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY,
-        DisplayManager.VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY,
-    )
+            or DisplayManager.VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY
+            or FLAG_SUPPORTS_TOUCH
+            or FLAG_ROTATES_WITH_CONTENT
+            or FLAG_DESTROY_CONTENT_ON_REMOVAL
+        )
+
+    /**
+     * Focus isolation — the point of Mika's hidden rung: TRUSTED +
+     * OWN_DISPLAY_GROUP + ALWAYS_UNLOCKED (33+) and OWN_FOCUS +
+     * STEAL_TOP_FOCUS_DISABLED (34+) give the shadow display its own focus,
+     * so a foregrounded shadow app cannot steal the real screen's focus or
+     * raise its IME. These are permission-checked, so a non-shell caller
+     * (us) is normally refused — which is why they ride as their own rung
+     * above [BASE_FLAGS] and degrade exactly like Mika's trusted → untrusted
+     * retry. 0 when the platform is too old for any of them.
+     */
+    private fun focusIsolationFlags(): Int {
+        var flags = 0
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            flags = flags or FLAG_TRUSTED or FLAG_OWN_DISPLAY_GROUP or FLAG_ALWAYS_UNLOCKED
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            flags = flags or FLAG_OWN_FOCUS or FLAG_STEAL_TOP_FOCUS_DISABLED
+        }
+        return flags
+    }
+
+    /** One rung of the creation ladder in [ensureCreated]. */
+    private data class Rung(val label: String, val flags: Int, val viaProjection: Boolean)
+
+    /**
+     * Tries one rung: through the consented projection when [Rung.viaProjection],
+     * else a plain app-created display. Returns null on refusal (or a null
+     * display) so the caller degrades to the next rung — a rung that throws is
+     * logged with its flags, because which rung wins is a device-QA question.
+     */
+    private fun createOnRung(dm: DisplayManager, rung: Rung, metrics: DisplayMetrics, surface: Surface): VirtualDisplay? {
+        return try {
+            val vd = if (rung.viaProjection) {
+                projection?.createVirtualDisplay(
+                    DISPLAY_NAME,
+                    metrics.widthPixels, metrics.heightPixels, metrics.densityDpi,
+                    rung.flags, surface, null, null,
+                )
+            } else {
+                dm.createVirtualDisplay(
+                    DISPLAY_NAME,
+                    metrics.widthPixels, metrics.heightPixels, metrics.densityDpi,
+                    surface, rung.flags, null, null,
+                )
+            }
+            if (vd == null) {
+                XLog.w(TAG, "createVirtualDisplay returned null for rung ${rung.label}")
+            }
+            vd
+        } catch (e: Exception) {
+            XLog.w(TAG, "createVirtualDisplay refused rung ${rung.label}", e)
+            null
+        }
+    }
 
     @Volatile
     private var virtualDisplay: VirtualDisplay? = null
@@ -150,56 +235,35 @@ object ShadowDisplayManager {
             }
         }, Handler(thread.looper))
 
-        // Rung 0: through the user-consented projection. The projection must
-        // carry PUBLIC: with OWN_CONTENT_ONLY alone MediaProjection wraps the
-        // display into PRIVATE|PRESENTATION with canHostTasks=false — no task
-        // can root there, not even from shell (V2502DA measured). A public
-        // projection display is the cast-to-external-screen shape, and it is
-        // the only projection shape that can host other packages' activities.
-        projection?.let { proj ->
-            try {
-                val vd = proj.createVirtualDisplay(
-                    DISPLAY_NAME,
-                    metrics.widthPixels, metrics.heightPixels, metrics.densityDpi,
-                    DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC
-                        or DisplayManager.VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY,
-                    reader.surface, null, null,
-                )
-                if (vd != null) {
-                    virtualDisplay = vd
-                    imageReader = reader
-                    displayId = vd.display.displayId
-                    XLog.i(TAG, "Shadow display created via MediaProjection: id=${vd.display.displayId}")
-                    return displayId
+        // Creation ladder, best rung first (Mika's ShellService order). The
+        // projection rungs lead: a display created through the consented
+        // projection is trusted (API 34+) and is the only shape that can host
+        // other packages' activities on this ROM — a plain display is
+        // untrusted and could host only our own activities (the
+        // "在其它显示器上启动 Activity 没权限" SecurityException). Within the
+        // projection rungs the focus-isolation bits come first and degrade on
+        // refusal, exactly like Mika's trusted → untrusted retry.
+        val focusFlags = focusIsolationFlags()
+        val rungs = buildList {
+            if (projection != null) {
+                if (focusFlags != 0) {
+                    add(Rung("projection+focus-isolation", BASE_FLAGS or focusFlags, true))
                 }
-                XLog.w(TAG, "projection.createVirtualDisplay returned null")
-            } catch (e: Exception) {
-                XLog.w(TAG, "projection.createVirtualDisplay refused", e)
+                add(Rung("projection+extended", BASE_FLAGS, true))
             }
+            add(Rung("plain+extended", BASE_FLAGS, false))
+            add(Rung("plain+own-content-only", DisplayManager.VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY, false))
         }
-
-        for ((index, flags) in FLAG_RUNGS.withIndex()) {
-            try {
-                val vd = dm.createVirtualDisplay(
-                    DISPLAY_NAME,
-                    metrics.widthPixels, metrics.heightPixels, metrics.densityDpi,
-                    reader.surface, flags,
-                    null, null,
-                )
-                if (vd != null) {
-                    virtualDisplay = vd
-                    imageReader = reader
-                    displayId = vd.display.displayId
-                    XLog.i(
-                        TAG, "Shadow display created: id=${vd.display.displayId} " +
-                            "rung=$index ${metrics.widthPixels}x${metrics.heightPixels}@${metrics.densityDpi}"
-                    )
-                    return displayId
-                }
-                XLog.w(TAG, "createVirtualDisplay returned null for flag rung $index")
-            } catch (e: Exception) {
-                XLog.w(TAG, "createVirtualDisplay refused flag rung $index", e)
-            }
+        for ((index, rung) in rungs.withIndex()) {
+            val vd = createOnRung(dm, rung, metrics, reader.surface) ?: continue
+            virtualDisplay = vd
+            imageReader = reader
+            displayId = vd.display.displayId
+            XLog.i(
+                TAG, "Shadow display created: id=${vd.display.displayId} " +
+                    "rung=$index(${rung.label}) ${metrics.widthPixels}x${metrics.heightPixels}@${metrics.densityDpi}"
+            )
+            return displayId
         }
 
         // Every rung refused — clean up so a retry starts fresh.

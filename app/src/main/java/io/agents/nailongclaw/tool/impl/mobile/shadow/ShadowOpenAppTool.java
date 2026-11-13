@@ -82,6 +82,10 @@ public class ShadowOpenAppTool extends BaseTool {
         // Wait briefly for the shadow UI to appear before returning, so the
         // first get_screen_info call right after does not race the cold start.
         service.awaitShadowUiStable(8000, 600);
+        // Record the package as the shadow task's own, so the escape watchdog
+        // (Mika's watchMainScreen) can recognize it spilling onto the real
+        // screen later. Set only after a successful launch.
+        service.setShadowTaskPackage(packageName);
         return ToolResult.success("Launched " + packageName + " on shadow display " + displayId);
     }
 }
