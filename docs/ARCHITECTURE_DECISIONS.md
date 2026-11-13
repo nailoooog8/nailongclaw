@@ -1,11 +1,11 @@
-# PokeClaw — Architecture Decisions
+# NailongClaw — Architecture Decisions
 
-> External-reader-friendly summary of the load-bearing choices in PokeClaw's design.
+> External-reader-friendly summary of the load-bearing choices in NailongClaw's design.
 > The goal of this document: someone unfamiliar with the codebase can understand the
 > *why* of each major decision in 15 minutes — without reading the source.
 >
 > For internal refactor guidance see `ARCHITECTURE_RECONSTRUCTION.md`.
-> For the protocol-level skill format see `skill-spec.md`.
+> For the skill recipe format see `SKILL_FORMAT.md`.
 
 ---
 
@@ -13,7 +13,7 @@
 
 **Decision.** The default local runtime is Google's LiteRT-LM with Gemma 4 weights
 (`gemma-4-E2B-it.litertlm` ≈ 2.6 GB for 8 GB-RAM devices, `gemma-4-E4B-it.litertlm` ≈ 3.6 GB
-for 10 GB+ devices). Cloud LLMs (OpenAI-compatible, Anthropic, Gemini, Groq, etc.) are
+for 12 GB+ devices). Cloud LLMs (OpenAI-compatible, Anthropic, Gemini, Groq, etc.) are
 opt-in for users who provide their own API keys.
 
 **Why.**
@@ -39,12 +39,12 @@ opt-in for users who provide their own API keys.
 
 ---
 
-## D2. 21 generic Tools × 13 Core Rules — separating what the LLM can do from how it should behave
+## D2. 52 generic Tools × 14 Core Rules — separating what the LLM can do from how it should behave
 
 **Decision.** All on-device actions go through a small, fixed set of generic tools
-(`app/src/main/java/io/agents/pokeclaw/tool/impl/`) — tap, scroll, input_text, open_app,
-read_screen, get_notifications, send_message, etc. — *not* per-app tools. App-specific
-behavior is encoded in 13 *Core Rules* injected into the system prompt.
+(`app/src/main/java/io/agents/nailongclaw/tool/impl/`) — tap, scroll, input_text, open_app,
+get_screen_info, get_notifications, send_message, etc. — *not* per-app tools. App-specific
+behavior is encoded in 14 *Core Rules* injected into the system prompt.
 
 **Why.**
 
@@ -78,7 +78,7 @@ behavior is encoded in 13 *Core Rules* injected into the system prompt.
 
 **Why.**
 
-- *Distribution requires an open core.* PokeClaw's GitHub stars, fork traffic, and
+- *Distribution requires an open core.* NailongClaw's GitHub stars, fork traffic, and
   acquirer optionality all depend on the codebase being credibly open.
 - *Sustainable revenue requires a paid surface.* Java Playbooks are the engineering
   effort that justifies a Plus/Pro tier. They are also the surface that benefits most
@@ -105,7 +105,7 @@ NotificationListenerService (for monitor + auto-reply flows).
 
 **Why.**
 
-- *No root requirement.* Root locks PokeClaw out of >99% of consumer Android phones.
+- *No root requirement.* Root locks NailongClaw out of >99% of consumer Android phones.
 - *No ADB pairing requirement.* Pairing-based automation tools work but require a PC
   during setup and re-pair after every reboot on some OEMs — far worse UX than a
   one-time Accessibility toggle.
@@ -150,7 +150,7 @@ table.
 
 ## D6. Community-delegated cross-OEM coverage, not in-house device farm
 
-**Decision.** PokeClaw owns Pixel + one Xiaomi Redmi as in-house QA. All other OEM
+**Decision.** NailongClaw owns Pixel + one Xiaomi Redmi as in-house QA. All other OEM
 coverage (Samsung, OPPO, realme, Infinix, vivo, Honor, etc.) is delegated to community
 reporters via a structured `debug-report.zip` flow.
 
@@ -169,7 +169,7 @@ reporters via a structured `debug-report.zip` flow.
   fingerprint, supported ABIs, RAM, OpenCL library probe (added 2026-05-26 for #41 / #14),
   Accessibility / Notification / Overlay state, recent logcat for backend tags, and
   recent HTTP logs.
-- Issues created via the PokeClaw template are required to attach this zip.
+- Issues created via the NailongClaw template are required to attach this zip.
 - The author triages, replies same-day (visible-commit signal), and ships a hotfix
   the next minor release.
 
@@ -184,8 +184,9 @@ reporters via a structured `debug-report.zip` flow.
 ## D7. Provider-agnostic OpenAI-compatible cloud LLM layer
 
 **Decision.** All cloud LLM access goes through an OpenAI-compatible base URL. Built-in
-providers (OpenAI, Anthropic via OpenRouter, Gemini, Groq, DeepSeek, Cerebras, etc.) are
-just preset (baseUrl, modelName) pairs in `LlmConfigActivity`. Users can also enter
+providers (OpenAI, Anthropic, Google/Gemini, plus a Custom baseUrl+key entry for
+OpenAI-compatible providers such as Groq / DeepSeek / Cerebras) are just preset
+(baseUrl, modelName) pairs in `LlmConfigActivity`. Users can also enter
 custom baseUrl + apiKey directly.
 
 **Why.**
@@ -229,7 +230,7 @@ reply is "thanks, can you attach the debug-report.zip from this build."
 
 ## North star (re-anchor)
 
-> PokeClaw is the open-source mobile agent harness. On every Android phone that runs
+> NailongClaw is the open-source mobile agent harness. On every Android phone that runs
 > an AI assistant, this is the layer that translates "do this for me" into
 > AccessibilityService taps + notification reads, regardless of which LLM the user
 > picked.

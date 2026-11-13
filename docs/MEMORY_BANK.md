@@ -244,7 +244,7 @@ adb shell am force-stop io.agents.nailongclaw   # 重启后重新读取
 
 ## 管理界面
 
-设置 → 工具 → 记忆库（`ui/settings/MemoryActivity`）：搜索、按类排序、点击编辑、长按删除、
+设置 → 功能 → 记忆库（`ui/settings/MemoryActivity`）：搜索、按类排序、点击编辑、长按删除、
 手动添加、导出 Markdown、总开关。列表**活条目在前、已作废在后**；带 ⚠ 的条目是与置顶/事件
 记忆矛盾的一对（需用户裁决），带「已作废」的是被时间顶替的（muted 色显示，保留度标签不再跑），
 带「渐淡 / 几乎遗忘」的条目是保留度已经掉下去的（见上节）。

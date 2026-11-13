@@ -1,4 +1,4 @@
-# PokeClaw 攻防实验台 · Kali WSL 工具基线（授权自测）
+# NailongClaw 攻防实验台 · Kali WSL 工具基线（授权自测）
 
 > 目标：把 `kali-linux` WSL 变成能对 **io.agents.nailongclaw**（本人 fork 的 Android 助手）做授权红队自测的实验台。
 > 授权边界：只测本机/本人设备上本人拥有的 app；不碰任何第三方系统。
@@ -11,7 +11,7 @@
 wsl -d kali-linux -- bash /home/nailoog/sec-lab/setup-kali.sh
 ```
 
-脚本内容见 `setup-kali.sh`，覆盖：
+脚本位于 Kali WSL 的 `/home/nailoog/sec-lab/setup-kali.sh`（**不在本仓库中**，本文只作引用），覆盖：
 - **静态 APK 分析**：`apktool` `jadx` `dexlib2`（反编译、看合并后的 manifest/导出组件/字符串/端点）
 - **导出组件/IPC 攻击**：`drozer`（`android intent launch_activity` / `app.activity.info` 等）
 - **动态插桩**：`frida` `frida-tools` `objection`（SSL pinning 绕过、hook 令牌校验——需 rooted/模拟器）

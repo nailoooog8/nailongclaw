@@ -53,7 +53,7 @@ enum 项 + 一段解析函数。
 **D5：解析/格式化写成纯函数。**
 `WebSearchClient` 的伴生对象（parseBocha/parseTavily/extractError/formatHits）不碰
 Android 类，纯 JUnit 可测（`WebSearchClientTest`，9 例）。HTTP 半径只留在 `search()`
-一个方法里，超时照抄 `McpStreamableHttpClient` 先例（15s/30s）——agent 执行器单线程
+一个方法里，超时照抄 `McpStreamableHttpClient` 先例（connect 15s / read 120s / write 30s）——agent 执行器单线程
 阻塞在此是安全的（`Thread.sleep(wait_after)` 与 MCP 确认门早有先例）。
 
 ## 3. 后续路线（本轮不做）

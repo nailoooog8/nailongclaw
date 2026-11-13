@@ -1,5 +1,7 @@
 # Community Issue Reply Templates (v0.7.0 cycle)
 
+> ⚠️ **历史草稿，勿直接发布**：本帖写于 2026-05（v0.7.0 周期），其中的版本引用（v0.7.0 "ships this cycle" 等）已过期——当前版本为 0.9.0，且 v0.9.0 改了 applicationId（`io.agents.pokeclaw` → `io.agents.nailongclaw`）。**发布前必须把版本号与包名刷新到当前版本**；技术步骤本身（KEY_LOCAL_BACKEND_PREFERENCE、recoverPendingGpuCrashIfNeeded 等）仍与现行代码一致。
+
 > Ready-to-paste replies for the 6 OEM-specific open issues PokeClaw cannot
 > reproduce in-house (Pixel + one Xiaomi Redmi only).
 >

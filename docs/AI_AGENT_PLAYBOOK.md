@@ -1,7 +1,7 @@
-# PokeClaw — Playbook for the Next AI Agent
+# NailongClaw — Playbook for the Next AI Agent
 
 > Things the previous agent (me, 2026-05-25 / 2026-05-26) wishes someone had told them.
-> Read this BEFORE doing any QA or release work on PokeClaw. Saves ~3 hours per landmine.
+> Read this BEFORE doing any QA or release work on NailongClaw. Saves ~3 hours per landmine.
 
 ---
 
@@ -101,7 +101,7 @@ PokeClaw is already configured correctly; other side-projects may not be. See `~
 `.github/workflows/emulator-matrix.yml` for Android emulator smoke tests:
 
 - **Component name**: launch via `io.agents.nailongclaw/.ui.splash.SplashActivity` (not `com.apk.claw.android...` which is a pre-rename stale name).
-- **APK artifact path**: `actions/upload-artifact@v4` with a path-glob preserves directory structure. The `.apk` may be at `apk/app/build/outputs/apk/debug/PokeClaw_*.apk` not `apk/*.apk`. Always use `find apk -type f -name '*.apk'` not assume a flat layout.
+- **APK artifact path**: `actions/upload-artifact@v4` with a path-glob preserves directory structure. The `.apk` may be at `apk/app/build/outputs/apk/debug/NailongClaw_*.apk` not `apk/*.apk`. Always use `find apk -type f -name '*.apk'` not assume a flat layout.
 
 ### 9. Component names changed during repo rename
 
@@ -158,9 +158,9 @@ v0.7.0 wired `PromptUtils.applyGlobalPrompt` into `AgentConfig.Builder.build()`.
 grep -rn "AgentConfig\.\|AgentConfig(\|toAgentConfig" app/src/main/java
 ```
 
-### 10. PokeClaw is a generic mobile-agent harness, NOT a missed-call product
+### 10. NailongClaw is a generic mobile-agent harness, NOT a missed-call product
 
-There is a SEPARATE revenue product called `~/MyGithub/missed-call-ai-chatbot-lab`. Missed-call follow-up is its scope, not PokeClaw's. PokeClaw stays generic — 21 tools × 13 rules — per `ARCHITECTURE_DECISIONS.md` D2. Do NOT add per-vertical workflows (missed call, plumber, dentist...) to PokeClaw core. If a generic primitive is needed (e.g. "phone call state read tool"), add it as a tool, not a workflow.
+There is a SEPARATE revenue product called `~/MyGithub/missed-call-ai-chatbot-lab`. Missed-call follow-up is its scope, not this project's. NailongClaw stays generic — 52 tools × 14 rules — per `ARCHITECTURE_DECISIONS.md` D2. Do NOT add per-vertical workflows (missed call, plumber, dentist...) to NailongClaw core. If a generic primitive is needed (e.g. "phone call state read tool"), add it as a tool, not a workflow.
 
 ---
 
@@ -193,7 +193,7 @@ adb shell pm clear io.agents.nailongclaw
 source ~/.config/pokeclaw/release-signing.env   # exports KEYSTORE_FILE etc.
 cd ~/MyGithub/PokeClaw
 NAILONGCLAW_VERSION_CODE=29 NAILONGCLAW_VERSION_NAME=0.7.1 ./gradlew assembleRelease
-adb install -r app/build/outputs/apk/release/PokeClaw_v*.apk
+adb install -r app/build/outputs/apk/release/NailongClaw_v*.apk
 ```
 
 ### Generate debug-report on signed release

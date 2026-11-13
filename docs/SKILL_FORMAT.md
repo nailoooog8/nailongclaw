@@ -47,7 +47,7 @@ agent 循环内每次工具调用都被 `ToolCallRecorder` 记录（`ToolRegistr
 只在 agent 循环期间 armed；直连工具/技能执行路径不记录）。任务成功结束
 （finish 工具或纯文本完成）时快照到 `ToolCallRecorder.lastCapture`。
 
-入口：设置 → 工具 → **自定义技能** → "从上次任务创建"。
+入口：设置 → 功能 → **技能** → "从上次任务创建"。
 生成时自动剔除 `finish` / `get_screen_info` / `take_screenshot` 这类观察性/终止性调用，
 生成的 YAML 可在对话框里自由编辑后保存，立即注册生效（无需重启）。
 
