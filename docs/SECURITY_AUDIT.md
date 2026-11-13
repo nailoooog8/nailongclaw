@@ -11,10 +11,10 @@
 
 | ID | 等级 | 问题 | 修复 | 状态 |
 |---|---|---|---|---|
-| r1 | **Critical** | 6 位 PIN 零限速，渠道配对与 LAN 控制台两处比较均可爆破 | [`BruteForceGuard`](../app/src/main/java/io/agents/pokeclaw/utils/BruteForceGuard.kt) | 已修复 |
-| r2 | **Critical** | `GET /api/channels`、`GET /api/llm` 明文返回全部 bot token 与 LLM API Key | [`ConfigServer.maskIfPresent`](../app/src/main/java/io/agents/pokeclaw/server/ConfigServer.kt) | 已修复 |
+| r1 | **Critical** | 6 位 PIN 零限速，渠道配对与 LAN 控制台两处比较均可爆破 | [`BruteForceGuard`](../app/src/main/java/io/agents/nailongclaw/utils/BruteForceGuard.kt) | 已修复 |
+| r2 | **Critical** | `GET /api/channels`、`GET /api/llm` 明文返回全部 bot token 与 LLM API Key | [`ConfigServer.maskIfPresent`](../app/src/main/java/io/agents/nailongclaw/server/ConfigServer.kt) | 已修复 |
 | r3 | **Medium** | `handleServeFile` 用字符串前缀校验路径，不折叠 `..` | 同上文件 `handleServeFile` | 已修复 |
-| r4 | **High** | 远程 MCP 服务器的 `description` 原样进入 system prompt | [`McpDescriptionSanitizer`](../app/src/main/java/io/agents/pokeclaw/agent/mcp/McpDescriptionSanitizer.kt) | 已修复 |
+| r4 | **High** | 远程 MCP 服务器的 `description` 原样进入 system prompt | [`McpDescriptionSanitizer`](../app/src/main/java/io/agents/nailongclaw/agent/mcp/McpDescriptionSanitizer.kt) | 已修复 |
 
 **必须诚实说明：以上「已修复」指的是代码层已修复且有单测覆盖。其中 r1 / r2 / r3 的 HTTP 层行为已于 2026-10-17 在真机上动态验证通过（SEC1 / SEC2 / SEC3 / SEC6），其余仍为静态走查**（见第 4 节），不要把本文当作「已通过完整安全测试」的证明。
 
@@ -75,7 +75,7 @@ if (!file.exists() || !file.toPath().startsWith(cacheDir.toPath())) { /* 404 */ 
 | 疑点 | 证伪依据 |
 |---|---|
 | SnakeYAML 反序列化 RCE | 实测 SnakeYAML 2.2 的 `Yaml()` 已禁用全局标签，反序列化 `!!javax.script.ScriptEngineManager` 抛 `ComposerException: Global tag is not allowed`。探针保留在 `scripts/YamlProbe.java`。 |
-| 导出的 Debug 接收器可被外部触发 | `DebugTaskReceiver` 与 `TaskTriggerReceiver` 虽为 `exported=true`，但入口均有 `!BuildConfig.DEBUG` 早退，release 构建下惰性。回归用例 SEC10。 |
+| 导出的 Debug 接收器可被外部触发 | 两个接收器已于 2026-10-26 移至 `app/src/debug/AndroidManifest.xml`，release 构建**不再包含**这两个导出组件（见 R3 §6.5 / SEC21）；接收器内 `!BuildConfig.DEBUG` 早退保留为纵深防御。回归用例 SEC10。 |
 | 记忆库召回可注入 system prompt | 记忆召回已有 `<memory>` 围栏，并主动剥离内容中的反围栏序列。 |
 
 ---

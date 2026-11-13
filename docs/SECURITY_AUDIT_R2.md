@@ -10,6 +10,10 @@
 > [testing-websocket-api-security]、
 > [performing-api-rate-limiting-bypass]、
 > [performing-directory-traversal-testing]、
+>
+> **⚠️ 状态快照（2026-10-16），不是当前状态。** 下文 F4–F9 的「未修复」判定已被
+> `SECURITY_AUDIT_R3.md` §1.2 的回归表更新（F4/F6/F7/F8/F9 均已修复，F5 部分修复）；
+> F3 的配对令牌修复见 R3 §6.5 与 §1.2。读本轮文档请把它当作历史快照，当前结论以 R3/R4 为准。
 > [performing-cryptographic-audit-of-application]、
 > [detecting-indirect-prompt-injection]、
 > [testing-prompt-injection-in-rag-pipelines]、
@@ -66,13 +70,13 @@
 >
 > | 改动 | 位置 |
 > |---|---|
-> | 改传 `message.from.id`；频道贴文无 `from` 时回退 `chat.id` | [`TelegramChannelHandler.kt`](../../app/src/main/java/io/agents/pokeclaw/channel/telegram/TelegramChannelHandler.kt) |
+> | 改传 `message.from.id`；频道贴文无 `from` 时回退 `chat.id` | [`TelegramChannelHandler.kt`](../../app/src/main/java/io/agents/nailongclaw/channel/telegram/TelegramChannelHandler.kt) |
 > | 新增 `lastFromUserId` 字段，**与 `lastChatId` 明确分离** | 同上 |
-> | 白名单条目改为 `CHANNEL\|senderId` 复合键 | [`ChannelSecurityGuard.kt`](../../app/src/main/java/io/agents/pokeclaw/channel/security/ChannelSecurityGuard.kt) |
+> | 白名单条目改为 `CHANNEL\|senderId` 复合键 | [`ChannelSecurityGuard.kt`](../../app/src/main/java/io/agents/nailongclaw/channel/security/ChannelSecurityGuard.kt) |
 > | `getWhitelist()` 返回 `Map<Channel, Set<String>>`（**破坏性 API 变更**） | 同上 |
 > | `addSenderToWhitelist` / `removeSenderFromWhitelist` / `isSenderWhitelisted` 全部增加 `channel` 参数 | 同上 |
 > | `purgeLegacyEntries()` 一次性丢弃无渠道前缀的旧条目 | 同上 |
-> | `ChannelHandler.getLastSenderId()` KDoc 写明「这是路由目标，**不是**鉴权身份」 | [`ChannelHandler.kt`](../../app/src/main/java/io/agents/pokeclaw/channel/ChannelHandler.kt) |
+> | `ChannelHandler.getLastSenderId()` KDoc 写明「这是路由目标，**不是**鉴权身份」 | [`ChannelHandler.kt`](../../app/src/main/java/io/agents/nailongclaw/channel/ChannelHandler.kt) |
 >
 > **两个刻意的设计决定**：
 >
@@ -87,9 +91,9 @@
 > **回归测试**：`ChannelSecurityGuardTest` 8 → 14 用例，新增 6 条覆盖跨渠道隔离、
 > 群 chat.id 冒充用户 id、按渠道独立增删、存储往返、旧条目 fail-closed。
 
-**位置**：[`TelegramChannelHandler.kt:99-104`](../../app/src/main/java/io/agents/pokeclaw/channel/telegram/TelegramChannelHandler.kt#L99-L104)
-→ [`ChannelSecurityGuard.kt:212-215`](../../app/src/main/java/io/agents/pokeclaw/channel/security/ChannelSecurityGuard.kt#L212-L215)
-→ [`ChannelSecurityGuard.kt:102-110`](../../app/src/main/java/io/agents/pokeclaw/channel/security/ChannelSecurityGuard.kt#L102-L110)
+**位置**：[`TelegramChannelHandler.kt:99-104`](../../app/src/main/java/io/agents/nailongclaw/channel/telegram/TelegramChannelHandler.kt#L99-L104)
+→ [`ChannelSecurityGuard.kt:212-215`](../../app/src/main/java/io/agents/nailongclaw/channel/security/ChannelSecurityGuard.kt#L212-L215)
+→ [`ChannelSecurityGuard.kt:102-110`](../../app/src/main/java/io/agents/nailongclaw/channel/security/ChannelSecurityGuard.kt#L102-L110)
 
 **问题**。`ChannelSecurityGuard.verify()` 的白名单键是 `senderId`，但各渠道传入的语义不同：
 
@@ -153,8 +157,8 @@ Level Authorization / MITRE ATT&CK T1078（Valid Accounts）。这是一个**授
 >
 > | 改动 | 位置 |
 > |---|---|
-> | 新增 `ToolRiskPolicy`：风险分类 + 按来源判定 | [`ToolRiskPolicy.kt`](../../app/src/main/java/io/agents/pokeclaw/tool/ToolRiskPolicy.kt) |
-> | `ToolRegistry.executeTool` 统一拦截，`sourceChannelProvider` 可注入以便测试 | [`ToolRegistry.kt`](../../app/src/main/java/io/agents/pokeclaw/tool/ToolRegistry.kt) |
+> | 新增 `ToolRiskPolicy`：风险分类 + 按来源判定 | [`ToolRiskPolicy.kt`](../../app/src/main/java/io/agents/nailongclaw/tool/ToolRiskPolicy.kt) |
+> | `ToolRegistry.executeTool` 统一拦截，`sourceChannelProvider` 可注入以便测试 | [`ToolRegistry.kt`](../../app/src/main/java/io/agents/nailongclaw/tool/ToolRegistry.kt) |
 > | 新增 `ToolRiskPolicyTest` 10 用例 | [`ToolRiskPolicyTest.kt`](../../app/src/test/java/io/agents/pokeclaw/tool/ToolRiskPolicyTest.kt) |
 >
 > **采用的是「来源闸门」而非「逐次确认弹窗」**，理由：
@@ -185,7 +189,7 @@ Level Authorization / MITRE ATT&CK T1078（Valid Accounts）。这是一个**授
 > 这是有意识的取舍——远程读屏同样是隐私面，但拦掉会显著影响 monitor/auto_reply 的实用性。
 > 若要收紧，应作为单独一条发现处理，不要混进本次变更。
 
-**位置**：[`ToolRegistry.kt:33-79`](../../app/src/main/java/io/agents/pokeclaw/tool/ToolRegistry.kt#L33-L79)
+**位置**：[`ToolRegistry.kt:33-79`](../../app/src/main/java/io/agents/nailongclaw/tool/ToolRegistry.kt#L33-L79)
 
 已注册工具中具备不可逆或高影响能力的有：
 
@@ -218,7 +222,7 @@ Level Authorization / MITRE ATT&CK T1078（Valid Accounts）。这是一个**授
 ### F3 — High — 导出组件无调用方认证 + 混淆代理
 
 **位置**：[`AndroidManifest.xml:107-134`](../../app/src/main/AndroidManifest.xml#L107-L134)
-→ [`ExternalAutomationEntrypoint.kt:16-25, 74-80`](../../app/src/main/java/io/agents/pokeclaw/automation/ExternalAutomationEntrypoint.kt#L74-L80)
+→ [`ExternalAutomationEntrypoint.kt:16-25, 74-80`](../../app/src/main/java/io/agents/nailongclaw/automation/ExternalAutomationEntrypoint.kt#L74-L80)
 
 上一轮把 `DebugTaskReceiver` / `TaskTriggerReceiver` 判为「release 下惰性」——**该结论正确**，
 本轮复核两处 `onReceive` 开头均有 `if (!io.agents.nailongclaw.BuildConfig.DEBUG) return;` ✅
@@ -253,7 +257,7 @@ private fun isTargetedToPokeClaw(context: Context, intent: Intent): Boolean {
 
 **缓解因素（必须诚实标注）**：
 `KVUtils.isExternalAutomationEnabled()` 默认 `false`
-（[`KVUtils.kt:260`](../../app/src/main/java/io/agents/pokeclaw/utils/KVUtils.kt#L260)），
+（[`KVUtils.kt:260`](../../app/src/main/java/io/agents/nailongclaw/utils/KVUtils.kt#L260)），
 所以**默认状态下不可利用**。这是本条评为 High 而非 Critical 的原因。
 但该功能是对外宣传的（文档注释里直接给了 `adb shell am broadcast` 示例），
 用户一旦开启，**设备上任意 App 即可驱动 agent**。
@@ -280,8 +284,8 @@ context.sendBroadcast(callback)
 
 ### F4 — High — `memory_recall` 绕过记忆围栏（持久化间接注入）
 
-**位置**：[`MemoryRecallTool.kt:59-66`](../../app/src/main/java/io/agents/pokeclaw/agent/memory/MemoryRecallTool.kt#L59-L66)
-对照 [`MemoryStore.kt:508-520`](../../app/src/main/java/io/agents/pokeclaw/agent/memory/MemoryStore.kt#L508-L520)
+**位置**：[`MemoryRecallTool.kt:59-66`](../../app/src/main/java/io/agents/nailongclaw/agent/memory/MemoryRecallTool.kt#L59-L66)
+对照 [`MemoryStore.kt:508-520`](../../app/src/main/java/io/agents/nailongclaw/agent/memory/MemoryStore.kt#L508-L520)
 
 上一轮把「记忆库召回注入」列为**已证伪**，依据是「已有 `<memory>` 围栏，并主动剥离反围栏」。
 该结论**只对 briefing 路径成立**：
@@ -321,7 +325,7 @@ val body = results.joinToString("\n") { r ->
 
 ### F5 — High — LAN 控制台明文传输凭据
 
-**位置**：[`ConfigServer.kt:171-199`](../../app/src/main/java/io/agents/pokeclaw/server/ConfigServer.kt#L171-L199)
+**位置**：[`ConfigServer.kt:171-199`](../../app/src/main/java/io/agents/nailongclaw/server/ConfigServer.kt#L171-L199)
 + [`network_security_config.xml`](../../app/src/main/res/xml/network_security_config.xml)
 
 r2 修复了**读方向**，但**写方向没动**：
@@ -366,8 +370,8 @@ PIN 以 `?pin=123456` 形式出现，会进入 HTTP 访问日志、浏览器历�
 
 ### F6 — Medium — `SecretBox` 加密失败静默降级为明文
 
-**位置**：[`KVUtils.kt:64-73`](../../app/src/main/java/io/agents/pokeclaw/utils/KVUtils.kt#L64-L73)
-对照 [`SecretBox.kt:26-28`](../../app/src/main/java/io/agents/pokeclaw/utils/SecretBox.kt#L26-L28)
+**位置**：[`KVUtils.kt:64-73`](../../app/src/main/java/io/agents/nailongclaw/utils/KVUtils.kt#L64-L73)
+对照 [`SecretBox.kt:26-28`](../../app/src/main/java/io/agents/nailongclaw/utils/SecretBox.kt#L26-L28)
 
 `SecretBox` 自己的文档注释写得很明确：
 
@@ -392,8 +396,8 @@ return putString(key, encrypted)
 
 ### F7 — Medium — 技能触发正则 ReDoS + 每次调用重编译
 
-**位置**：[`SkillRegistry.kt:55-64`](../../app/src/main/java/io/agents/pokeclaw/agent/skill/SkillRegistry.kt#L55-L64)
-同型问题：[`PipelineRouter.kt:118-121`](../../app/src/main/java/io/agents/pokeclaw/agent/PipelineRouter.kt#L118-L121)
+**位置**：[`SkillRegistry.kt:55-64`](../../app/src/main/java/io/agents/nailongclaw/agent/skill/SkillRegistry.kt#L55-L64)
+同型问题：[`PipelineRouter.kt:118-121`](../../app/src/main/java/io/agents/nailongclaw/agent/PipelineRouter.kt#L118-L121)
 
 ```kotlin
 val regex = pattern.lowercase().replace(Regex("\\{\\w+\\}"), "(.+)")
@@ -420,9 +424,9 @@ Regex(regex).containsMatchIn(lower)     // 每次匹配都重新编译
 
 ### F8 — Medium — 工具参数无条件落盘 + 打进可分享的调试报告
 
-**位置**：[`ToolRegistry.kt:107-110`](../../app/src/main/java/io/agents/pokeclaw/tool/ToolRegistry.kt#L107-L110)
-+ [`XLog.java:32-45`](../../app/src/main/java/io/agents/pokeclaw/utils/XLog.java#L32-L45)
-+ [`DebugReportManager.kt:40-42, 192-206`](../../app/src/main/java/io/agents/pokeclaw/support/DebugReportManager.kt#L40-L42)
+**位置**：[`ToolRegistry.kt:107-110`](../../app/src/main/java/io/agents/nailongclaw/tool/ToolRegistry.kt#L107-L110)
++ [`XLog.java:32-45`](../../app/src/main/java/io/agents/nailongclaw/utils/XLog.java#L32-L45)
++ [`DebugReportManager.kt:40-42, 192-206`](../../app/src/main/java/io/agents/nailongclaw/support/DebugReportManager.kt#L40-L42)
 
 `XLog.e` / `XLog.i` **无视 DEBUG 标志恒写入 `AppLogStore`**：
 
@@ -442,7 +446,7 @@ XLog.e("ToolRegistry", "Tool '$name' execution failed with params=$params", e)
 `params` 里可能包含 `input_text` 的**用户输入正文**、`send_message` 的**消息全文**、
 `make_call` 的**电话号码**。release 构建同样落盘（`AppLogStore` 上限约 1 MB 滚动）。
 
-**放大路径**：[`DebugReportManager`](../../app/src/main/java/io/agents/pokeclaw/support/DebugReportManager.kt)
+**放大路径**：[`DebugReportManager`](../../app/src/main/java/io/agents/nailongclaw/support/DebugReportManager.kt)
 把这些打包进一个**用户主动分享给支持方的 ZIP**：
 
 ```kotlin
@@ -452,7 +456,7 @@ addRecentHttpLogs(zip, context.cacheDir) // http_logs/*.log
 ```
 
 **已核实的近失事件（latent）**：
-[`FileLoggingInterceptor.writeToFile`](../../app/src/main/java/io/agents/pokeclaw/agent/langchain/http/FileLoggingInterceptor.java#L126-L131)
+[`FileLoggingInterceptor.writeToFile`](../../app/src/main/java/io/agents/nailongclaw/agent/langchain/http/FileLoggingInterceptor.java#L126-L131)
 把**所有请求头原样写入**，**不脱敏**：
 
 ```java
@@ -479,7 +483,7 @@ for (int i = 0; i < request.headers().size(); i++) {
 
 ### F9 — Low — `isValidHost` 对空 Host fail-open
 
-**位置**：[`ConfigServer.kt:206-215`](../../app/src/main/java/io/agents/pokeclaw/server/ConfigServer.kt#L206-L215)
+**位置**：[`ConfigServer.kt:206-215`](../../app/src/main/java/io/agents/nailongclaw/server/ConfigServer.kt#L206-L215)
 
 ```kotlin
 private fun isValidHost(host: String?): Boolean {
@@ -495,7 +499,7 @@ HTTP/1.1 要求 Host 必填，但 NanoHTTPD 的容忍度取决于版本与请求
 
 ### F10 — Info — `WebActivity` 死代码中的 WebView 风险
 
-**位置**：[`WebActivity.kt:79-97`](../../app/src/main/java/io/agents/pokeclaw/ui/web/WebActivity.kt#L79-L97)
+**位置**：[`WebActivity.kt:79-97`](../../app/src/main/java/io/agents/nailongclaw/ui/web/WebActivity.kt#L79-L97)
 
 ```kotlin
 settings.apply {

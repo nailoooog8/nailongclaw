@@ -3,12 +3,16 @@
 > **授权边界**：只针对本人拥有、本机/本人设备上的 `io.agents.nailongclaw`。不碰第三方系统。
 > **方法论**：攻击面分类参考 [SnailSploit/Claude-Red](https://github.com/SnailSploit/Claude-Red) 的 `offensive-mobile`；
 > 验证纪律参考 [cloudflare/security-audit-skill](https://github.com/cloudflare/security-audit-skill) 的 `DESKTOP-MOBILE-AND-LOCAL-IPC`。
-> **本轮状态**：静态走查 + 只读真机侦察已完成；**动态 PoC 未执行**——因现网设备是陈旧包（见 §0），
-> 动态项留作重刷当前 HEAD 后的执行清单。诚实边界：可利用性结论是"代码路径成立"，非"真机复现"。
+> **本轮状态**：静态走查 + 只读真机侦察已完成；SEC21 与 R4-R1 的负路径已真机验证（2026-10-27，见 §3），
+> 其余动态 PoC 未执行——留作重刷当前 HEAD 后的执行清单。诚实边界：可利用性结论是"代码路径成立"，非"真机复现"。
 
 ---
 
 ## 0. 前置：设备是陈旧包，先重刷当前 HEAD
+
+> **本节为 2026-10-27 当时的侦察记录，已历史化。** QA 机已于 2026-10-27 重刷至 vc57、2026-11-08 再刷至
+> vc62（见 `BACKLOG.md` 运维条），"现网陈旧包"状态不再存在；下表保留为当时的证据链，教训只有一条：
+> **真机安全 QA 前必须重刷当前 HEAD 包**。
 
 现网设备 `10AG4J1THX00524`（V2502DA）上装的 `io.agents.nailongclaw`：
 
@@ -59,7 +63,7 @@ PKG=io.agents.nailongclaw
 
 | 组件 | 导出 | 触发 | 门控 | 渠道天花板 |
 |---|---|---|---|---|
-| `.ui.splash.SplashActivity` | ✅ LAUNCHER | `am start … --es task "…"` | **无令牌、无开关**（见 §3，红队新发现） | EXTERNAL（只读） |
+| `.ui.splash.SplashActivity` | ✅ LAUNCHER | `am start … --es task "…"` | 配对令牌 + 开关（**§3 修复后，纯令牌门控**；修订前为"无令牌、无开关"） | EXTERNAL（只读） |
 | `.automation.ExternalAutomationReceiver` | ✅ | `am broadcast -a …RUN_TASK/RUN_CHAT` | 配对令牌 + 开关 | EXTERNAL（只读） |
 | `.automation.ExternalAutomationActivity` | ✅ | `am start -a …RUN_TASK/RUN_CHAT` | 配对令牌 + 开关 | EXTERNAL（只读） |
 | `.service.BootReceiver` | ✅ | `BOOT_COMPLETED` | 仅启自身前台服务 | — |
@@ -145,13 +149,13 @@ adb shell am start -n io.agents.nailongclaw/.ui.splash.SplashActivity \
 IP=127.0.0.1; PORT=9527
 
 # 4.1 无 PIN（预期 401；debug 端点 release 403）
-curl -s -o /dev/null -w "%{http_code}\n" http://$IP:$PORT/api/config
+curl -s -o /dev/null -w "%{http_code}\n" http://$IP:$PORT/api/channels
 
 # 4.2 错 PIN（预期 401；BruteForceGuard 5 次锁 30s 起——只打 1-2 次）
-curl -s -o /dev/null -w "%{http_code}\n" -H "X-Config-PIN: 000000" http://$IP:$PORT/api/config
+curl -s -o /dev/null -w "%{http_code}\n" -H "X-Config-PIN: 000000" http://$IP:$PORT/api/channels
 
 # 4.3 Host 校验（预期：空 Host / 外网 Host fail-closed）
-curl -s -o /dev/null -w "%{http_code}\n" -H "Host: evil.example.com" http://$IP:$PORT/api/config
+curl -s -o /dev/null -w "%{http_code}\n" -H "Host: evil.example.com" http://$IP:$PORT/api/channels
 
 # 4.4 cleartext 观测（预期：HTTP 明文，bot token/LLM key 过空——F5 残留，被动泄露面）
 curl -s -D - -o /dev/null http://$IP:$PORT/ | head -20

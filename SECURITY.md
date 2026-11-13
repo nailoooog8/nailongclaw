@@ -52,15 +52,19 @@
 
 ## 已发布的安全审计
 
-本 fork 对自身改动引入的安全边界做过一轮审计，覆盖 PIN 暴力破解、凭据明文泄漏、
-路径穿越与 MCP 工具投毒四类问题：
+本 fork 对自身改动引入的安全边界做过多轮审计（R1–R4），覆盖 PIN 暴力破解、凭据明文泄漏、
+路径穿越、MCP 工具投毒、供应链与外部自动化入口等类别：
 
-→ [`docs/SECURITY_AUDIT.md`](docs/SECURITY_AUDIT.md)
+- R1（v0.8.0，2026-10-11）→ [`docs/SECURITY_AUDIT.md`](docs/SECURITY_AUDIT.md)
+- R2（2026-10-16）→ [`docs/SECURITY_AUDIT_R2.md`](docs/SECURITY_AUDIT_R2.md)
+- R3（R3-01..R3-11）→ [`docs/SECURITY_AUDIT_R3.md`](docs/SECURITY_AUDIT_R3.md)
+- R4（最新，2026-10-27，含红队行动手册与蓝队复盘）→ [`docs/SECURITY_AUDIT_R4.md`](docs/SECURITY_AUDIT_R4.md)、[`docs/SECURITY_AUDIT_R4_RED_RUNBOOK.md`](docs/SECURITY_AUDIT_R4_RED_RUNBOOK.md)、[`docs/SECURITY_AUDIT_R4_BLUE.md`](docs/SECURITY_AUDIT_R4_BLUE.md)
 
-该文档同时记录了**哪些验证已执行、哪些尚未覆盖**，欢迎针对其中的空白项提出补充。
+各轮文档同时记录了**哪些验证已执行、哪些尚未覆盖**，欢迎针对其中的空白项提出补充。
+**报告漏洞前请先看最新一轮（R4）的结论**，早期轮次的开放项可能已被后续轮次关闭。
 
 ## 不算漏洞的情况
 
-- 未经 `adb` / 无障碍授权就期待自动化失效 —— PokeClaw 的设计前提就是已授权设备上的自动化
+- 未经 `adb` / 无障碍授权就期待自动化失效 —— NailongClaw 的设计前提就是已授权设备上的自动化
 - 通过 Xposed / root / 重打包绕过完整性校验后的行为
 - 社会工程与诱骗（例如诱导用户自行授权）
