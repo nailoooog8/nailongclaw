@@ -8,7 +8,11 @@ import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
-    id("org.jetbrains.kotlin.plugin.compose") version "2.1.21"
+    // Version comes from the root buildscript classpath (kotlin-gradle-plugin
+    // 2.4.0) — AGP 9's built-in Kotlin is 2.2 and cannot read litertlm 0.18's
+    // 2.4 metadata. See build.gradle.kts (root) and gradle.properties.
+    id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose") version "2.4.0"
 }
 
 /**
@@ -226,6 +230,15 @@ android {
     }
 }
 
+// AGP's built-in Kotlin used to align jvmTarget with compileOptions (17) on its
+// own; the externally applied plugin (2.4.0) defaults to the JDK it runs on
+// (21). Pin it back to 17 or javac and kotlinc disagree and the build fails.
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+    }
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
@@ -273,8 +286,12 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     debugImplementation("androidx.compose.ui:ui-tooling")
 
-    // LiteRT-LM on-device LLM inference (Google AI Edge)
-    implementation("com.google.ai.edge.litertlm:litertlm-android:0.10.0")
+    // LiteRT-LM on-device LLM inference + EmbeddingGemma embeddings (Google AI Edge).
+    // 0.18.0 is the first release with EmbeddingEngine/computeEmbedding — the memory
+    // bank's semantic ranking (MemoryEmbedder) needs it. The 0.10.0 → 0.18.0 jump also
+    // carries nine releases of LLM-path changes; local-mode regression is on the QA
+    // checklist (BACKLOG H-ticket).
+    implementation("com.google.ai.edge.litertlm:litertlm-android:0.18.0")
 
     // ZXing 二维码/条形码扫描
     implementation(libs.zxing)
