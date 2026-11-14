@@ -1377,6 +1377,14 @@ When in doubt, rerun the smaller bundle first, then expand only if something dri
   - **f. ROTATES_WITH_CONTENT 几何**：影子屏开一个会转横屏的应用（视频全屏）→ 对影子屏节点 tap，落点仍在预期元素上（坐标空间随显示旋转没错位）。若错位，回退该旗标并记录。⏳ **2026-11-15 模拟器部分**：`FLAG_ROTATES_WITH_CONTENT` 在 DisplayDeviceInfo 确认在列；几何 tap 测试需可旋转横屏的 app，模拟器缺样本，真机补。
   - **g. 死循环硬闸**：构造或复现「同屏同动作连续 4 次」（如同一节点反复 tap 无变化）→ 任务以 `Task stopped: the same action on the same screen repeated 4 times in a row (dead loop)` 终止，而不是跑到 maxIterations。⏳ **2026-11-15**：模拟器无可用 LLM（本地 Gemma 8192 上下文被工具声明吃满、无云端密钥）不可端到端构造；LoopHistory/isStuckInLoop 已由 6 例单测钉死，端到端待云端真机。
   - **h. 提速计时**：同一云端任务改造前后各跑一次，对比每轮工具执行耗时（日志时间戳 / Share Debug Report）：`open_app` 不再付 3×500ms（无弹窗时应 ~0.6s 级），动作轮不再有固定 500ms 硬睡，`scroll_to_find` 每轮不再拉两次整树。
+- [ ] **H79. 记忆库语义检索 + litertlm 0.18.0 升级批（2026-11-13，代码就绪+单测绿，真机待验）[RELEASE-OK]** [LOGCAT-DEBUG 部分用 Share Debug Report 读]。两个风险叠在一批：**litertlm 0.10.0→0.18.0 是本地 LLM 链路的九版本跳升，还外挂了 Kotlin 2.4.0（`android.builtInKotlin=false` + `android.newDsl=false` 两个 AGP 绕过旗）**；语义检索本身默认关、失败自动降级。子项：
+  - **a. 升级回归（最重要，先做）**：本地模式端到端一轮——模型页下载/选 gemma `.litertlm` → 发一条消息 → 本地生成正常返回（不是崩溃/不是空回复）。GPU 回退路径也要碰到：`LocalModelRuntime.acquireSharedEngine` 先试 GPU 失败落 CPU 的设备上，确认日志有 fallback 且任务完成。**release 构建单独装一次**（R8 对新 Kotlin 元数据 + litertlm JNI 的裁剪是未知区）。
+  - **b. 模型下载**：设置 → 功能 → 记忆库 → 开「语义检索」→ 模型行点下载（157MB）→ 进度走到 100%、行变「已下载」、页脚出现「语义检索已开启（N/M 条已索引）」。中途杀掉 app 再进 → 续传不重头（`.downloading` 临时文件在）。
+  - **c. 后台补算**：下载完成后等页脚计数到 M（或点「重建向量索引」）→ Share Debug Report 里找 `Backfilling N memory vector(s)`；`adb shell ls` 外部文件目录见 `memory_vectors.json` 与 `memories.json` 同目录。
+  - **d. 换述召回（本批的意义）**：造一对记忆——库里存「用户的无线网络名称是TPLINK」，问「上次 WiFi 怎么配的」→ 简报/`memory_recall` 把该条排上来。对照：同一条在**关闭**语义检索时问同样问题 → 召回不到（词法零共享二元组）。这一对是 H79 的核心判据。
+  - **e. 双降级**：删模型（设置里确认删除）→ 行回「未下载」、检索行为与升级前一致；再开开关不下载 → Toast「已开启；下载嵌入模型后生效」且仍按词法跑。任何一步都不崩、不卡死（引擎句柄释放后文件才删得掉）。
+  - **f. 端上证明（隐私定位）**：飞行模式下跑一轮带记忆注入的任务 → 简报照常注入、语义排序照常（证明没有任何东西出端；这也是 MEMORY_DESIGN §2.2 理由 2 的实物证据）。
+  - **g. 导出不含向量**：导出并分享 → 落盘/分享出的 Markdown 里只有正文/标签/置顶，无向量字段；`memories.json` 手改后重启 → 条目在、向量按 id 对账（改过内容的条目向量被 prune 重算）。
 ## CI. Emulator Smoke Harness
 The runner itself is code. When it reports red for a reason that has nothing to do with
 the app, it burns triage time and trains everyone to ignore the matrix — which is worse

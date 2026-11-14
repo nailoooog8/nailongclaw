@@ -27,7 +27,7 @@ Google 的移动 agent 永远是 Pixel-first 的；Samsung 的 Galaxy AI 战略�
 | **控制台密钥脱敏** | LAN 控制台的 `GET` 接口原本明文返回全部 bot token 与 API Key，现返回掩码 |
 | **MCP 客户端** | Streamable HTTP，含管理 UI、Bearer/Basic/Custom 鉴权、Keystore 落盘加密 |
 | **MCP 工具投毒防护** | 第三方 MCP 服务器的描述不再原样进入 system prompt |
-| **长期记忆库** | 跨会话记忆、矛盾检测、遗忘抑制指纹、访问加权保留 |
+| **长期记忆库** | 跨会话记忆、矛盾检测、遗忘抑制指纹、访问加权保留、可选端上语义检索（EmbeddingGemma，默认关） |
 | **技能层** | YAML 配方、任务捕获、技能管理 UI |
 | **任务看门狗** | 120 秒无活动 / 600 秒总时长自动中止并释放任务锁，避免卡死 |
 | **后台保活** | 常驻前台服务开关 + 粘性服务 + 看门狗 |

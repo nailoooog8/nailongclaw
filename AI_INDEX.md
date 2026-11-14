@@ -26,8 +26,8 @@ This is the repo map for coding agents. Keep canonical information in existing f
 | `scripts/` | QA and automation scripts |
 | `.github/workflows/` | Build + unit tests, CLA/DCO check, emulator-matrix QA, Firebase Test Lab, signed release |
 | `docs/` | GitHub Pages site and public site assets |
-| `docs/design/` | Design docs: `MEMORY_BANK.md` (how the memory bank works: retention curve, suppression fingerprints, contradiction detection, file format), `MEMORY_DESIGN.md` (why the memory bank is built this way: community survey, rejected alternatives, known gaps), `ARCHITECTURE_DECISIONS.md`, `WEB_SEARCH_DESIGN.md`, `SKILL_FORMAT.md`, `MCP_INTEGRATION_PLAN.md`, `ARCHITECTURE_RECONSTRUCTION.md` |
-| `docs/security/` | Security audit reports R1–R4 with red-team runbook and blue-team review (`SECURITY_AUDIT*.md`) |
+| `docs/design/` | Design docs: `MEMORY_BANK.md` (how the memory bank works: retention curve, suppression fingerprints, contradiction detection, optional on-device semantic ranking (EmbeddingGemma), file format), `MEMORY_DESIGN.md` (why the memory bank is built this way: community survey, rejected alternatives, known gaps — §2 records the 2026-11-13 reversal of the no-vector-retrieval decision), `ARCHITECTURE_DECISIONS.md`, `WEB_SEARCH_DESIGN.md`, `SKILL_FORMAT.md`, `MCP_INTEGRATION_PLAN.md`, `ARCHITECTURE_RECONSTRUCTION.md` |
+| `docs/security/` | Security audit reports R1–R5 with red-team runbook and blue-team review (`SECURITY_AUDIT*.md`) |
 | `docs/ops/` | Ops runbooks: `AI_AGENT_PLAYBOOK.md`, `RELEASING.md`, `SEC-LAB_KALI_SETUP.md`, `OEM_COVERAGE_TIERS.md`, `community-issue-replies.md`, `LOCALIZATION_STATUS.md` |
 | `docs/archive/` | Archived one-off docs: `AGENT_PERCEPTION_RESEARCH.md`, `RELEASE_NOTES_WEB_SEARCH.md` |
 | `docs/screenshots/` | Screenshot assets used by the landing page |

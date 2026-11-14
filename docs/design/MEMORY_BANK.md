@@ -20,18 +20,54 @@
 注入的小节同时把三条记忆工具的用法讲给模型听（包括"作废了什么要转告用户、
 查历史用 include_history"），所以记忆库为空时模型也知道该记什么。
 
-排序不用向量，纯本地打分：
+排序默认纯本地词法打分；用户在设置里打开「语义检索」后变为混合排序（见下节）：
 
 ```
 score = 类型权重(身份1.2 / 偏好1.0 / 事实0.7 / 事件0.3)
       + 置顶 3.0
-      + 与当前任务词元重合 +2.0（标签命中再加）
+      + 相关性（词法模式：与当前任务词元重合 +2.0，标签命中再加；
+                语义模式：2.0 × max(0, cosine(查询向量, 记忆向量))，
+                该条目没有向量时退回词法分支）
       + 2.0 × 保留度(entry)                  // 见下节
 ```
 
 中文靠二元组（bigram）切词，不需要分词器；英文按 ≥2 字符的词。`memory_recall` 命中的条目
 `hits+1` 并刷新 `lastUsedAt`——"被用得多"这件事只由下面的保留度曲线表达，打分里没有单独的
 命中次数项（`hits` 和 `lastUsedAt` 永远一起涨，算两遍就是把同一个信号奖励两次）。
+
+## 语义检索（EmbeddingGemma 2，可选开关，2026-11-13 起）
+
+词法排序召回不了"换了个说法"的记忆：用户问「上次 WiFi 怎么配的」，库里写的是「无线网络」——
+零共享二元组，词法分 0。打开语义检索后，相关性那一项换成端上 embedding 的余弦相似度，
+档次从"命中/未命中"的二值变成连续值， paraphrases 因此能排上来。**它只换相关性这一项**，
+类型权重、置顶、保留度曲线一寸不动。
+
+**路线：只走端上。** 模型是 EmbeddingGemma 2 文本版（270M，Apache-2.0，HF
+`litert-community/embeddinggemma-2-text-270m-litert-lm`，157MB `.litertlm`），跑在本地 LLM
+同一个 LiteRT-LM 运行时上（litertlm-android 0.18.0，`EmbeddingEngine`），不引第二套推理栈。
+**不接云端 gemini-embedding**：每轮把用户私有记忆原文发给 Google 与「数据不出手机」的定位
+直接冲突（docs/MEMORY_DESIGN.md §2 理由 2 的原始语境正是云端，端上路线不触雷）。
+
+```
+向量缓存 = storageDir()/memory_vectors.json   // 与 memories.json 同目录的 sidecar
+        = { fingerprint, vectors: { 条目id: [768 维浮点] } }
+```
+
+- **按条目 id 对账**：id 是内容哈希，改内容即换 id，旧向量自然成孤儿，下次存盘时 prune 掉。
+  合并路径保留原 id 但换文本，那里显式丢弃旧向量（`dropVectorLocked`）。
+- **fingerprint 不匹配整库作废**：换模型不会混用两个向量空间。
+- **写入后后台补算**（daemon 单线程，合并式调度，锁外推理）：缺向量的条目补embedding，
+  失败只留缺口，下次写入再排。
+- **推理永不进锁**：查询向量在 `synchronized` 之前算，与 `terms(query)` 同一个位置。
+
+**降级路径（三条，全部自动）**：开关关闭 / 模型未下载 / 推理抛异常 → 全链路退回词法排序，
+行为与开关存在之前逐字节一致。单条目缺向量也只影响那一条（词法分支兜底）。
+`memory_recall` 的命中门槛是 `cosine ≥ 0.30`——embedding 是稠密向量，无关对约 0.1–0.3、
+相关对约 0.5–0.8，"有向量"不等于"是命中"，没有下限召回会变成整库按分数排。
+
+设置 → 功能 → 记忆库里的三行：**语义检索开关**（默认关）、**嵌入模型**（下载 157MB /
+删除，删除即释放引擎句柄并清向量索引）、**重建向量索引**（N/M 条已索引）。低端机
+（<4GB 内存）不显示下载按钮。删除模型后语义检索自动回退词法。
 
 ## 保留度（access-weighted retention）
 
@@ -232,6 +268,10 @@ Agent 不会把你让它删掉的那句话原样背回来，它会把**同一个
 简报，是最该先让出的空间。淘汰和删除是两回事：淘汰**不留抑制指纹**（容量不够不是"用户不要这条了"
 的证据），且作废条目被淘汰同样不留指纹——它不是被遗忘的，是被时间替换的。
 
+打开语义检索后，同目录会多一个 `memory_vectors.json`（sidecar，结构与语义见上一节）：
+compact JSON、原子写、损坏当空库重算。**导出 Markdown 不含它**（导出只写正文/标签/置顶），
+`memories.json` 也不含它——向量是派生数据，永远不进可手编的源文件。
+
 `memory_recall` 默认只返回仍有效的条目；`include_history: true` 时作废条目也返回，
 内容区带「（已作废，被 #编号 接替）」标注——标注放在内容区而不是 `(命中 N 次)` 尾缀后，
 因为尾缀是网页端 chip 解析的锚点（`MemoryRecallFormat`，格式与解析器同文件防漂移）。
@@ -256,17 +296,29 @@ adb shell am force-stop io.agents.nailongclaw   # 重启后重新读取
 可选「恢复记忆」（放回记忆库并解除抑制）或「仅解除抑制」（只让 Agent 可以重新学到）。
 列表右上角的「全部清除」才是旧的一键清空。
 
+**语义检索三行**（2026-11-13 起）：总开关下方是「语义检索」开关（默认关）与其下的
+「嵌入模型」行（下载 157MB / 已下载 / 下载进度，点击删除，删前确认并说明会回退词法）
+和「重建向量索引」行（显示 N/M 条已索引）。低内存设备（<4GB）模型行显示
+「需 4GB+ 内存」且不给下载。页脚在开关打开时追加「语义检索已开启（N/M 条已索引）」
+或「已开启但未下载模型，当前按词法检索」。
+
 **总开关关掉后**：不再向模型注入任何记忆，`memory_save` 也会明确回复"没有保存"，但库里已有的
 条目保留，随时可以再打开。
 
 ## 代码位置
 
-- `agent/memory/MemoryStore.kt` — 存储、合并、排序、简报生成、抑制指纹、淘汰、**时效接替与恢复**
+- `agent/memory/MemoryStore.kt` — 存储、合并、排序（词法/混合）、简报生成、抑制指纹、淘汰、**时效接替与恢复**
 - `agent/memory/MemoryRetention.kt` — 保留度曲线（半衰期、闲置天数、分档标签）
 - `agent/memory/MemorySimilarity.kt` — 二元组 Dice、矛盾判定、指纹解析
+- `agent/memory/MemoryEmbedder.kt` — 语义排序接口 + cosine（全仓唯一的向量数学）
+- `agent/memory/LiteRtMemoryEmbedder.kt` — LiteRT-LM `EmbeddingEngine` 封装（懒加载/空闲释放/CPU）
+- `agent/memory/EmbeddingModelManager.kt` — 模型下载/存储/删除（镜像 LocalModelManager 的续传+校验）
+- `agent/memory/MemoryVectorCache.kt` — `memory_vectors.json` sidecar（按 id 对账、fingerprint 作废）
 - `agent/memory/MemoryEntry.kt` — 数据类（含时间四字段）、分类定义、容错解析
 - `agent/memory/MemorySaveTool.kt` / `MemoryRecallTool.kt`（含 `include_history`）/ `MemoryForgetTool.kt`
-- `ui/settings/MemoryActivity.kt` — 管理界面（含已作废徽标与恢复入口）
+- `ui/settings/MemoryActivity.kt` — 管理界面（含已作废徽标、恢复入口、语义检索三行）
 - `app/src/test/.../MemorySimilarityTest.kt` — 矛盾判定与相似度的回归测试（31 例）
 - `app/src/test/.../MemoryRetentionTest.kt` — 保留度曲线的回归测试（22 例）
 - `app/src/test/.../MemoryStoreTest.kt` — 接替/豁免/恢复/淘汰/简报过滤的顺序敏感不变量（36 例）
+- `app/src/test/.../MemoryVectorCacheTest.kt` — sidecar 的往返/fingerprint/维度/损坏/空存（6 例）
+- `app/src/test/.../MemorySemanticRankingTest.kt` — 混合排序：换述召回、下限、逐条降级、合并失效、后台补算（7 例）
