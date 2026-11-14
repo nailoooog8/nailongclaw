@@ -1385,6 +1385,7 @@ When in doubt, rerun the smaller bundle first, then expand only if something dri
   - **e. 双降级**：删模型（设置里确认删除）→ 行回「未下载」、检索行为与升级前一致；再开开关不下载 → Toast「已开启；下载嵌入模型后生效」且仍按词法跑。任何一步都不崩、不卡死（引擎句柄释放后文件才删得掉）。
   - **f. 端上证明（隐私定位）**：飞行模式下跑一轮带记忆注入的任务 → 简报照常注入、语义排序照常（证明没有任何东西出端；这也是 MEMORY_DESIGN §2.2 理由 2 的实物证据）。
   - **g. 导出不含向量**：导出并分享 → 落盘/分享出的 Markdown 里只有正文/标签/置顶，无向量字段；`memories.json` 手改后重启 → 条目在、向量按 id 对账（改过内容的条目向量被 prune 重算）。
+  - **模拟器路径（2026-11-14 补，真机不在手上时用）**：a–g 里除「GPU 回退」和一切性能数字外都能在模拟器验——litertlm 0.18.0 的 AAR 带 `x86_64` JNI，嵌入引擎又是 CPU 后端，模拟器可跑。搭建顺序：①`sdkmanager`（**必须带 `--proxy=http --proxy_host=127.0.0.1 --proxy_port=7897`**——本机出网全靠 Clash Verge 代理，Java 程序不读 `HTTP_PROXY` 环境变量）装 `emulator` + `system-images;android-36;default;x86_64`，license 确认要用户本人点；②建 AVD 时 **RAM 配 ≥4GB**——`EmbeddingModelManager` 的门槛是 `getDeviceRamGb ≥ 4`（`totalMem/1GB + 1`），默认 2GB 的 AVD 连下载按钮都不显示；③之后用 android-emulator MCP（`android_build_and_run` → `android_ui_tap` 驱动设置页 → `android_logs` 找 backfill 日志 → `android_screenshot` 留证）。**两个模拟器专属注意**：App 的 OkHttp 不走系统代理，b 子项的 157MB 下载取决于 Clash 是 TUN 还是系统代理模式——启动后第一件事就验；不通则降级为 `adb push` 侧载（经代理下到宿主机再推进 `files/models/embeddinggemma-2-text-270m.litertlm`，`EmbeddingModelManager` 只认该目录文件名，侧载即骗过下载步）。模拟器验过的功能结论作数，**延迟/稳定性数字不外推真机**。
 ## CI. Emulator Smoke Harness
 The runner itself is code. When it reports red for a reason that has nothing to do with
 the app, it burns triage time and trains everyone to ignore the matrix — which is worse
