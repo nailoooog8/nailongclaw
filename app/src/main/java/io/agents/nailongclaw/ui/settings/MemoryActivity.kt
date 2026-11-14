@@ -17,6 +17,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.FileProvider
 import io.agents.nailongclaw.R
+import io.agents.nailongclaw.agent.memory.EmbeddingModelManager
 import io.agents.nailongclaw.agent.memory.MemoryEntry
 import io.agents.nailongclaw.agent.memory.MemoryKind
 import io.agents.nailongclaw.agent.memory.MemoryRetention
@@ -24,9 +25,12 @@ import io.agents.nailongclaw.agent.memory.MemorySimilarity
 import io.agents.nailongclaw.agent.memory.MemoryStore
 import io.agents.nailongclaw.base.BaseActivity
 import io.agents.nailongclaw.ui.cds.CdsUi
+import io.agents.nailongclaw.utils.KVUtils
 import io.agents.nailongclaw.widget.CdsDialog
 import io.agents.nailongclaw.widget.CommonToolbar
 import io.agents.nailongclaw.widget.MenuGroup
+import io.agents.nailongclaw.widget.MenuItem
+import java.util.concurrent.Executors
 
 /**
  * Memory bank manager: browse, search, edit, pin and delete what the agent
@@ -41,6 +45,13 @@ class MemoryActivity : BaseActivity() {
     private lateinit var memoryGroup: MenuGroup
     private lateinit var actionsGroup: MenuGroup
     private var searchQuery: String = ""
+
+    /** Model download runs off the main thread, exactly like LlmConfigActivity. */
+    private val embedExecutor = Executors.newSingleThreadExecutor()
+    private var isDownloading = false
+
+    /** The embedding-model row, kept so the download callback can live-update it. */
+    private var modelMenuItem: MenuItem? = null
 
     /** CDS palette (follows system night mode), shared by all render passes. */
     private val cds by lazy { io.agents.nailongclaw.ui.cds.CdsUi.palette(this) }
@@ -199,7 +210,16 @@ class MemoryActivity : BaseActivity() {
         // than entries quietly going missing.
         val fading = all.count { !it.isInvalidated && MemoryRetention.isFading(it, now) }
         val state = if (MemoryStore.isEnabled()) "已开启" else "已关闭"
-        return "记忆库$state · 共 $total 条（置顶 $pinned 条" +
+        val semantic = if (KVUtils.isMemoryEmbeddingEnabled()) {
+            if (EmbeddingModelManager.isDownloaded(this)) {
+                " · 语义检索已开启（${MemoryStore.indexedVectorCount()}/${MemoryStore.count()} 条已索引）"
+            } else {
+                " · 语义检索已开启但未下载模型，当前按词法检索"
+            }
+        } else {
+            ""
+        }
+        return "记忆库$state$semantic · 共 $total 条（置顶 $pinned 条" +
             (if (invalidated > 0) " · 作废 $invalidated 条" else "") +
             (if (conflicted > 0) " · 矛盾 $conflicted 条" else "") +
             (if (fading > 0) " · 渐淡 $fading 条" else "") +
@@ -238,6 +258,90 @@ class MemoryActivity : BaseActivity() {
             setTrailingTextColor(if (enabled) cds.accent else cds.textMuted)
             setLeadingIconColor(cds.textPrimary)
             setTrailingIconColor(cds.textMuted)
+        }
+
+        // ── Semantic ranking (opt-in; docs/MEMORY_DESIGN.md §2) ─────────────
+        //
+        // The bigram ranker cannot recall a memory stored in different words
+        // than the question ("WiFi" vs "无线网络"). The embedding model fixes
+        // that and nothing else; everything it costs — 157 MB, one inference
+        // per turn — is why it is a switch, not a default.
+        val semanticOn = KVUtils.isMemoryEmbeddingEnabled()
+        actionsGroup.addMenuItem(
+            leadingIcon = android.R.drawable.ic_menu_sort_by_size,
+            title = "语义检索（EmbeddingGemma 2）",
+            onClick = {
+                val turningOn = !KVUtils.isMemoryEmbeddingEnabled()
+                KVUtils.setMemoryEmbeddingEnabled(turningOn)
+                if (turningOn) {
+                    MemoryStore.refreshVectors()
+                    if (!EmbeddingModelManager.isDownloaded(this)) {
+                        Toast.makeText(this, "已开启；下载嵌入模型后生效", Toast.LENGTH_LONG).show()
+                    }
+                }
+                renderAll()
+            },
+            showDivider = true
+        ).apply {
+            setTitleColor(cds.textPrimary)
+            setTrailingText(if (semanticOn) "开启" else "关闭")
+            setTrailingTextColor(if (semanticOn) cds.accent else cds.textMuted)
+            setLeadingIconColor(cds.textPrimary)
+            setTrailingIconColor(cds.textMuted)
+        }
+
+        if (semanticOn) {
+            val modelDownloaded = EmbeddingModelManager.isDownloaded(this)
+            val ramOk = EmbeddingModelManager.isDeviceSupported(this)
+            modelMenuItem = actionsGroup.addMenuItem(
+                leadingIcon = android.R.drawable.stat_sys_download,
+                title = "嵌入模型（${EmbeddingModelManager.MODEL_DISPLAY_NAME} · ${EmbeddingModelManager.modelSizeLabel()}）",
+                onClick = {
+                    when {
+                        isDownloading ->
+                            Toast.makeText(this, "已在下载中", Toast.LENGTH_SHORT).show()
+                        modelDownloaded -> showDeleteModelDialog()
+                        !ramOk ->
+                            Toast.makeText(this, "该设备内存不足，无法运行嵌入模型", Toast.LENGTH_SHORT).show()
+                        else -> startModelDownload()
+                    }
+                },
+                showDivider = true
+            ).apply {
+                setTitleColor(cds.textPrimary)
+                setLeadingIconColor(cds.textPrimary)
+                setTrailingText(
+                    when {
+                        isDownloading -> "下载中…"
+                        !ramOk -> "需 4GB+ 内存"
+                        modelDownloaded -> "已下载"
+                        else -> "未下载"
+                    }
+                )
+                setTrailingTextColor(if (modelDownloaded && !isDownloading) cds.accent else cds.textMuted)
+                setTrailingIconColor(cds.textMuted)
+            }
+
+            if (modelDownloaded) {
+                val indexed = MemoryStore.indexedVectorCount()
+                val total = MemoryStore.count()
+                actionsGroup.addMenuItem(
+                    leadingIcon = android.R.drawable.ic_menu_rotate,
+                    title = "重建向量索引",
+                    onClick = {
+                        MemoryStore.rebuildVectors()
+                        Toast.makeText(this, "已在后台重建", Toast.LENGTH_SHORT).show()
+                        renderAll()
+                    },
+                    showDivider = true
+                ).apply {
+                    setTitleColor(cds.textPrimary)
+                    setLeadingIconColor(cds.textPrimary)
+                    setTrailingText("$indexed / $total")
+                    setTrailingTextColor(cds.textMuted)
+                    setTrailingIconColor(cds.textMuted)
+                }
+            }
         }
 
         actionsGroup.addMenuItem(
@@ -289,6 +393,72 @@ class MemoryActivity : BaseActivity() {
             setLeadingIconColor(cds.textPrimary)
             setTrailingIconColor(cds.textMuted)
         }
+    }
+
+    /**
+     * Downloads the embedding model with live progress on the model row.
+     * Same shape as LlmConfigActivity's download: single-thread executor,
+     * callback marshalled back with runOnUiThread.
+     */
+    private fun startModelDownload() {
+        isDownloading = true
+        renderAll()
+        embedExecutor.execute {
+            EmbeddingModelManager.downloadModel(
+                this,
+                object : EmbeddingModelManager.DownloadCallback {
+                    override fun onProgress(
+                        bytesDownloaded: Long,
+                        totalBytes: Long,
+                        bytesPerSecond: Long
+                    ) {
+                        val pct = if (totalBytes > 0) (bytesDownloaded * 100 / totalBytes).toInt() else 0
+                        runOnUiThread {
+                            modelMenuItem?.setTrailingText("$pct%")
+                            modelMenuItem?.setTrailingTextColor(cds.accent)
+                        }
+                    }
+
+                    override fun onComplete(modelPath: String) {
+                        runOnUiThread {
+                            isDownloading = false
+                            Toast.makeText(this@MemoryActivity, "模型已下载，语义检索生效", Toast.LENGTH_SHORT).show()
+                            renderAll()
+                        }
+                    }
+
+                    override fun onError(error: String) {
+                        runOnUiThread {
+                            isDownloading = false
+                            Toast.makeText(this@MemoryActivity, error, Toast.LENGTH_LONG).show()
+                            renderAll()
+                        }
+                    }
+                }
+            )
+        }
+    }
+
+    private fun showDeleteModelDialog() {
+        CdsDialog.show(
+            context = this,
+            title = "删除嵌入模型？",
+            content = CdsDialog.message(
+                this,
+                "删除后语义检索自动回退到词法匹配，已计算的向量索引一并清除。可随时重新下载（157 MB）。"
+            ),
+            confirmText = "删除",
+            cancelText = getString(R.string.common_cancel),
+            danger = true,
+            onConfirm = {
+                EmbeddingModelManager.deleteModel(this)
+                // With the model gone the backfill no-ops; this only clears
+                // the now-meaningless sidecar.
+                MemoryStore.rebuildVectors()
+                Toast.makeText(this, "已删除，已回退到词法检索", Toast.LENGTH_SHORT).show()
+                renderAll()
+            }
+        )
     }
 
     /**

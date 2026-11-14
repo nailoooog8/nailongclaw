@@ -29,10 +29,19 @@ import kotlin.math.min
  *    and the user curate it from inside a conversation.
  *  - the memory manager UI (ui/settings/MemoryActivity) for direct editing.
  *
- * Ranking is deliberately cheap and local (no embeddings): term overlap with
- * the current task, kind weight, and the access-weighted retention curve in
- * [MemoryRetention] — which is where "how often this proved useful" lives.
- * Pinned entries bypass decay and are always injected.
+ * Ranking is lexical by default — term overlap with the current task, kind
+ * weight, and the access-weighted retention curve in [MemoryRetention] (where
+ * "how often this proved useful" lives) — and becomes hybrid when the user
+ * turns on semantic ranking (KVUtils.isMemoryEmbeddingEnabled + a downloaded
+ * EmbeddingGemma model): an on-device embedding then replaces the flat
+ * lexical hit bonus with a graded cosine term, and lexical scoring degrades
+ * to the fallback for entries with no cached vector. Pinned entries bypass
+ * decay and are always injected.
+ *
+ * The hybrid mode is opt-in because it trades a ~157 MB model download and
+ * per-turn inference for recall the bigram matcher cannot get ("WiFi" never
+ * matches "无线网络"); the decision record and its reversal live in
+ * docs/MEMORY_DESIGN.md §2.
  *
  * ## Temporal supersession (the graphiti half)
  *
@@ -79,6 +88,25 @@ object MemoryStore {
     /** Minimum head length for a truncated top-ranked memory; below this, skip instead. */
     private const val MIN_TRUNCATED_HEAD = 20
 
+    /**
+     * Relevance bonus band, shared by both ranking modes so the balance
+     * between relevance and kind/pin/retention weights is mode-independent:
+     * a perfect semantic match earns exactly what a lexical hit always did.
+     */
+    private const val LEXICAL_MATCH_BONUS = 2.0
+    private const val SEMANTIC_MATCH_BONUS = 2.0
+
+    /**
+     * Cosine at or above this counts as a retrieval hit in [recall].
+     *
+     * Embeddings are dense: unrelated pairs sit near 0.1-0.3, related ones
+     * near 0.5-0.8, and exactly 0 almost never happens — so "has a vector"
+     * is not a hit test the way "shares a bigram" is. Without a floor, a
+     * recall would return the whole bank ranked, instead of the relevant
+     * part of it.
+     */
+    private const val SEMANTIC_FLOOR = 0.30f
+
     /** Fence around agent-written memory text inside the system prompt. */
     private const val OPEN_FENCE = "<memory>"
     private const val CLOSE_FENCE = "</memory>"
@@ -91,6 +119,24 @@ object MemoryStore {
 
     @Volatile
     private var cache: MutableList<MemoryEntry>? = null
+
+    /**
+     * Entry id → embedding, the semantic half of hybrid ranking. Lazily
+     * loaded from the `memory_vectors.json` sidecar, keyed by entry id (a
+     * content hash — an edit invalidates its own vector), guarded by [lock]
+     * like every other derived state. Null when never loaded.
+     */
+    @Volatile
+    private var vectorCache: MutableMap<String, FloatArray>? = null
+
+    /** Coalesces vector backfills: at most one pending pass, whatever the write rate. */
+    private val vectorDirty = java.util.concurrent.atomic.AtomicBoolean(false)
+
+    // Daemon threads: the backfill must never hold the JVM (or a unit-test
+    // worker) open on its own.
+    private val embedExecutor = java.util.concurrent.Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "memory-vector-backfill").apply { isDaemon = true }
+    }
 
     // ── Test seams ────────────────────────────────────────────────────────────
     //
@@ -123,6 +169,17 @@ object MemoryStore {
     @JvmStatic
     internal var enabledOverride: Boolean? = null
 
+    /**
+     * Overrides the embedder [embedder] resolves. Test-only — a fake here
+     * makes hybrid ranking exercisable in a JVM test with no MMKV and no
+     * model file, and its presence is also what marks semantic mode "on"
+     * (the production path additionally requires the settings flag and a
+     * downloaded model). Null is the production path.
+     */
+    @VisibleForTesting
+    @JvmStatic
+    internal var embedderOverride: MemoryEmbedder? = null
+
     data class Scored(val entry: MemoryEntry, val score: Double)
 
     /** Outcome of a write attempt, so callers can tell "stored" from "refused". */
@@ -149,6 +206,11 @@ object MemoryStore {
     @JvmStatic
     fun init(context: Context) {
         appContext = context.applicationContext
+        // Cold start with semantic ranking already on but vectors missing
+        // (fresh install, hand-pushed memories.json, or the flag flipped on
+        // before a restart): build them in the background. Coalesced, so
+        // this is one scan and a no-op when nothing is missing.
+        scheduleVectorBackfill()
     }
 
     @JvmStatic
@@ -166,6 +228,10 @@ object MemoryStore {
         synchronized(lock) {
             cache = null
             suppressions = null
+            // Vectors are keyed by entry id; a reload of the bank must not
+            // keep serving the previous generation's map (the manager UI
+            // calls this after hand-editing memories.json).
+            vectorCache = null
         }
     }
 
@@ -202,6 +268,10 @@ object MemoryStore {
      *
      * Matching live entries are reinforced (hits+1, lastUsedAt=now) and the bank is
      * rewritten, so the ranking improves with use.
+     *
+     * Semantic mode embeds the query before the lock is taken (inference must
+     * never run under it) and admits entries that share no bigram with the
+     * query but sit close to it in vector space.
      */
     @JvmStatic
     @JvmOverloads
@@ -213,15 +283,21 @@ object MemoryStore {
     ): List<Scored> {
         val qTerms = terms(query)
         val now = clock()
+        val emb = embedder()
+        val qVec = emb?.let { runCatching { it.embed(query) }.getOrNull() }
         return synchronized(lock) {
             val entries = loadLocked()
+            val vectors = if (emb != null && qVec != null) loadVectorsLocked(emb).toMap() else emptyMap()
             val pool = entries
                 .filter { includeHistory || !it.isInvalidated }
                 .filter {
                     kind.isNullOrBlank() || !MemoryKind.isValid(kind) || it.kind == kind
                 }
-            val hits = pool.filter { matches(it, qTerms) || qTerms.isEmpty() }
-                .map { score(it, qTerms, now) to it }
+            val hits = pool.filter {
+                qTerms.isEmpty() || matches(it, qTerms) ||
+                    relevance(it, qVec, vectors) >= SEMANTIC_FLOOR
+            }
+                .map { score(it, qTerms, now, qVec, vectors) to it }
                 .sortedByDescending { it.first }
                 .take(min(limit.coerceIn(1, 25), BRIEFING_LIMIT))
                 .map { it.second }
@@ -238,8 +314,194 @@ object MemoryStore {
                 cache = merged.toMutableList()
                 persistLocked()
             }
-            hits.map { Scored(it, score(it, qTerms, now)) }
+            hits.map { Scored(it, score(it, qTerms, now, qVec, vectors)) }
         }
+    }
+
+    // ── Semantic ranking ──────────────────────────────────────────────────────
+
+    /**
+     * The embedder hybrid ranking should use, or null for pure lexical mode.
+     *
+     * Null means any of: the test override is unset, the bank or the semantic
+     * flag is off, or the model file is not downloaded. Every caller treats
+     * null as "rank exactly as the lexical-only version did" — that is the
+     * documented default (docs/MEMORY_DESIGN.md §2), not a degraded mode.
+     *
+     * Cheap by construction (flag read + file-exists check + map lookup): it
+     * is called under [lock] from the read paths, and it must never start
+     * inference — [LiteRtMemoryEmbedder] loads its engine on the first
+     * [MemoryEmbedder.embed], which callers make outside the lock.
+     */
+    private fun embedder(): MemoryEmbedder? {
+        embedderOverride?.let { return it }
+        // No context means no model directory, hence no embedder — and it
+        // keeps the MMKV flag read (which needs an initialized MMKV) out of
+        // JVM tests that run on the storageDirOverride seam alone.
+        val ctx = appContext ?: return null
+        if (!isEnabled()) return null
+        if (!KVUtils.isMemoryEmbeddingEnabled()) return null
+        val path = EmbeddingModelManager.getModelPath(ctx) ?: return null
+        return MemoryEmbedders.get(path, ctx.cacheDir.absolutePath)
+    }
+
+    /** Lazy sidecar load; caller must hold [lock]. */
+    private fun loadVectorsLocked(emb: MemoryEmbedder): MutableMap<String, FloatArray> {
+        vectorCache?.let { return it }
+        val loaded = MemoryVectorCache.load(storageDir(), emb.fingerprint, emb.dimension)
+        vectorCache = loaded
+        return loaded
+    }
+
+    /**
+     * Drops vectors whose entry no longer exists. Caller must hold [lock].
+     *
+     * Entry ids are content hashes, so edits and evictions orphan vectors on
+     * their own; this is the one sweep that reclaims them, run from
+     * [persistLocked] so no mutation path can forget it. A no-op (not even a
+     * file read) when semantic mode is off.
+     */
+    private fun pruneVectorsLocked() {
+        val emb = embedder() ?: return
+        val cache = loadVectorsLocked(emb)
+        val live = loadLocked().mapTo(HashSet()) { it.id }
+        if (cache.keys.retainAll(live)) {
+            MemoryVectorCache.save(storageDir(), emb.fingerprint, cache)
+        }
+    }
+
+    /**
+     * Forgets one entry's vector because its content changed under a stable
+     * id — the merge path keeps the original id while replacing the text, so
+     * the id-keyed prune cannot see the staleness. The next backfill
+     * re-embeds the entry. Caller must hold [lock].
+     */
+    private fun dropVectorLocked(id: String) {
+        val emb = embedder() ?: return
+        val cache = loadVectorsLocked(emb)
+        if (cache.remove(id) != null) {
+            MemoryVectorCache.save(storageDir(), emb.fingerprint, cache)
+        }
+    }
+
+    /**
+     * Background pass embedding every entry that has no vector yet.
+     *
+     * Coalesced through [vectorDirty]: whatever the write rate, at most one
+     * pass is pending. Inference happens outside [lock]; the lock is taken
+     * only to snapshot what is missing and to merge results back. The pass
+     * re-checks for work when it finishes, so a write that lands mid-pass is
+     * picked up immediately instead of waiting for the next write.
+     */
+    private fun scheduleVectorBackfill() {
+        if (!vectorDirty.compareAndSet(false, true)) return
+        embedExecutor.execute {
+            try {
+                while (runBackfillPass()) { /* another round settles the gap */ }
+            } finally {
+                vectorDirty.set(false)
+            }
+        }
+    }
+
+    /**
+     * One backfill round. Returns true when entries that appeared *during*
+     * the round still need embedding (excluding ones whose embed failed —
+     * retrying those every round would spin).
+     */
+    private fun runBackfillPass(): Boolean {
+        return try {
+            val emb = synchronized(lock) {
+                if (isEnabled()) embedder() else null
+            } ?: return false
+            val missing = synchronized(lock) {
+                val cache = loadVectorsLocked(emb)
+                loadLocked().filter { it.id !in cache }.map { it.id to it.content }
+            }
+            if (missing.isEmpty()) return false
+            XLog.i(TAG, "Backfilling ${missing.size} memory vector(s)")
+            val failed = mutableSetOf<String>()
+            for ((id, content) in missing) {
+                val vec = runCatching { emb.embed(content) }.getOrNull()
+                if (vec == null) {
+                    failed.add(id)
+                    continue
+                }
+                synchronized(lock) { vectorCache?.put(id, vec) }
+            }
+            synchronized(lock) {
+                val cache = vectorCache ?: return false
+                MemoryVectorCache.save(storageDir(), emb.fingerprint, cache)
+                loadLocked().any { it.id !in cache && it.id !in failed }
+            }
+        } catch (e: Exception) {
+            // A failed backfill only means some entries stay unvectorized
+            // and rank lexically; the next write schedules another pass.
+            XLog.e(TAG, "Vector backfill failed", e)
+            false
+        }
+    }
+
+    /**
+     * Throws away every cached vector and recomputes them in the background.
+     * Exposed for the settings row ("重建向量") and used after the user
+     * switches the model or edits memories.json by hand.
+     */
+    @JvmStatic
+    fun rebuildVectors() {
+        synchronized(lock) {
+            vectorCache = null
+            MemoryVectorCache.delete(storageDir())
+        }
+        scheduleVectorBackfill()
+    }
+
+    /**
+     * Schedules a backfill without discarding what is already cached — the
+     * settings toggle uses it so turning semantic ranking on indexes a bank
+     * that has never been embedded (e.g. hand-pushed memories.json).
+     */
+    @JvmStatic
+    fun refreshVectors() = scheduleVectorBackfill()
+
+    /**
+     * Test seam: block until any queued or running backfill has finished.
+     *
+     * [MemoryStore] is a process-global singleton, so without this a backfill
+     * daemon outlives the test that scheduled it and keeps writing into
+     * whatever `storageDirOverride` the *next* test installed — flaky
+     * failures that look like ranking bugs. The executor is FIFO, so a
+     * sentinel submitted behind the pending pass drains the queue.
+     */
+    @VisibleForTesting
+    @JvmStatic
+    internal fun awaitVectorBackfillForTest() {
+        val latch = java.util.concurrent.CountDownLatch(1)
+        embedExecutor.execute { latch.countDown() }
+        latch.await(5, java.util.concurrent.TimeUnit.SECONDS)
+    }
+
+    /** How many live entries currently have a cached vector (0 in lexical mode). */
+    @JvmStatic
+    fun indexedVectorCount(): Int = synchronized(lock) {
+        val emb = embedder() ?: return@synchronized 0
+        loadVectorsLocked(emb).size
+    }
+
+    /**
+     * Relevance of [e] to the query vector, clamped to [0, 1]; 0 when
+     * semantic mode is off, the entry has no cached vector, or the pair is
+     * orthogonal. Shared by [recall]'s hit filter and [score] so the two can
+     * never disagree about what "relevant" means.
+     */
+    private fun relevance(
+        e: MemoryEntry,
+        qVec: FloatArray?,
+        vectors: Map<String, FloatArray>
+    ): Float {
+        if (qVec == null) return 0f
+        val v = vectors[e.id] ?: return 0f
+        return maxOf(0f, cosine(qVec, v))
     }
 
     // ── Writes ────────────────────────────────────────────────────────────────
@@ -377,6 +639,10 @@ object MemoryStore {
                 entries[entries.indexOf(dup)] = merged
                 cache = entries
                 persistLocked()
+                // The merge kept dup's id but may have replaced its text, so
+                // the cached vector now describes the old wording. Drop it;
+                // the backfill re-embeds the merged content.
+                dropVectorLocked(merged.id)
                 // R5 顺手批: memory bodies used to ride log lines into the
                 // debug-report ZIP — lengths and ids are diagnostic enough.
                 XLog.d(TAG, "memory_save merged into ${merged.id} (len=${merged.content.length})")
@@ -545,6 +811,11 @@ object MemoryStore {
         val n = loadLocked().size
         cache = mutableListOf()
         suppressions = mutableListOf()
+        // Vectors are derived from entries; with the bank empty they are
+        // garbage. Null the in-memory map and drop the sidecar so a later
+        // re-enable recomputes from scratch.
+        vectorCache = null
+        MemoryVectorCache.delete(storageDir())
         persistLocked()
         persistSuppressionsLocked()
         n
@@ -715,11 +986,20 @@ object MemoryStore {
     @JvmStatic
     fun briefing(query: String): String {
         if (!isEnabled()) return ""
-        val entries = try {
-            synchronized(lock) { loadLocked().filter { !it.isInvalidated }.toList() }
+        // Semantic features (query vector) are computed BEFORE the lock — see
+        // MemoryEmbedder's contract. embed() returning null (model missing,
+        // runtime failure) leaves qVec null and the whole path lexical.
+        val emb = embedder()
+        val qVec = emb?.let { runCatching { it.embed(query) }.getOrNull() }
+        var entries: List<MemoryEntry> = emptyList()
+        var vectors: Map<String, FloatArray> = emptyMap()
+        try {
+            synchronized(lock) {
+                entries = loadLocked().filter { !it.isInvalidated }.toList()
+                vectors = if (emb != null && qVec != null) loadVectorsLocked(emb).toMap() else emptyMap()
+            }
         } catch (e: Exception) {
             XLog.e(TAG, "briefing failed", e)
-            emptyList()
         }
 
         val sb = StringBuilder(BRIEFING_HEADER)
@@ -727,7 +1007,7 @@ object MemoryStore {
             sb.append(BRIEFING_EMPTY_LINE)
             return sb.toString()
         }
-        val picked = pick(query, entries, entriesBudget(entries.size))
+        val picked = pick(query, entries, entriesBudget(entries.size), qVec, vectors)
         sb.append(BRIEFING_ABOUT_LINE)
         for (scored in picked) {
             sb.append(briefingLine(scored.entry))
@@ -819,10 +1099,16 @@ object MemoryStore {
      *    injected as a truncated head rather than blowing the budget or
      *    dropping the fact the model most needs — the disk copy is untouched.
      */
-    private fun pick(query: String, entries: List<MemoryEntry>, budget: Int): List<Scored> {
+    private fun pick(
+        query: String,
+        entries: List<MemoryEntry>,
+        budget: Int,
+        qVec: FloatArray? = null,
+        vectors: Map<String, FloatArray> = emptyMap()
+    ): List<Scored> {
         if (budget <= 0) return emptyList()
         val qTerms = terms(query)
-        val scored = entries.map { Scored(it, score(it, qTerms, clock())) }
+        val scored = entries.map { Scored(it, score(it, qTerms, clock(), qVec, vectors)) }
             .sortedByDescending { it.score }
         val out = mutableListOf<Scored>()
         var chars = 0
@@ -894,6 +1180,12 @@ object MemoryStore {
                 file.writeText(tmp.readText())
                 tmp.delete()
             }
+            // Every mutation funnels through here, so this is the one place
+            // that keeps the sidecar in step with the bank: evicted, deleted
+            // and superseded-then-replaced entries drop their vectors — and
+            // newly written ones get embedded in the background.
+            pruneVectorsLocked()
+            scheduleVectorBackfill()
             true
         } catch (e: Exception) {
             XLog.e(TAG, "Failed to persist $FILE_NAME", e)
@@ -947,12 +1239,28 @@ object MemoryStore {
      * There is deliberately no separate `hits` bonus — [recall] bumps `hits`
      * and `lastUsedAt` together, so counting hits twice would reward the same
      * signal twice and cap it at seven recalls besides.
+     *
+     * **Hybrid mode** ([qVec] non-null): the flat lexical hit is replaced by a
+     * graded cosine term — a perfect semantic match earns the same
+     * [SEMANTIC_MATCH_BONUS] a lexical hit always did, so the relevance band
+     * (and the kind/pin/retention weights around it) is mode-independent. An
+     * entry whose vector is still missing falls back to the lexical branch,
+     * which is also the whole story when semantic mode is off.
      */
-    private fun score(e: MemoryEntry, qTerms: Set<String>, now: Long): Double {
+    private fun score(
+        e: MemoryEntry,
+        qTerms: Set<String>,
+        now: Long,
+        qVec: FloatArray? = null,
+        vectors: Map<String, FloatArray> = emptyMap()
+    ): Double {
         var s = MemoryKind.weight(e.kind)
         if (e.pinned) s += 3.0
-        if (qTerms.isNotEmpty() && matches(e, qTerms)) {
-            s += 2.0
+        val rel = relevance(e, qVec, vectors)
+        if (rel > 0f) {
+            s += SEMANTIC_MATCH_BONUS * rel
+        } else if (qTerms.isNotEmpty() && matches(e, qTerms)) {
+            s += LEXICAL_MATCH_BONUS
             val tagHits = e.tags.count { tag -> qTerms.any { it in tag } }
             s += min(1.5, 0.5 * tagHits)
         }
