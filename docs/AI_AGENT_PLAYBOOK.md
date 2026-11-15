@@ -59,7 +59,7 @@ if (!isLocalModel || isTaskMode) {
 
 `isLocalModel=false` (Cloud) → routes to `onSendTask`. The task path requires Accessibility / Notification / Overlay / Battery / File-Access permissions. On a fresh device with none granted, the task path opens `SettingsActivity` to prompt the user to fix permissions. **This is intentional**, but it looks identical to "the Send button is wired to the wrong handler" so you may waste an hour like I did. Three workarounds:
 
-1. Grant the 6 permissions before sending. Some are `adb`-settable (`enabled_accessibility_services`), some are NOT (`SYSTEM_ALERT_WINDOW` needs user tap).
+1. Grant the 6 permissions before sending. All of them are `adb`-settable — including `SYSTEM_ALERT_WINDOW` (`appops set`, recipe in §9.5 below; verified 2026-11-15. The old "needs user tap" note here was wrong and contradicted §9.5).
 2. Use **Local LLM in Chat mode** — `onSendChat`, no permission gate. Local needs a downloaded `.litertlm` though (~2.6 GB).
 3. Use **debug-build APK** + `DebugTaskReceiver` broadcast.
 
@@ -141,10 +141,10 @@ adb shell settings put secure accessibility_enabled 1
 
 # Verify
 adb shell dumpsys accessibility | grep -E "Bound services|Enabled services"
-# Want to see: Bound services:{Service[label=PokeClaw, eventTypes=TYPES_ALL_MASK, ...]}
+# Want to see: Bound services:{Service[label=NailongClaw, eventTypes=TYPES_ALL_MASK, ...]} (label renamed from PokeClaw with the 2026-10-27 rebrand)
 ```
 
-**Trap:** if you `force-stop` PokeClaw after granting, the Accessibility binding may be lost. Re-run the bypass + `enabled_accessibility_services` write before the next chat-send test.
+**Trap:** if you `force-stop` NailongClaw after granting, `enabled_accessibility_services` gets **cleared to null** — generic Android behavior, confirmed on the AOSP 35 emulator (2026-11-15) and vivo alike, not a vendor quirk. The binding cannot come back until you re-run step 6's `settings put` writes; verify with `dumpsys accessibility | grep -E "Bound services|Enabled services"` (both empty after force-stop).
 
 **Reverse:** clear all granted perms before user testing if you want a fresh-install QA.
 
