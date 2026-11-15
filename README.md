@@ -63,7 +63,7 @@ Google 的移动 agent 永远是 Pixel-first 的；Samsung 的 Galaxy AI 战略�
 
 | 开销 | 量级 |
 |---|---|
-| 44 个内置工具的 JSON schema 全量注入 LiteRT-LM（最大头；`LangChain4jToolBridge.buildToolSpecifications()` 本身不过滤，2026-11-13 起仅在请求侧裁掉「无影子屏时的 5 个 shadow 声明」这一种情形） | 主要 |
+| 49 个工具的 JSON schema 全量注入 LiteRT-LM（44 内置 + 5 影子屏，最大头；`LangChain4jToolBridge.buildToolSpecifications()` 注入全部注册工具，2026-11-13 起仅在请求侧裁掉「无影子屏时的 5 个 shadow 声明」这一种情形，裁后 44） | 主要 |
 | 任务提示词（`LOCAL_TASK_PROMPT`） | 约 3.2K 字符 |
 | 记忆简报（`MemoryStore.briefing`：规则块 + 最多 12 条记忆全文，置顶条目不计入上限） | 正文合计 1,400 字符预算 |
 

@@ -36,12 +36,22 @@ import io.agents.nailongclaw.utils.XLog
  * The flag ladder mirrors Mika's ShellService: Mika's base five
  * (PUBLIC|OWN_CONTENT_ONLY|SUPPORTS_TOUCH|ROTATES_WITH_CONTENT|
  * DESTROY_CONTENT_ON_REMOVAL), then — through the consented projection, the
- * only shape that can host other packages on this ROM — Mika's hidden
+ * only shape that can host other packages on the vivo QA ROM — Mika's hidden
  * focus-isolation bits (TRUSTED|OWN_DISPLAY_GROUP|ALWAYS_UNLOCKED on 33+,
  * OWN_FOCUS|STEAL_TOP_FOCUS_DISABLED on 34+), degrading rung by rung the way
  * Mika degrades trusted → untrusted. Whichever rung the platform accepts is
  * logged with its label; a device that refuses the hidden bits keeps full
  * function, just without the shadow display's own focus.
+ *
+ * Platform split (measured on the h79 AVD, API 35, 2026-11-15): AOSP's
+ * MediaProjection force-adds PRIVATE on top of a requested PUBLIC display
+ * (DisplayDeviceInfo mFlags=467: PUBLIC|PRIVATE|PRESENTATION together), and
+ * a PRIVATE display refuses activity launches even from its owner uid — so
+ * [io.agents.nailongclaw.tool.impl.mobile.shadow.ShadowOpenAppTool] cannot
+ * work there and shadow apps must be placed with shell `am start --display`.
+ * The vivo ROM does not add PRIVATE, which is what makes the production
+ * launch path viable. Details in BACKLOG (2026-11-15 platform-difference
+ * entry).
  *
  * Gated on API 33+: perception of shadow windows needs
  * [android.view.accessibility.AccessibilityWindowInfo.getDisplayId], which
@@ -152,13 +162,15 @@ object ShadowDisplayManager {
     private var imageReader: ImageReader? = null
 
     /**
-     * The user-consented projection, when held. A display created THROUGH a
-     * MediaProjection is trusted (API 34+): other packages' activities may be
-     * launched onto it. A plainly-created display is untrusted and can host
-     * only this app's own activities — the SecurityException the shadow tools
-     * surfaced as「在其它显示器上启动 Activity 没权限」. The projection must be
-     * obtained while a mediaProjection-type foreground service runs; see
-     * ForegroundService's consent-start path.
+     * The user-consented projection, when held. On the vivo ROM a display
+     * created THROUGH a MediaProjection can host other packages' activities;
+     * AOSP instead force-adds PRIVATE (see the class doc's platform split),
+     * where even the owner uid is refused. A plainly-created display is
+     * untrusted everywhere and can host only this app's own activities — the
+     * SecurityException the shadow tools surfaced as「在其它显示器上启动
+     * Activity 没权限」. The projection must be obtained while a
+     * mediaProjection-type foreground service runs; see ForegroundService's
+     * consent-start path.
      */
     @Volatile
     private var projection: MediaProjection? = null
@@ -236,13 +248,15 @@ object ShadowDisplayManager {
         }, Handler(thread.looper))
 
         // Creation ladder, best rung first (Mika's ShellService order). The
-        // projection rungs lead: a display created through the consented
-        // projection is trusted (API 34+) and is the only shape that can host
-        // other packages' activities on this ROM — a plain display is
-        // untrusted and could host only our own activities (the
-        // "在其它显示器上启动 Activity 没权限" SecurityException). Within the
-        // projection rungs the focus-isolation bits come first and degrade on
-        // refusal, exactly like Mika's trusted → untrusted retry.
+        // projection rungs lead: on the vivo ROM a projection display is the
+        // only shape that can host other packages' activities — a plain
+        // display is untrusted everywhere and could host only our own
+        // activities (the "在其它显示器上启动 Activity 没权限"
+        // SecurityException); on AOSP the projection display is force-added
+        // PRIVATE and hosts nothing but us either way (see the class doc's
+        // platform split). Within the projection rungs the focus-isolation
+        // bits come first and degrade on refusal, exactly like Mika's
+        // trusted → untrusted retry.
         val focusFlags = focusIsolationFlags()
         val rungs = buildList {
             if (projection != null) {

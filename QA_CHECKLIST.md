@@ -483,7 +483,7 @@ Key OEM differences:
 
 This is a **historical** snapshot of the v0.6.8 QA state, kept for the record. It is
 **not** a green release sheet and **not** current — current QA state lives in the
-QA Debug Changelog (newest entry 2026-11-08) and `BACKLOG.md`. Do not describe any
+QA Debug Changelog (newest entry 2026-11-15) and `BACKLOG.md`. Do not describe any
 release as phone-QA-passed based on this section.
 
 Test device and artifact state:

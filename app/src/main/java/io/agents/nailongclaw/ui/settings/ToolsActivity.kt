@@ -164,8 +164,11 @@ class ToolsActivity : BaseActivity() {
                     // The consent dialog must be driven by an Activity. The
                     // result goes to ForegroundService.startWithProjection,
                     // which upgrades to the mediaProjection FGS type and
-                    // creates the display through the projection — a trusted
-                    // display, the only kind that hosts OTHER packages.
+                    // creates the display through the projection — on the
+                    // vivo ROM the only kind that hosts OTHER packages (on
+                    // AOSP the projection display is force-added PRIVATE and
+                    // hosts nothing but us; see ShadowDisplayManager's
+                    // platform split).
                     val mpm = getSystemService(android.content.Context.MEDIA_PROJECTION_SERVICE)
                         as android.media.projection.MediaProjectionManager
                     startActivityForResult(mpm.createScreenCaptureIntent(), REQ_PROJECTION_CONSENT)
