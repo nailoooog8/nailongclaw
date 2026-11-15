@@ -456,6 +456,15 @@ G1201  09:15 → 10:42   二等座  ¥93.0   有票</pre>
           <button class="prompt-close" id="searchPromptClose" type="button" aria-label="关闭">✕</button>
         </div>
 
+        <!-- 活动胶囊：任务运行中显示「正在做什么 · 秒数」，renderRuntime 驱动，
+             ✕ 经 PokeClawChat.stop 停止任务。这是 WebView 面第一个停止入口。 -->
+        <div class="task-capsule" id="taskCapsule" hidden>
+          <span class="task-capsule-spinner"></span>
+          <span class="task-capsule-label" id="taskCapsuleLabel"></span>
+          <span class="task-capsule-time" id="taskCapsuleTime">0:00</span>
+          <button class="task-capsule-stop" id="taskCapsuleStop" type="button" aria-label="停止任务">✕</button>
+        </div>
+
         <div class="composer">
           <textarea id="composerInput" rows="1" placeholder="描述你想让手机做的事…（Enter 发送，Shift + Enter 换行）"></textarea>
           <div class="composer-bar">

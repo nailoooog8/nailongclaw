@@ -473,4 +473,9 @@
     <string name="notification_scheduled_cancelled_title">Scheduled task cancelled</string>
     <string name="notification_scheduled_blocked_title">Scheduled task blocked</string>
     <string name="notification_scheduled_blocked_text">A system dialog stopped it.</string>
+
+    <!-- Task activity capsule + narration collapse (ui/chat/ChatScreen) -->
+    <string name="chat_capsule_running">Running…</string>
+    <string name="chat_capsule_round">Round %1$d</string>
+    <string name="chat_span_summary">Tool activity · %1$d calls</string>
 </resources>

@@ -214,6 +214,7 @@ object FloatingCircleManager {
         ThreadUtils.runOnUiThread {
             resultSummary = ""
             currentAction = ""
+            io.agents.nailongclaw.task.TaskRuntimeState.stop()
             setState(State.IDLE)
             hide()
         }
@@ -231,6 +232,9 @@ object FloatingCircleManager {
             // A new task clears the previous run's action label and result summary
             currentAction = ""
             resultSummary = ""
+            // Publish to the in-app capsule feed before the view work — the
+            // capsule renders from this even when the overlay is refused
+            io.agents.nailongclaw.task.TaskRuntimeState.start(taskText)
             cancelNotifyCollapse()
             setState(State.TASK_NOTIFY)
             // Auto-collapse to RUNNING after 3 seconds (call setState directly, bypassing TASK_NOTIFY guard)
@@ -257,6 +261,7 @@ object FloatingCircleManager {
         ThreadUtils.runOnUiThread {
             currentRound = round
             currentChannel = channel
+            io.agents.nailongclaw.task.TaskRuntimeState.update(currentAction, round)
             // If the task notification pill is still showing, only update data; do not switch UI (wait for timer to expire)
             if (currentState == State.TASK_NOTIFY) {
                 return@runOnUiThread
@@ -278,6 +283,7 @@ object FloatingCircleManager {
         ThreadUtils.runOnUiThread {
             currentRound = step
             currentTokenState = tokenState
+            io.agents.nailongclaw.task.TaskRuntimeState.update(currentAction, step)
             val view = EasyFloat.getFloatView(FLOAT_TAG) ?: return@runOnUiThread
             val tvStatus = view.findViewById<TextView>(R.id.tvTokenStatus) ?: return@runOnUiThread
             tvStatus.text = "Step $step | $formattedTokens | $formattedCost"
@@ -305,6 +311,7 @@ object FloatingCircleManager {
     fun updateTaskAction(action: String) {
         ThreadUtils.runOnUiThread {
             currentAction = action
+            io.agents.nailongclaw.task.TaskRuntimeState.update(action, currentRound)
             val view = EasyFloat.getFloatView(FLOAT_TAG) ?: return@runOnUiThread
             val tvAction = view.findViewById<TextView>(R.id.tvTaskAction) ?: return@runOnUiThread
             tvAction.text = if (action.length > 26) action.substring(0, 26) + "…" else action
@@ -320,6 +327,7 @@ object FloatingCircleManager {
         ThreadUtils.runOnUiThread {
             resultSummary = summary?.trim().orEmpty()
             resultSuccess = true
+            io.agents.nailongclaw.task.TaskRuntimeState.stop()
             setState(State.SUCCESS)
             scheduleAutoReset()
         }
@@ -333,6 +341,7 @@ object FloatingCircleManager {
         ThreadUtils.runOnUiThread {
             resultSummary = summary?.trim().orEmpty()
             resultSuccess = false
+            io.agents.nailongclaw.task.TaskRuntimeState.stop()
             setState(State.ERROR)
             scheduleAutoReset()
         }

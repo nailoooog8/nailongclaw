@@ -312,6 +312,11 @@ fun ChatScreen(
                             colors = colors,
                         )
 
+                        // 活动胶囊：任务跑着的时候（含渠道/定时任务——数据来自
+                        // 悬浮球同一条 TaskEvent 管道）在输入条上方显示
+                        // 「正在做什么 + 已用秒数」，走开回来一眼看清。
+                        TaskActivityCapsule(colors = colors)
+
                         ChatInputBar(
                             isAwaitingReply = isAwaitingReply,
                             isTaskRunning = isTaskRunning,
@@ -356,6 +361,7 @@ fun ChatScreen(
                         MessageList(
                             messages = messages,
                             colors = colors,
+                            isTaskRunning = isTaskRunning,
                             onBackgroundTap = dismissKeyboard,
                             modifier = Modifier.fillMaxSize(),
                         )
@@ -648,15 +654,67 @@ private fun PermissionBanner(onClick: () -> Unit, colors: PokeclawColors) {
 
 // ======================== MESSAGE LIST ========================
 
+/**
+ * One lazy-list node: either a single message, or a collapsed run of
+ * narration (SYSTEM + TOOL_GROUP) between two user turns.
+ *
+ * Pure view-layer grouping — [ChatMessage] and the markdown history format
+ * are untouched, so a reload re-derives the same spans.
+ */
+private sealed class RenderNode {
+    data class Msg(val index: Int) : RenderNode()
+    data class Span(
+        val startIndex: Int,
+        val indices: List<Int>,
+        val toolStepCount: Int,
+    ) : RenderNode()
+}
+
+/** Runs of non-USER messages with ≥3 tool steps become collapsible spans. */
+private fun computeRenderNodes(messages: List<ChatMessage>): List<RenderNode> {
+    val nodes = mutableListOf<RenderNode>()
+    var run = mutableListOf<Int>()
+    var runToolSteps = 0
+
+    fun flush() {
+        if (run.isEmpty()) return
+        if (runToolSteps >= 3) {
+            nodes.add(RenderNode.Span(run.first(), run.toList(), runToolSteps))
+        } else {
+            run.forEach { nodes.add(RenderNode.Msg(it)) }
+        }
+        run = mutableListOf()
+        runToolSteps = 0
+    }
+
+    messages.forEachIndexed { index, message ->
+        if (message.role == ChatMessage.Role.USER) {
+            flush()
+            nodes.add(RenderNode.Msg(index))
+        } else {
+            run.add(index)
+            runToolSteps += message.toolSteps?.size ?: 0
+        }
+    }
+    flush()
+    return nodes
+}
+
 @Composable
 private fun MessageList(
     messages: List<ChatMessage>,
     colors: PokeclawColors,
+    isTaskRunning: Boolean = false,
     onBackgroundTap: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+    val nodes = remember(messages) { computeRenderNodes(messages) }
+    // Per-span expand override, keyed by the span's first message index.
+    // Absent = default: the trailing span of a running task stays open so
+    // narration is live; every other span collapses to one summary row.
+    val expandedSpans = remember { mutableStateMapOf<Int, Boolean>() }
 
     // Auto-follow only when the user is already at (or near) the bottom, and
     // jump instantly instead of animating: an animated scroll from a reset or
@@ -666,12 +724,12 @@ private fun MessageList(
     // counts as "at bottom" so the chat still opens pinned to the newest
     // message, just without the animated sweep.
     LaunchedEffect(messages.size) {
-        if (messages.isEmpty()) return@LaunchedEffect
+        if (nodes.isEmpty()) return@LaunchedEffect
         val info = listState.layoutInfo
         val nearBottom = info.visibleItemsInfo.isEmpty() ||
             info.visibleItemsInfo.last().index >= info.totalItemsCount - 2
         if (nearBottom) {
-            listState.scrollToItem(messages.size - 1)
+            listState.scrollToItem(nodes.size - 1)
         }
     }
 
@@ -684,14 +742,151 @@ private fun MessageList(
             },
         contentPadding = PaddingValues(vertical = 8.dp),
     ) {
-        items(messages.size) { index ->
-            val message = messages[index]
-            when (message.role) {
-                ChatMessage.Role.USER -> UserBubble(message.content, message.timestamp, colors)
-                ChatMessage.Role.ASSISTANT -> AssistantBubble(message.content, message.timestamp, colors, message.modelName)
-                ChatMessage.Role.SYSTEM -> SystemMessage(message.content, colors)
-                ChatMessage.Role.TOOL_GROUP -> ToolGroup(message, colors)
+        items(nodes.size) { nodeIndex ->
+            val node = nodes[nodeIndex]
+            when (node) {
+                is RenderNode.Msg -> {
+                    val message = messages[node.index]
+                    when (message.role) {
+                        ChatMessage.Role.USER -> UserBubble(message.content, message.timestamp, colors)
+                        ChatMessage.Role.ASSISTANT -> AssistantBubble(message.content, message.timestamp, colors, message.modelName)
+                        ChatMessage.Role.SYSTEM -> SystemMessage(message.content, colors)
+                        ChatMessage.Role.TOOL_GROUP -> ToolGroup(message, colors)
+                    }
+                }
+                is RenderNode.Span -> {
+                    // Live narration: the trailing span of a running task stays
+                    // open; everything else (finished turns, restored history)
+                    // defaults collapsed — the dsh-Go "整轮折叠" pattern.
+                    val isLiveSpan = isTaskRunning && nodeIndex == nodes.lastIndex
+                    val expanded = expandedSpans[node.startIndex] ?: isLiveSpan
+                    if (expanded) {
+                        node.indices.forEach { idx ->
+                            val message = messages[idx]
+                            when (message.role) {
+                                ChatMessage.Role.USER -> UserBubble(message.content, message.timestamp, colors)
+                                ChatMessage.Role.ASSISTANT -> AssistantBubble(message.content, message.timestamp, colors, message.modelName)
+                                ChatMessage.Role.SYSTEM -> SystemMessage(message.content, colors)
+                                ChatMessage.Role.TOOL_GROUP -> ToolGroup(message, colors)
+                            }
+                        }
+                        SpanCollapseHeader(
+                            toolStepCount = node.toolStepCount,
+                            expanded = true,
+                            colors = colors,
+                            onToggle = { expandedSpans[node.startIndex] = false },
+                        )
+                    } else {
+                        SpanCollapseHeader(
+                            toolStepCount = node.toolStepCount,
+                            expanded = false,
+                            colors = colors,
+                            onToggle = { expandedSpans[node.startIndex] = true },
+                        )
+                    }
+                }
             }
+        }
+    }
+}
+
+/** The one-row summary for a collapsed (or expandable) narration span. */
+@Composable
+private fun SpanCollapseHeader(
+    toolStepCount: Int,
+    expanded: Boolean,
+    colors: PokeclawColors,
+    onToggle: () -> Unit,
+) {
+    Surface(
+        onClick = onToggle,
+        color = Color.Transparent,
+        shape = RoundedCornerShape(10.dp),
+        modifier = Modifier
+            .padding(start = 54.dp, end = 64.dp, top = 2.dp, bottom = 2.dp),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+        ) {
+            Text(
+                stringResource(R.string.chat_span_summary, toolStepCount),
+                fontSize = 12.sp,
+                color = colors.textTertiary,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(
+                if (expanded) Icons.Default.KeyboardArrowDown else Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = colors.textTertiary,
+                modifier = Modifier.size(16.dp),
+            )
+        }
+    }
+}
+
+// ======================== TASK ACTIVITY CAPSULE ========================
+
+/**
+ * 单行胶囊：「⟳ 正在打开设置 · 0:19 · 第3轮」，输入条上方。
+ * 数据来自 [io.agents.nailongclaw.task.TaskRuntimeState]——悬浮球收到的
+ * 同一条 TaskEvent 流，所以渠道/定时任务在聊天里也能看到。任务结束快照
+ * 变 null，胶囊随组合消失；答案在消息流里。
+ */
+@Composable
+private fun TaskActivityCapsule(colors: PokeclawColors) {
+    val snapshot by io.agents.nailongclaw.task.TaskRuntimeState.snapshot.collectAsState()
+    val active = snapshot ?: return
+
+    // Jump the elapsed clock once per second while composed; a null snapshot
+    // leaves composition (early return above) and cancels this effect.
+    var nowMs by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(active.startedAtMs) {
+        while (true) {
+            nowMs = System.currentTimeMillis()
+            kotlinx.coroutines.delay(1000)
+        }
+    }
+
+    val elapsedSec = ((nowMs - active.startedAtMs) / 1000).coerceAtLeast(0)
+    val elapsed = String.format(Locale.US, "%d:%02d", elapsedSec / 60, elapsedSec % 60)
+    val label = active.action.ifBlank { stringResource(R.string.chat_capsule_running) }
+
+    Surface(
+        color = colors.aiBubble,
+        border = androidx.compose.foundation.BorderStroke(0.5.dp, colors.aiBubbleBorder),
+        shape = RoundedCornerShape(14.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+        ) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(12.dp),
+                strokeWidth = 1.5.dp,
+                color = colors.accent,
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                buildString {
+                    append(label)
+                    if (active.round > 0) append(" · ").append(stringResource(R.string.chat_capsule_round, active.round))
+                },
+                fontSize = 12.sp,
+                color = colors.textTertiary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                elapsed,
+                fontSize = 11.sp,
+                color = colors.textTertiary,
+            )
         }
     }
 }

@@ -1086,6 +1086,46 @@ body {
 }
 .prompt-close:hover { background: var(--cds-fill-ghost-hover); color: var(--cds-text-primary); }
 
+/* 活动胶囊：任务运行中（含渠道/定时任务——快照来自悬浮球同一条
+   TaskEvent 管道）显示「正在做什么 · 秒数」，renderRuntime 驱动，页面自
+   己跳秒（Kotlin 只在快照变化时推一次，不每秒过桥）。显隐只翻 hidden，
+   所以和 .search-prompt 同一条理由：display:flex 必须显式让位给
+   [hidden]{display:none}。 */
+.task-capsule {
+  display: flex; gap: 8px; align-items: center;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  border-radius: 999px;
+  background: var(--cds-surface-2);
+  box-shadow: inset 0 0 0 1px var(--cds-border);
+  font-size: 11.5px; color: var(--cds-text-secondary);
+}
+.task-capsule[hidden] { display: none; }
+.task-capsule-spinner {
+  width: 11px; height: 11px; flex: none;
+  border-radius: 50%;
+  border: 1.5px solid var(--cds-clay);
+  border-top-color: transparent;
+  animation: task-capsule-spin 900ms linear infinite;
+}
+@keyframes task-capsule-spin { to { transform: rotate(360deg); } }
+.task-capsule-label {
+  min-width: 0; flex: 1;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.task-capsule-time { flex: none; color: var(--cds-text-muted); font-variant-numeric: tabular-nums; }
+.task-capsule-stop {
+  flex: none;
+  width: 22px; height: 22px;
+  display: grid; place-items: center;
+  border: none; cursor: pointer;
+  border-radius: 50%;
+  background: transparent; color: var(--cds-text-muted);
+  font: inherit; font-size: 11px; line-height: 1;
+  transition: background-color 150ms var(--cds-ease-swift), color 150ms ease;
+}
+.task-capsule-stop:hover { background: var(--cds-fill-ghost-hover); color: var(--cds-clay); }
+
 /* 模型切换器 popover */
 .pop-wrap { position: relative; }
 .pop {

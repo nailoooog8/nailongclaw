@@ -261,6 +261,64 @@
     }
   }
 
+  /* ------------------------------------------------------- 活动胶囊（真实数据）
+     任务运行中在 composer 上方显示「正在做什么 · 秒数」。数据是 Kotlin 侧
+     TaskRuntimeState 的快照——悬浮球收到的同一条 TaskEvent 流，所以渠道/
+     定时任务也会点亮胶囊，不只是这个面里发的。两条硬规矩：
+       1. Kotlin 只在快照变化时推 renderRuntime（含 null=收摊），跳秒由页面
+          的 setInterval 自己做——running 任务每秒过一次桥是浪费。
+       2. 显隐只翻 hidden 属性（.task-capsule 的 display:flex 会盖掉 UA 的
+          [hidden] 规则，CSS 里已显式让位），JS 不碰 style.display。
+     ✕ 是这个面第一个停止入口：此前页面只能眼睁睁看着任务跑完或失败。 */
+  var _runtime = null;
+  var _runtimeTick = null;
+
+  function renderRuntime(payload) {
+    _runtime = payload || null;
+    syncTaskCapsule();
+  }
+
+  function syncTaskCapsule() {
+    var capsule = document.getElementById('taskCapsule');
+    if (!capsule) return;
+    var running = !!(_runtime && _runtime.taskRunning);
+    capsule.hidden = !running;
+    if (!running) {
+      stopRuntimeTick();
+      return;
+    }
+    var label = document.getElementById('taskCapsuleLabel');
+    var text = _runtime.action || '运行中…';
+    if (_runtime.round > 0) text += ' · 第' + _runtime.round + '轮';
+    label.textContent = text;
+    startRuntimeTick();
+  }
+
+  function startRuntimeTick() {
+    if (_runtimeTick) return;
+    _runtimeTick = setInterval(updateCapsuleTime, 1000);
+    updateCapsuleTime();
+  }
+
+  function stopRuntimeTick() {
+    if (_runtimeTick) { clearInterval(_runtimeTick); _runtimeTick = null; }
+  }
+
+  function updateCapsuleTime() {
+    var el = document.getElementById('taskCapsuleTime');
+    if (!el) { stopRuntimeTick(); return; }
+    if (!_runtime || !_runtime.taskRunning) { stopRuntimeTick(); return; }
+    var sec = Math.max(0, Math.floor((Date.now() - _runtime.startedAtMs) / 1000));
+    el.textContent = Math.floor(sec / 60) + ':' + ('0' + (sec % 60)).slice(-2);
+  }
+
+  var capsuleStop = document.getElementById('taskCapsuleStop');
+  if (capsuleStop) {
+    capsuleStop.addEventListener('click', function () {
+      if (hasNativeBridge() && PokeClawChat.stop) PokeClawChat.stop();
+    });
+  }
+
   /* ------------------------------------------------------- 滚动底部钉住
      抄 useClaudeScrollPinning.ts。四个机制，缺一不可：
        1. 40px 底部容差
@@ -2978,6 +3036,7 @@
   window.__cds = {
     renderLive: renderLive,
     renderLiveRaw: renderLiveRaw,
+    renderRuntime: renderRuntime,
     renderConfirmation: renderConfirmation,
     removeConfirmation: removeConfirmation,
     enterLiveMode: enterLiveMode,

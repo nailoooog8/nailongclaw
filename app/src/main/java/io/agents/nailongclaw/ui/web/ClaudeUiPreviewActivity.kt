@@ -59,9 +59,15 @@ import io.agents.nailongclaw.ui.settings.WebSearchActivity
 import io.agents.nailongclaw.task.ScheduledTaskStore
 import io.agents.nailongclaw.task.TaskRecord
 import io.agents.nailongclaw.task.TaskRecordStore
+import io.agents.nailongclaw.task.TaskRuntimeState
 import io.agents.nailongclaw.task.TaskScheduler
 import io.agents.nailongclaw.utils.KVUtils
 import io.agents.nailongclaw.utils.XLog
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import java.util.concurrent.Executors
 
 /**
@@ -106,6 +112,13 @@ class ClaudeUiPreviewActivity : BaseActivity() {
     private lateinit var webView: WebView
     private var qaReceiver: BroadcastReceiver? = null
     private val executor = Executors.newSingleThreadExecutor()
+
+    /**
+     * 任务运行时快照 → 页面胶囊的推送管道。BaseActivity 不提供
+     * lifecycleScope，这里自建一个，[onDestroy] 里成对注销——collect 持有
+     * Activity 引用，漏掉 cancel 就是泄漏。
+     */
+    private val runtimeScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     /**
      * Whether the page's in-WebView settings sheet is open. The page is the
@@ -373,6 +386,20 @@ class ClaudeUiPreviewActivity : BaseActivity() {
             if (payload.isEmpty()) return
             XLog.e(TAG, "[chat] send(${payload.length} chars)")
             runOnUiThread { taskFlowController.sendTask(payload) }
+        }
+
+        /**
+         * JS → Kotlin: stop the running task.
+         *
+         * Until now the WebView surface had no stop entry at all — the only
+         * off-surface stops were the floating pill and the old chat screen.
+         * Called from the activity capsule's ✕ (cds.js); safe when nothing
+         * runs, `cancelCurrentTask` is a no-op then.
+         */
+        @JavascriptInterface
+        fun stop() {
+            XLog.e(TAG, "[chat] stop() — stop requested from the page")
+            runOnUiThread { appViewModel.stopTask() }
         }
 
         /**
@@ -1024,6 +1051,35 @@ class ClaudeUiPreviewActivity : BaseActivity() {
      * topbar would keep the previous conversation's name until the user typed
      * something.
      */
+    /**
+     * Kotlin → JS: the task runtime snapshot (what the agent is doing now).
+     *
+     * Read from [TaskRuntimeState] — the same feed the floating pill publishes
+     * — so channel and scheduled tasks light the capsule too, not just ones
+     * typed on this surface. One `renderRuntime` call per snapshot change; the
+     * page ticks the elapsed clock itself, so running tasks do not spam
+     * evaluateJavascript once a second.
+     */
+    private fun publishRuntime() {
+        if (!::webView.isInitialized) return
+        val snapshot = io.agents.nailongclaw.task.TaskRuntimeState.snapshot.value
+        val payload = if (snapshot == null) {
+            "null"
+        } else {
+            buildString {
+                append('{')
+                append("\"taskRunning\":true")
+                append(",\"action\":"); appendJsonString(snapshot.action)
+                append(",\"round\":").append(snapshot.round)
+                append(",\"startedAtMs\":").append(snapshot.startedAtMs)
+                append('}')
+            }
+        }
+        webView.post {
+            webView.evaluateJavascript("window.__cds && window.__cds.renderRuntime($payload);", null)
+        }
+    }
+
     private fun publishConversations() {
         if (!::webView.isInitialized) return
         val json = ClaudeUiSessionBridge.conversationsPayload(
@@ -1403,6 +1459,11 @@ class ClaudeUiPreviewActivity : BaseActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // 活动胶囊的推送管道：快照变化 → renderRuntime。webView 尚未就绪时
+        // publishRuntime 是安全 no-op；进页面后的首推在 onPageFinished 里。
+        runtimeScope.launch {
+            TaskRuntimeState.snapshot.collect { publishRuntime() }
+        }
         // Before anything can call a bridge method: which conversation this
         // surface has open decides what gets saved, restored and listed.
         currentConversationId = resolveInitialConversationId()
@@ -1457,6 +1518,9 @@ class ClaudeUiPreviewActivity : BaseActivity() {
                     publishModelStatus()
                     publishWebSearchStatus()
                     publishBrandInfo()
+                    // 任务可能在页面加载前就开始了（渠道/定时任务）——进页面
+                    // 就把运行时快照补推一次，胶囊不用等下一个事件才出现。
+                    publishRuntime()
                 }
             }
             // Without a WebChromeClient the page's console output never leaves
@@ -1811,6 +1875,7 @@ class ClaudeUiPreviewActivity : BaseActivity() {
         // open/close cycle would leave one idle thread behind. ComposeChatActivity
         // shuts its own down in onDestroy; this surface has to as well.
         executor.shutdown()
+        runtimeScope.cancel()
         super.onDestroy()
     }
 

@@ -470,4 +470,9 @@
     <string name="notification_scheduled_cancelled_title">定期タスクをキャンセルしました</string>
     <string name="notification_scheduled_blocked_title">定期タスクがブロックされました</string>
     <string name="notification_scheduled_blocked_text">システムダイアログにより停止されました。</string>
+
+    <!-- タスク活動カプセルと実行ログ折りたたみ (ui/chat/ChatScreen) -->
+    <string name="chat_capsule_running">実行中…</string>
+    <string name="chat_capsule_round">ラウンド%1$d</string>
+    <string name="chat_span_summary">実行ログ · ツール%1$d回</string>
 </resources>

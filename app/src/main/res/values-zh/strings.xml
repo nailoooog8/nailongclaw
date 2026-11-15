@@ -470,4 +470,9 @@
     <string name="notification_scheduled_cancelled_title">定时任务已取消</string>
     <string name="notification_scheduled_blocked_title">定时任务被拦截</string>
     <string name="notification_scheduled_blocked_text">被系统对话框中断。</string>
+
+    <!-- 活动胶囊与执行过程折叠 (ui/chat/ChatScreen) -->
+    <string name="chat_capsule_running">运行中…</string>
+    <string name="chat_capsule_round">第%1$d轮</string>
+    <string name="chat_span_summary">执行过程 · %1$d 次工具调用</string>
 </resources>
