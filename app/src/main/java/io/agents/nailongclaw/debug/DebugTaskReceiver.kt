@@ -23,15 +23,28 @@ import org.json.JSONObject
 /**
  * Debug-only broadcast receiver for triggering tasks via ADB without UI interaction.
  *
+ * The `-n` component is REQUIRED when the app targets API 34+: manifest
+ * receivers no longer receive implicit (component-less) broadcasts for
+ * custom actions, so the action-only form silently never arrives (found on
+ * the API 35 emulator 2026-11-15).
+ *
  * Usage:
- *   adb shell am broadcast -a io.agents.nailongclaw.DEBUG_TASK --es task "open my camera"
+ *   adb shell am broadcast -a io.agents.nailongclaw.DEBUG_TASK \
+ *     -n io.agents.nailongclaw/.debug.DebugTaskReceiver --es task "open my camera"
+ *
+ * Direct single-tool execution (no LLM):
+ *   adb shell am broadcast -a io.agents.nailongclaw.DEBUG_TASK \
+ *     -n io.agents.nailongclaw/.debug.DebugTaskReceiver \
+ *     --es tool shadow_get_screen_info
  *
  * Set Cloud LLM config (any provider):
- *   adb shell am broadcast -a io.agents.nailongclaw.DEBUG_TASK --es task "config:" \
+ *   adb shell am broadcast -a io.agents.nailongclaw.DEBUG_TASK \
+ *     -n io.agents.nailongclaw/.debug.DebugTaskReceiver --es task "config:" \
  *     --es api_key "sk-..." --es model_name "gpt-4o-mini"
  *
  * With custom base URL (OpenRouter, Groq, Ollama, etc.):
- *   adb shell am broadcast -a io.agents.nailongclaw.DEBUG_TASK --es task "config:" \
+ *   adb shell am broadcast -a io.agents.nailongclaw.DEBUG_TASK \
+ *     -n io.agents.nailongclaw/.debug.DebugTaskReceiver --es task "config:" \
  *     --es api_key "sk-..." --es base_url "https://api.openrouter.ai/v1" --es model_name "google/gemini-2.5-flash"
  */
 class DebugTaskReceiver : BroadcastReceiver() {

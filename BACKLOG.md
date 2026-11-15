@@ -285,6 +285,7 @@ One round landed the whole state/data track of the two-track plan: P0 contracts 
 - On-device LLM as competitive moat (first to ship with Gemma 4)
 - Positioning: cloud/desktop-driven mobile-agent frameworks already exist; PokeClaw should own the phone-resident, local-first, model-slot harness that can run on a user's own Android device without a PC/cloud phone fleet.
 - **竞品对比收尾（2026-11-13，Mika v0.1.41 + dsh-Go 源码实读）**：影子屏 flag 梯子 / 逃逸看门狗 / 死循环硬闸 / 去盲目重试 / quiet-period settle 已落地（QA_CHECKLIST H78 待真机验）。**未搬项都卡在「需 shell uid」**，除非换 Shizuku/自连 ADB 通道（dsh-Go 的不打扰模式走的就是这条），否则无解：①影子 App 音频静音（Mika 用 `appops set <pkg> PLAY_AUDIO ignore` + 恢复台账；我们没有 MANAGE_APP_OPS_MODES，抢音频焦点会连用户的音乐一起静）②IME policy LOCAL（隐藏 `IWindowManager.setDisplayImePolicy`，防影子 App 在真机弹输入法；先看 H78-b 真机是否真有问题再评估反射）③per-display `userActivity` 续亮（`PowerManager.userActivity` 隐藏；先验证息屏后影子 App 是否停摆）④`moveRootTaskToDisplay` 精确挪任务（现在逃逸拉回是重开应用，Mika 是挪任务）。另：`ROTATES_WITH_CONTENT` 的旋转几何若 H78-f 失败要补（a11y 坐标本身随显示旋转，问题只会在截图/ImageReader 侧出现）。
+- **影子屏平台差异（2026-11-15 模拟器 QA 实证入档）**：①AOSP API 35 的 MediaProjection 在请求 PUBLIC 时**强加 PRIVATE**（DisplayDeviceInfo `mFlags=467` 实证：PUBLIC|PRIVATE|PRESENTATION 并存），PRIVATE 虚拟屏连 owner uid 也拒启动 activity → **`shadow_open_app` 在 AOSP 上结构性不可用**（真机用 shell `am start --display` 放置；vivo ROM 不加 PRIVATE 故生产可用）；②rung0 焦点隔离被拒的实锤拒因 = `Requires ADD_TRUSTED_DISPLAY permission`（与「需 shell uid」的既定结论同型，模拟器上 H78-b 不可测）；③模拟器 `getWindowsOnAllDisplays()` 在窗口刚注册的一拍内可能返回空（时序毛刺），窗口稳定后可靠——真机 QA 遇首次读空重读一次即可；④UI Automation（uiautomator）注册会踢掉 app 无障碍服务连接，QA 驱动尽量走广播/shell。
 
 ---
 

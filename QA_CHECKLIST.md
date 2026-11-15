@@ -1367,14 +1367,14 @@ When in doubt, rerun the smaller bundle first, then expand only if something dri
 - [ ] **H77. 模型切换真的生效 [RELEASE-OK]**: 在卡片里从本地切到一个已配密钥的云端模型 → 顶栏与 composer 两个 pill **同时**变成该模型名 + 提供商（不等重进应用）；发一条消息 → 用新模型作答（cloud 路径重建了 client）。再切回本地 → 两个 pill 回本地，下一条消息走本地。任务运行中切换 → 当前任务不受影响（它持有自己那份 client），下一条消息才换；本地路径在任务运行中会明说「Local task using model」而不是默默重载。判据：pill 文本 + `KVUtils` 的 provider/modelName 值 + 回答来源；不认截图。
 - [ ] **H75. 新建对话 [RELEASE-OK]**: 主界面发几条消息 → 打开侧栏 → 点「新建对话」→ feed 清空、顶栏标题变「新对话」、输入框可用来开新话题；**上一段历史没有丢**——侧栏列表里出现它（按「今天」分组）。杀进程重进 → 落在那段新对话上（不是旧的）。落盘判据：`getExternalFilesDir(null)/chats` 下 `.md` 文件数 +1。
 - [ ] **H76. 会话列表 / 打开 / 重命名 / 删除 [RELEASE-OK]**: 侧栏列表按「今天 / 昨天 / 月日」分组，当前会话行高亮；点另一行 → feed 换成那段历史、顶栏标题跟着变，模型仍可用（不是冷启动）。hover 行尾出现重命名/删除两颗（默认隐形）：重命名 → 对话框改标题 → 列表与顶栏同步；删除 → 确认框列出标题 → 确认后列表移除该行。**删当前会话** → feed 清空并落到一条新 id（不是指向已删文件的幽灵）。搜索框输入 → 列表按标题过滤，无匹配显示「没有匹配的会话」。空列表显示「还没有对话。点上面的『新建对话』开始。」。最后一条硬判据：这些会话**也出现在 Compose 聊天页的侧栏**里（2026-10-27 起是刻意如此，见 BACKLOG 第五轮）。
-- [ ] **H78. 影子屏 vs Mika/dsh-Go 调整批（2026-11-13，代码就绪，真机待验）[RELEASE-OK]** [LOGCAT-DEBUG 部分用 Share Debug Report 读，release 构建 logcat 被 BuildConfig.DEBUG 门控]。八个子项，全过才算这批落地：
-  - **a. flag 梯子胜出级**：工具页授权屏幕捕获 → 创建影子屏 → Share Debug Report 里找 `Shadow display created: ... rung=N(label)`。rung0=`projection+focus-isolation`（隐藏焦点旗标被平台收下）是满分；落到 rung1=`projection+extended` 说明隐藏旗标被拒——**记录拒绝原因，结论写进 BACKLOG（焦点隔离需 shell uid，与 Mika 降级模式同级），不算失败**；rung2/3 说明投影路径都挂了，要查。
+- [ ] **H78. 影子屏 vs Mika/dsh-Go 调整批（2026-11-13，代码就绪；2026-11-15 h79 模拟器替验 a/c/d/e 全 PASS + QA 修 3 缺陷，f/g 与 b 待真机）[RELEASE-OK]** [LOGCAT-DEBUG 部分用 Share Debug Report 读，release 构建 logcat 被 BuildConfig.DEBUG 门控]。八个子项，全过才算这批落地：
+  - **a. flag 梯子胜出级**：工具页授权屏幕捕获 → 创建影子屏 → Share Debug Report 里找 `Shadow display created: ... rung=N(label)`。rung0=`projection+focus-isolation`（隐藏焦点旗标被平台收下）是满分；落到 rung1=`projection+extended` 说明隐藏旗标被拒——**记录拒绝原因，结论写进 BACKLOG（焦点隔离需 shell uid，与 Mika 降级模式同级），不算失败**；rung2/3 说明投影路径都挂了，要查。✅ **2026-11-15 h79 模拟器 PASS**：`rung=1(projection+extended)`，拒因 = `Requires ADD_TRUSTED_DISPLAY permission`（与预期同型）；降级链按设计工作。
   - **b. 焦点隔离（仅 a 落到 rung0 时可测）**：影子屏开抖音且它在前台 → 在真机上打字/切输入框 → 真机 IME 与焦点不被抢、不弹到别处。
-  - **c. 逃逸看门狗**：影子屏开抖音后，从通知栏/别的入口把抖音弄到真机主屏（或直接在主屏打开抖音）→ 下一个 `shadow_tap_node` / `shadow_get_screen_info` 结果带 `WARNING: ... escaped to the real screen and was pulled back`，且影子屏重新显示抖音。反例：在真机主屏自己开着抖音时影子工具**不**报逃逸（5s 用户触摸静默窗 + 双屏都要不在影子屏才判逃逸）。
-  - **d. DESTROY_CONTENT_ON_REMOVAL**：影子屏开着抖音 → 工具页销毁影子屏 → 抖音**不在**真机主屏前台（activity 随屏销毁，不溢回真机）。
-  - **e. shadow_input_text**：影子屏开抖音 → `shadow_get_screen_info` 找到搜索框节点 → `shadow_input_text` → 成功消息带 `(verified by read-back)`，影子屏搜索框里是刚输入的文字；再验一个拒绝场景（对不可编辑节点调用）返回明确错误而不是假成功。
-  - **f. ROTATES_WITH_CONTENT 几何**：影子屏开一个会转横屏的应用（视频全屏）→ 对影子屏节点 tap，落点仍在预期元素上（坐标空间随显示旋转没错位）。若错位，回退该旗标并记录。
-  - **g. 死循环硬闸**：构造或复现「同屏同动作连续 4 次」（如同一节点反复 tap 无变化）→ 任务以 `Task stopped: the same action on the same screen repeated 4 times in a row (dead loop)` 终止，而不是跑到 maxIterations。
+  - **c. 逃逸看门狗**：影子屏开抖音后，从通知栏/别的入口把抖音弄到真机主屏（或直接在主屏打开抖音）→ 下一个 `shadow_tap_node` / `shadow_get_screen_info` 结果带 `WARNING: ... escaped to the real screen and was pulled back`，且影子屏重新显示抖音。反例：在真机主屏自己开着抖音时影子工具**不**报逃逸（5s 用户触摸静默窗 + 双屏都要不在影子屏才判逃逸）。**取证项**：5s 静默窗依赖 TYPE_VIEW_CLICKED/LONG_CLICKED/TOUCH_INTERACTION_START 三类事件送达——反例测完记录「真屏触摸后 5s 内是否压住了误报」：若 TOUCH_INTERACTION_START 根本不到达（无 touch exploration 时存疑），静默窗实际只由 view 点击撑着，要记录实况。**追加项（2026-11-15 修复后）**：影子屏内跳包（抖音点链接 → 新包前台）→ `shadow_get_screen_info` 后日志出现 `Shadow task tracking now <新包>`，后续对新包逃逸同样报 WARNING；影子屏落回桌面时日志出现 `Shadow task tracking cleared` 且看门狗安静。✅ **2026-11-15 h79 模拟器 PASS（正例+双屏反例+5s 静默窗）**：逃逸态（真屏有 Settings、影子侧 task 移除）→ `shadow_get_screen_info` 错误结果带 `WARNING: com.android.settings escaped to the real screen and the pull-back failed (SecurityException …)`（拉回被 AOSP display 启动拒绝，属平台差异非 app 缺陷）；双屏都有时不报（反例 ✓）；`input tap` 后 5s 内 0 报警、6s 后恢复报警——**触摸事件送达实锤，静默窗工作**。`Shadow task tracking now com.android.settings` 已验（armed 路径）；cleared 场景（影子屏落桌面）在模拟器未构造出，真机补。
+  - **d. DESTROY_CONTENT_ON_REMOVAL**：影子屏开着抖音 → 工具页销毁影子屏 → 抖音**不在**真机主屏前台（activity 随屏销毁，不溢回真机）。✅ **2026-11-15 h79 模拟器 PASS**（服务禁用触发 onDestroy→release 的干净路径，避开 UIA 干扰）：display 随之消失、Settings 未出现在真屏前台也无任何 Settings activity 残留。
+  - **e. shadow_input_text**：影子屏开抖音 → `shadow_get_screen_info` 找到搜索框节点 → `shadow_input_text` → 成功消息带 `(verified by read-back)`，影子屏搜索框里是刚输入的文字；再验一个拒绝场景（对不可编辑节点调用）返回明确错误而不是假成功。✅ **2026-11-15 h79 模拟器 PASS**：`Set text on shadow node n2 (verified by read-back)`；负例两发——不可编辑节点 → `is not a text field (no "edit" marker)`，树已变的节点 → `Unknown shadow node … refresh with shadow_get_screen_info`，均诚实报错无假成功。
+  - **f. ROTATES_WITH_CONTENT 几何**：影子屏开一个会转横屏的应用（视频全屏）→ 对影子屏节点 tap，落点仍在预期元素上（坐标空间随显示旋转没错位）。若错位，回退该旗标并记录。⏳ **2026-11-15 模拟器部分**：`FLAG_ROTATES_WITH_CONTENT` 在 DisplayDeviceInfo 确认在列；几何 tap 测试需可旋转横屏的 app，模拟器缺样本，真机补。
+  - **g. 死循环硬闸**：构造或复现「同屏同动作连续 4 次」（如同一节点反复 tap 无变化）→ 任务以 `Task stopped: the same action on the same screen repeated 4 times in a row (dead loop)` 终止，而不是跑到 maxIterations。⏳ **2026-11-15**：模拟器无可用 LLM（本地 Gemma 8192 上下文被工具声明吃满、无云端密钥）不可端到端构造；LoopHistory/isStuckInLoop 已由 6 例单测钉死，端到端待云端真机。
   - **h. 提速计时**：同一云端任务改造前后各跑一次，对比每轮工具执行耗时（日志时间戳 / Share Debug Report）：`open_app` 不再付 3×500ms（无弹窗时应 ~0.6s 级），动作轮不再有固定 500ms 硬睡，`scroll_to_find` 每轮不再拉两次整树。
 ## CI. Emulator Smoke Harness
 The runner itself is code. When it reports red for a reason that has nothing to do with
@@ -2146,6 +2146,19 @@ adb logcat -d | grep "opened with the task ledger requested"
 ## QA Debug Changelog
 
 Format: `[date] [status] [test-id] description`
+
+### 2026-11-15 — H78 a/c/d/e 模拟器 PASS；QA 亲手抓出并修掉 3 个缺陷（含 2 个 P1）
+
+**驱动方式**：h79 AVD（API 35）+ debug 构建；`DebugTaskReceiver` 显式组件广播直驱工具（不经 LLM——注意 targetSdk 34+ 起**隐式广播到 manifest receiver 被静默丢弃**，`-n io.agents.nailongclaw/.debug.DebugTaskReceiver` 必带，KDoc 已更正）；影子屏上 app 用 root shell `am start --display <id>` 放置。UI Automation（uiautomator resolve/dump）会**顶掉** app 无障碍服务连接（UiAutomationManager 注册即把 ClawAccessibilityService 踢下线），驱动期尽量走广播+shell，少用 UIA。
+
+**结果**：a PASS（`rung=1(projection+extended)`；rung0 因缺 `ADD_TRUSTED_DISPLAY` 被拒自动降级——按既定结论不算失败，拒因已留痕）；b 模拟器 N/A（rung0 未胜出）；c PASS（逃逸 WARNING 全链路 + 拉回失败诚实上报 + 双屏反例不误报 + **5s 用户触摸静默窗生效**——触摸后 5s 内 0 报警、6s 后恢复报警，证明触摸事件确实送达，④的「完全收不到」担忧排除）；d PASS（服务销毁路径：display 随之消失、`DESTROY_CONTENT_ON_REMOVAL` 下 activity **不溢回**真屏前台）；e PASS（`Set text on shadow node n2 (verified by read-back)` + 两个负面用例诚实报错）；f 部分（`FLAG_ROTATES_WITH_CONTENT` 在 DisplayDeviceInfo 确认在列，几何 tap 测试需可旋转 app，真机补）；g 未测（需 agent 循环 + LLM；LoopHistory 逻辑已由 6 例单测钉死）。
+
+**QA 抓出并当场修复的缺陷**（均复测通过，见工作区 diff）：
+1. **P1 崩溃**：`ForegroundService.onCreate` 在无 POST_NOTIFICATIONS 时走 `stopSelf()`——`startForegroundService()` 义务未履约，用户一授权屏幕捕获整个 app 以 `ForegroundServiceDidNotStartInTimeException` 崩死（全新安装必现；真机没暴露只因早已授权过通知）。FGS 通知本不需要 POST_NOTIFICATIONS，`startForeground` 改为无条件。
+2. **P1 影子感知全瞎**：display 定向扫描全部用了无参 `getWindows()`——它**只返回默认屏窗口**（vivo 上能跑纯靠「影子 app 恰为活跃窗口」的巧合，真屏一活跃即瞎）。改走 `getWindowsOnAllDisplays()`（API 33+）按 displayId 取，五处扫描同修。**模拟器上 `getWindowsOnAllDisplays` 在窗口刚注册的一拍内可能返回空**（时序毛刺），窗口稳定后可靠——真机 QA 若遇首次读空，重读一次即可。
+3. **逃逸检查不可达**：`shadow_get_screen_info` 在影子屏全空时先报「无可读窗口」直接返回，而**逃逸恰恰意味着 app 已不在影子屏**——最需要报警的时刻反而静默。错误路径现在也跑看门狗并把 WARNING 附在错误上（复测：`Shadow escape: com.android.settings surfaced on the real screen` + 拉回失败诚实上报）。
+
+**平台差异入档**：AOSP API 35 的 MediaProjection 会在 PUBLIC 之上强加 PRIVATE（`mFlags=467` 实证），PRIVATE 屏连 owner uid 也拒启动 activity → **`shadow_open_app` 在 AOSP 上不可用**（vivo ROM 不加 PRIVATE，故真机可用）；模拟器 QA 一律用 shell `am start --display` 放置。h 的提速对比需要新旧构建各跑一次，本项待真机。桌面态重建疑云：销毁按钮后 8s 出现 plain 重建，与 UIA 干扰时间线吻合，未能在无 UIA 环境复现——挂账观察。
 
 ### 2026-10-24 — H28: memory chips get their real data source, and skill steps become visible
 
