@@ -4,6 +4,7 @@
 package io.agents.nailongclaw.ui.chat
 
 import android.content.Context
+import io.agents.nailongclaw.agent.llm.LocalModelRuntime
 import io.agents.nailongclaw.utils.XLog
 import com.google.ai.edge.litertlm.Contents
 import com.google.ai.edge.litertlm.Conversation
@@ -80,17 +81,30 @@ object ConversationCompactor {
                 )
             )
 
-            val prompt = "Summarize this conversation in 3-5 sentences. Keep names, dates, decisions, and action items:\n\n$olderText"
-            val response = tempConversation.sendMessage(prompt)
-            val digest = response?.toString()?.trim() ?: return null
+            try {
+                val prompt = "Summarize this conversation in 3-5 sentences. Keep names, dates, decisions, and action items:\n\n$olderText"
+                val response = tempConversation.sendMessage(prompt)
+                val digest = response?.toString()?.trim() ?: return null
 
-            tempConversation.close()
+                // Save digest to .memory.md
+                saveDigest(context, conversationId, digest, messages)
 
-            // Save digest to .memory.md
-            saveDigest(context, conversationId, digest, messages)
-
-            XLog.i(TAG, "Compacted: ${olderMessages.size} messages → ${digest.length} chars digest")
-            return digest
+                XLog.i(TAG, "Compacted: ${olderMessages.size} messages → ${digest.length} chars digest")
+                return digest
+            } finally {
+                try {
+                    tempConversation.close()
+                } catch (e: Exception) {
+                    // The summarization prompt routinely nears the 8192 window,
+                    // so sendMessage failures here are expected — and every one
+                    // of them used to leak the engine's only session. A failed
+                    // close on top of that means the native session is wedged;
+                    // reset so the next conversation open rebuilds instead of
+                    // hitting "A session already exists".
+                    XLog.w(TAG, "Compaction conversation close failed — resetting shared engine", e)
+                    LocalModelRuntime.resetSharedEngine()
+                }
+            }
         } catch (e: Exception) {
             XLog.e(TAG, "Compaction failed", e)
             return null

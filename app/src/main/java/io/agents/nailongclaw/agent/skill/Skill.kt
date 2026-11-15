@@ -58,11 +58,17 @@ data class SkillParameter(
 
 /**
  * Result of a skill execution.
+ *
+ * [cancelled] marks an execution cut short by a user stop request rather than
+ * a tool failure. It matters: the orchestrator must not fold a cancelled run
+ * into the failure branch, whose next step is falling back to the agent loop —
+ * that would start an LLM task right after the user asked everything to stop.
  */
 data class SkillResult(
     val success: Boolean,
     val stepsUsed: Int,
     val tokensUsed: Int = 0,
     val fallbackUsed: Boolean = false,
+    val cancelled: Boolean = false,
     val message: String = ""
 )

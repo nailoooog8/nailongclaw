@@ -291,7 +291,14 @@ class TaskOrchestrator(
     fun cancelCurrentTask() {
         currentWatchdog?.disarm()
         currentWatchdog = null
-        if (!taskSessionStore.markStopping()) return
+        if (!taskSessionStore.isTaskRunning()) return
+        // markStopping is idempotent; a repeat press while already STOPPING
+        // must not skip the agentService signal below — a skill fallback can
+        // start the agent loop *after* the first press, and executeTask resets
+        // the cancelled flag on entry, so the first press's cancel() is gone
+        // by then. agentService.cancel() is a plain flag set; re-signalling is
+        // harmless when nothing is running.
+        taskSessionStore.markStopping()
         if (::agentService.isInitialized) {
             agentService.cancel()
         }
@@ -431,6 +438,32 @@ class TaskOrchestrator(
                         FloatingCircleManager.showTaskNotify(task, channel)
                         val watchdog = armWatchdog(channel, messageID)
                         Thread({
+                            // Cancellation wrap-up, mirroring the agent loop's
+                            // cancel branch (emit Cancelled → ledger CANCELLED,
+                            // channel notice, capsule error state). A cancelled
+                            // skill must neither fall back to the agent loop
+                            // nor report Completed.
+                            fun finishCancelled() {
+                                watchdog.disarm()
+                                val cancelledSession = releaseTask()
+                                if (!cancelledSession.isRunning) {
+                                    XLog.d(TAG, "Task already released, ignoring skill cancellation")
+                                    return
+                                }
+                                emit(TaskEvent.Cancelled)
+                                ForegroundService.resetToIdle(ClawApplication.instance)
+                                if (cancelledSession.channel != null && cancelledSession.messageId.isNotEmpty()) {
+                                    ChannelManager.sendMessage(
+                                        cancelledSession.channel,
+                                        ClawApplication.instance.getString(R.string.channel_msg_task_cancelled),
+                                        cancelledSession.messageId
+                                    )
+                                    ChannelManager.flushMessages(cancelledSession.channel)
+                                }
+                                FloatingCircleManager.setErrorState()
+                                onTaskFinished()
+                                XLog.d(TAG, "Skill task cancelled by user")
+                            }
                             val skillResult = skillExecutor.execute(
                                 skill,
                                 route.params,
@@ -449,8 +482,15 @@ class TaskOrchestrator(
                                     watchdog.recordProgress()
                                     emitToolResultEvent(toolName, result)
                                 },
+                                isCancelled = { taskSessionStore.isStopRequested() },
                             )
-                            if (skillResult.success) {
+                            // A stop lands between steps, so it can also fire
+                            // after the last tool returned but before this
+                            // branch runs — fold that into the cancelled
+                            // path too.
+                            if (skillResult.cancelled || taskSessionStore.isStopRequested()) {
+                                finishCancelled()
+                            } else if (skillResult.success) {
                                 watchdog.disarm()
                                 val session = releaseTask()
                                 if (session.isRunning) {
@@ -462,11 +502,19 @@ class TaskOrchestrator(
                                 }
                             } else {
                                 watchdog.disarm()
-                                val fallbackGoal = skill.fallbackGoal
-                                    .let { g -> route.params.entries.fold(g) { acc, (k, v) -> acc.replace("{$k}", v) } }
-                                XLog.i(TAG, "Skill ${skill.id} failed, falling back to agent loop: $fallbackGoal")
-                                emit(TaskEvent.ToolAction("Retrying with AI agent"))
-                                startNewTask(channel, fallbackGoal, messageID, isFallback = true)
+                                // The stop flag can land between the branch
+                                // check above and this fallback — last guard
+                                // before spawning an agent loop the user just
+                                // asked to stop.
+                                if (taskSessionStore.isStopRequested()) {
+                                    finishCancelled()
+                                } else {
+                                    val fallbackGoal = skill.fallbackGoal
+                                        .let { g -> route.params.entries.fold(g) { acc, (k, v) -> acc.replace("{$k}", v) } }
+                                    XLog.i(TAG, "Skill ${skill.id} failed, falling back to agent loop: $fallbackGoal")
+                                    emit(TaskEvent.ToolAction("Retrying with AI agent"))
+                                    startNewTask(channel, fallbackGoal, messageID, isFallback = true)
+                                }
                             }
                         }, "skill-executor").start()
                         return

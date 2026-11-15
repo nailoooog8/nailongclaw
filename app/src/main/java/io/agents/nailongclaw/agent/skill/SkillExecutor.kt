@@ -33,7 +33,11 @@ class SkillExecutor {
      * @param onToolResult callback after each attempt, carrying the tool's
      *   registry name and its result — per attempt, matching the agent loop
      *   where every call gets exactly one result. Optional.
-     * @return SkillResult indicating success or failure
+     * @param isCancelled polled at step and attempt boundaries; when it fires
+     *   the run stops with a [SkillResult.cancelled] result. Tools already in
+     *   flight are not interrupted — a stop lands at the next boundary, the
+     *   same contract the agent loop has for its own tool calls.
+     * @return SkillResult indicating success, failure, or cancellation
      */
     fun execute(
         skill: Skill,
@@ -41,12 +45,17 @@ class SkillExecutor {
         onProgress: ((step: Int, total: Int, description: String) -> Unit)? = null,
         onToolCall: ((toolName: String) -> Unit)? = null,
         onToolResult: ((toolName: String, result: ToolResult) -> Unit)? = null,
+        isCancelled: (() -> Boolean)? = null,
     ): SkillResult {
         XLog.i(TAG, "Executing skill: ${skill.id} with params: $params")
         val totalSteps = skill.steps.size
         var stepsUsed = 0
 
         for ((index, step) in skill.steps.withIndex()) {
+            if (stopRequested(isCancelled)) {
+                XLog.i(TAG, "Skill ${skill.id} cancelled before step ${index + 1}")
+                return cancelledResult(stepsUsed)
+            }
             stepsUsed = index + 1
             val stepNum = index + 1
             onProgress?.invoke(stepNum, totalSteps, step.description)
@@ -58,6 +67,10 @@ class SkillExecutor {
             // Execute with retries
             var succeeded = false
             for (attempt in 1..step.retries) {
+                if (stopRequested(isCancelled)) {
+                    XLog.i(TAG, "Skill ${skill.id} cancelled before step $stepNum attempt $attempt")
+                    return cancelledResult(stepsUsed)
+                }
                 try {
                     onToolCall?.invoke(step.toolName)
                     val toolParams = resolvedParams.mapValues { (_, v) -> v as Any }
@@ -70,8 +83,8 @@ class SkillExecutor {
                         break
                     } else {
                         XLog.w(TAG, "Step $stepNum failed (attempt $attempt/${step.retries}): ${result.error}")
-                        if (attempt < step.retries) {
-                            Thread.sleep(500) // brief pause before retry
+                        if (attempt < step.retries && !retryPause(isCancelled)) {
+                            return cancelledResult(stepsUsed)
                         }
                     }
                 } catch (e: Exception) {
@@ -80,8 +93,8 @@ class SkillExecutor {
                         ToolResult.error("Tool execution failed: ${e.message}"),
                     )
                     XLog.e(TAG, "Step $stepNum exception (attempt $attempt/${step.retries})", e)
-                    if (attempt < step.retries) {
-                        Thread.sleep(500)
+                    if (attempt < step.retries && !retryPause(isCancelled)) {
+                        return cancelledResult(stepsUsed)
                     }
                 }
             }
@@ -112,6 +125,30 @@ class SkillExecutor {
     }
 
     /**
+     * Pause between retry attempts. Returns false when the run should cut to
+     * a cancelled result: the thread was interrupted, or a stop arrived while
+     * sleeping.
+     */
+    private fun retryPause(isCancelled: (() -> Boolean)?): Boolean {
+        try {
+            Thread.sleep(RETRY_PAUSE_MS)
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+            return false
+        }
+        return !stopRequested(isCancelled)
+    }
+
+    private fun stopRequested(isCancelled: (() -> Boolean)?): Boolean = isCancelled?.invoke() ?: false
+
+    private fun cancelledResult(stepsUsed: Int): SkillResult = SkillResult(
+        success = false,
+        stepsUsed = stepsUsed,
+        cancelled = true,
+        message = "Cancelled by user",
+    )
+
+    /**
      * Replace {param_name} placeholders in step params with actual values.
      */
     private fun resolveParams(
@@ -133,5 +170,6 @@ class SkillExecutor {
 
     companion object {
         private const val TAG = "SkillExecutor"
+        private const val RETRY_PAUSE_MS = 500L
     }
 }

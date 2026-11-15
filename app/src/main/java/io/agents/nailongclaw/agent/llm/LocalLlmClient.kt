@@ -91,8 +91,17 @@ class LocalLlmClient(private val config: AgentConfig) : LlmClient {
      * Create a new conversation with system prompt and tool declarations.
      */
     private fun createConversation(systemPrompt: String, toolSpecs: List<ToolSpecification>) {
-        // LiteRT-LM only supports one session at a time — close existing first
-        try { conversation?.close() } catch (_: Exception) {}
+        // LiteRT-LM only supports one session at a time — close existing first.
+        // A failed close here wedges the native session, and the
+        // openConversation below would burn a 1.5s retry sleeping through its
+        // conflict-retry cycle; resetting now lets the very next attempt
+        // rebuild the engine directly.
+        try {
+            conversation?.close()
+        } catch (e: Exception) {
+            XLog.w(TAG, "pre-open conversation close failed — resetting shared engine", e)
+            LocalModelRuntime.resetSharedEngine()
+        }
         conversation = null
 
         // Convert tool specs to native LiteRT-LM tools
@@ -533,7 +542,18 @@ class LocalLlmClient(private val config: AgentConfig) : LlmClient {
 
     override fun close() {
         XLog.i(TAG, "close() — closing conversation only (engine stays in EngineHolder)")
-        try { conversation?.close() } catch (e: Exception) { XLog.w(TAG, "close conversation error", e) }
+        try {
+            conversation?.close()
+        } catch (e: Exception) {
+            // A failed close leaves the native session wedged — the next
+            // createConversation would hit "A session already exists" and no
+            // amount of retrying on the same engine clears it. openConversation
+            // now self-heals that, but a full engine rebuild costs 2-3s; do it
+            // here so the next task starts clean instead of wading through a
+            // conflict-retry cycle.
+            XLog.w(TAG, "close conversation error — resetting shared engine", e)
+            LocalModelRuntime.resetSharedEngine()
+        }
         conversation = null
         engine = null
         processedMessageCount = 0

@@ -100,10 +100,21 @@ object LocalModelRuntime {
                 XLog.w(TAG, "openConversation attempt $attempt failed for $modelPath: ${e.message}")
 
                 if (isSessionConflict(e)) {
-                    throw IllegalStateException("Local model session already in use", e)
-                }
-
-                if (!forceCpu && isGpuBackendFailure(e)) {
+                    // "A session already exists" means some earlier holder
+                    // abandoned a Conversation it never managed to close (a
+                    // failed task's terminal close swallowed the error, a
+                    // compactor crashed, …). The native session is wedged:
+                    // retrying createConversation on the same engine can
+                    // never succeed, so tear the engine down — EngineHolder
+                    // close destroys the orphaned session with it — and let
+                    // the next attempt rebuild. Safe because the chat side
+                    // refuses to open while a task runs and vice versa
+                    // (ChatSessionController's isTaskRunning gate), so a
+                    // conflict can only come from a dead holder, never from
+                    // in-flight inference.
+                    XLog.w(TAG, "openConversation: session conflict — resetting shared engine for $modelPath")
+                    resetSharedEngine()
+                } else if (!forceCpu && isGpuBackendFailure(e)) {
                     XLog.w(TAG, "openConversation: GPU path failed, forcing CPU for $modelPath")
                     LocalBackendHealth.noteRecoverableGpuFailure(modelPath, e)
                     forceCpuEngine(context, modelPath)
@@ -161,7 +172,11 @@ object LocalModelRuntime {
             try {
                 lease.conversation.close()
             } catch (e: Exception) {
-                XLog.w(TAG, "runSingleShot: conversation close failed", e)
+                // Same rule as the task and chat paths: a close that fails
+                // leaves the engine's only session wedged. Nothing here can
+                // retry meaningfully, so reset and let the next open rebuild.
+                XLog.w(TAG, "runSingleShot: conversation close failed — resetting shared engine", e)
+                resetSharedEngine()
             }
         }
     }

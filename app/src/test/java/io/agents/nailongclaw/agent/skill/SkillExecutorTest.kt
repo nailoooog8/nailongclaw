@@ -141,4 +141,66 @@ class SkillExecutorTest {
 
         assertEquals(listOf("H28"), ok.callLog.single().values.toList())
     }
+
+    // H84-cancel (BACKLOG P1): the three stop entries all funnel into the
+    // session store's stop flag; the executor must honour it at its step and
+    // attempt boundaries instead of running the skill to the end.
+
+    @Test
+    fun `a stop before the first step cancels with zero tool calls`() {
+        val ok = StubTool("h28_stub_cancel_pre", listOf(ToolResult.success("saved")))
+        install(ok)
+
+        val result = SkillExecutor().execute(
+            skill(SkillStep(toolName = "h28_stub_cancel_pre", retries = 1)),
+            emptyMap(),
+            isCancelled = { true },
+        )
+
+        assertFalse(result.success)
+        assertTrue(result.cancelled)
+        assertEquals(0, ok.callLog.size)
+    }
+
+    @Test
+    fun `a stop after a failed attempt skips the retry and cancels`() {
+        val flaky = StubTool(
+            "h28_stub_cancel_retry",
+            listOf(ToolResult.error("transient"), ToolResult.success("second try")),
+        )
+        install(flaky)
+
+        val result = SkillExecutor().execute(
+            skill(SkillStep(toolName = "h28_stub_cancel_retry", retries = 2)),
+            emptyMap(),
+            isCancelled = { flaky.callLog.size >= 1 },
+        )
+
+        assertFalse(result.success)
+        assertTrue(result.cancelled)
+        // The retry the stop pre-empted never ran.
+        assertEquals(1, flaky.callLog.size)
+    }
+
+    @Test
+    fun `a stop between steps leaves the remaining steps unexecuted`() {
+        val ok = StubTool(
+            "h28_stub_cancel_mid",
+            listOf(ToolResult.success("one"), ToolResult.success("two")),
+        )
+        install(ok)
+
+        val result = SkillExecutor().execute(
+            skill(
+                SkillStep(toolName = "h28_stub_cancel_mid", params = mapOf("msg" to "a"), retries = 1),
+                SkillStep(toolName = "h28_stub_cancel_mid", params = mapOf("msg" to "b"), retries = 1),
+            ),
+            emptyMap(),
+            isCancelled = { ok.callLog.size >= 1 },
+        )
+
+        assertFalse(result.success)
+        assertTrue(result.cancelled)
+        assertEquals(1, ok.callLog.size)
+    }
 }

@@ -60,6 +60,17 @@ class TaskSessionStore {
 
     fun isTaskRunning(): Boolean = _state.value.isRunning
 
+    /**
+     * Whether a stop has been requested for the current session. This is the
+     * consumer side of [markStopping]: execution paths that cannot be
+     * interrupted from the outside (the skill executor's bare thread) poll it
+     * at their natural boundaries and wind down when it fires.
+     */
+    fun isStopRequested(): Boolean = synchronized(lock) {
+        val current = _state.value
+        current.phase == TaskSessionPhase.STOPPING && current.stopRequested
+    }
+
     fun tryAcquire(
         messageId: String,
         channel: Channel,
