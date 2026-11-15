@@ -435,7 +435,13 @@ class ChatSessionController(
                 }
                 XLog.e(TAG, "Chat error", e)
                 postToMain {
-                    replaceTypingIndicator("Error: ${e.message}")
+                    val raw = e.message ?: "Chat failed"
+                    // Same deal as the task path: a human line when the failure
+                    // shape is known, the raw rendering when it is not. The raw
+                    // string stays in the log.
+                    replaceTypingIndicator(
+                        ErrorHumanizer.humanize(raw) ?: "Error: $raw"
+                    )
                     sink.awaitingReply = false
                 }
             }

@@ -26,6 +26,20 @@ class ClawApplication : BaseApp() {
         lateinit var instance: ClawApplication
             private set
         lateinit var appViewModelInstance: AppViewModel
+
+        /**
+         * Whether any Activity of this app is currently in the foreground.
+         *
+         * Counting started/destroyed (not resumed/paused) keeps the flag true
+         * across the brief hole when one activity starts another — a
+         * paused/started pair would otherwise flicker "background" between
+         * screens. Consumed by [io.agents.nailongclaw.notify.TaskOutcomeNotifier]
+         * to tell "the user typed this and walked away" from "the user is
+         * watching the transcript right now".
+         */
+        @Volatile
+        var isAppInForeground: Boolean = false
+            private set
     }
 
     override fun onCreate() {
@@ -52,6 +66,11 @@ class ClawApplication : BaseApp() {
         // Task ledger: durable record of accepted tasks — the task page reads
         // only from here, never from the volatile session store
         io.agents.nailongclaw.task.TaskRecordStore.init(this)
+        // Task outcome notifications: observe terminal ledger transitions once,
+        // process-wide — every entry path is covered because the ledger is
+        // written by every entry path
+        io.agents.nailongclaw.notify.TaskOutcomeNotifier.register()
+        registerActivityLifecycleCallbacks(foregroundTracker)
         // Scheduled tasks: the durable timer half; alarms themselves are
         // re-armed by BootReceiver after a reboot
         io.agents.nailongclaw.task.ScheduledTaskStore.init(this)
@@ -91,6 +110,26 @@ class ClawApplication : BaseApp() {
     }
 
     private var networkListener: NetworkUtils.OnNetworkStatusChangedListener? = null
+
+    private val foregroundTracker = object : android.app.Application.ActivityLifecycleCallbacks {
+        private var startedCount = 0
+
+        override fun onActivityStarted(activity: android.app.Activity) {
+            startedCount++
+            isAppInForeground = true
+        }
+
+        override fun onActivityStopped(activity: android.app.Activity) {
+            startedCount = (startedCount - 1).coerceAtLeast(0)
+            if (startedCount == 0) isAppInForeground = false
+        }
+
+        override fun onActivityCreated(activity: android.app.Activity, savedInstanceState: android.os.Bundle?) = Unit
+        override fun onActivityResumed(activity: android.app.Activity) = Unit
+        override fun onActivityPaused(activity: android.app.Activity) = Unit
+        override fun onActivitySaveInstanceState(activity: android.app.Activity, outState: android.os.Bundle) = Unit
+        override fun onActivityDestroyed(activity: android.app.Activity) = Unit
+    }
 
     /**
      * Listen for network recovery and automatically re-initialize channels.

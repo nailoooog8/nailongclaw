@@ -14,6 +14,7 @@ import android.os.Looper
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import io.agents.nailongclaw.ClawApplication
+import io.agents.nailongclaw.R
 import io.agents.nailongclaw.TaskEvent
 import io.agents.nailongclaw.agent.ContextFence
 import io.agents.nailongclaw.agent.calendar.CalendarGatewayImpl
@@ -100,8 +101,8 @@ object ScheduleDispatcher {
                 notify(
                     context,
                     NOTIFY_QUEUED,
-                    "Scheduled task queued",
-                    "\"${task.taskText}\" is waiting for the running task to finish.",
+                    context.getString(R.string.notification_scheduled_queued_title),
+                    context.getString(R.string.notification_scheduled_queued_text, task.taskText),
                 )
             }
             return
@@ -125,7 +126,7 @@ object ScheduleDispatcher {
         notify(
             context,
             NOTIFY_OUTCOME_BASE + recordId.hashCode() % 1000,
-            "Scheduled task started",
+            context.getString(R.string.notification_scheduled_started_title),
             fired.taskText,
         )
 
@@ -209,14 +210,24 @@ object ScheduleDispatcher {
     }
 
     private fun notifyOutcome(context: Context, task: ScheduledTask, event: TaskEvent) {
-        val (title, text) = when (event) {
-            is TaskEvent.Completed -> "Scheduled task done" to event.answer.take(200)
-            is TaskEvent.Failed -> "Scheduled task failed" to event.error.take(200)
-            TaskEvent.Cancelled -> "Scheduled task cancelled" to task.taskText
-            TaskEvent.Blocked -> "Scheduled task blocked" to "A system dialog stopped it."
+        val (titleRes, text) = when (event) {
+            is TaskEvent.Completed ->
+                R.string.notification_scheduled_done_title to event.answer.take(200)
+            is TaskEvent.Failed ->
+                R.string.notification_scheduled_failed_title to event.error.take(200)
+            TaskEvent.Cancelled ->
+                R.string.notification_scheduled_cancelled_title to task.taskText
+            TaskEvent.Blocked ->
+                R.string.notification_scheduled_blocked_title to
+                    context.getString(R.string.notification_scheduled_blocked_text)
             else -> return
         }
-        notify(context, NOTIFY_OUTCOME_BASE + task.id.hashCode() % 1000, title, text)
+        notify(
+            context,
+            NOTIFY_OUTCOME_BASE + task.id.hashCode() % 1000,
+            context.getString(titleRes),
+            text,
+        )
     }
 
     private fun notify(context: Context, id: Int, title: String, text: String) {

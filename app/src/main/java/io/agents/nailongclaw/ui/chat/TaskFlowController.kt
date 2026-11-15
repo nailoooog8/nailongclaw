@@ -296,8 +296,8 @@ class TaskFlowController(
                         activity.runOnUiThread { handleTaskEvent(event) }
                     }                } catch (e: Exception) {
                     XLog.e(TAG, "sendTask failed: ${e.message}", e)
-                    addSystem("Error: ${e.message}")
-                    ledgerOnEvent(TaskEvent.Failed("Error: ${e.message}"))
+                    publishFailure(e.message ?: "Task failed to start")
+                    ledgerOnEvent(TaskEvent.Failed(e.message ?: "Task failed to start"))
                     cleanupAfterTask()
                 }
             }
@@ -338,15 +338,15 @@ class TaskFlowController(
                     onTaskTerminal?.invoke(TaskEvent.Completed(answer))
                     cleanupAfterTask()
                 }
-            } catch (e: Exception) {
-                XLog.e(TAG, "executeDirectToolTask failed: ${e.message}", e)
-                activity.runOnUiThread {
-                    publishAssistantResponse("Error: ${e.message}")
-                    ledgerOnEvent(TaskEvent.Failed(e.message ?: "Direct tool failed"))
-                    onTaskTerminal?.invoke(TaskEvent.Failed(e.message ?: "Direct tool failed"))
-                    cleanupAfterTask()
+                } catch (e: Exception) {
+                    XLog.e(TAG, "executeDirectToolTask failed: ${e.message}", e)
+                    activity.runOnUiThread {
+                        publishFailure(e.message ?: "Direct tool failed")
+                        ledgerOnEvent(TaskEvent.Failed(e.message ?: "Direct tool failed"))
+                        onTaskTerminal?.invoke(TaskEvent.Failed(e.message ?: "Direct tool failed"))
+                        cleanupAfterTask()
+                    }
                 }
-            }
         }
     }
 
@@ -483,7 +483,7 @@ class TaskFlowController(
                     checkAutoReplyConfirmation()
                 }
                 is TaskEvent.Failed -> {
-                    publishAssistantResponse("Error: ${event.error}")
+                    publishFailure(event.error)
                     onTaskTerminal?.invoke(event)
                     cleanupAfterTask()
                 }
@@ -575,6 +575,22 @@ class TaskFlowController(
         }
         publishAssistantText(text, actualModelName)
         assistantResponsePublished = true
+    }
+
+    /**
+     * Publish a failure: one human line when [ErrorHumanizer] recognises the
+     * shape (raw text moves into the system line below it), otherwise the
+     * historical `Error: …` rendering. Either way the terminal filter applies
+     * — several paths can report the same failure.
+     */
+    private fun publishFailure(raw: String) {
+        val friendly = ErrorHumanizer.humanize(raw)
+        if (friendly == null) {
+            publishAssistantResponse("Error: $raw")
+        } else {
+            publishAssistantResponse(friendly)
+            addSystem("Raw error: ${raw.take(300)}")
+        }
     }
 
     /**

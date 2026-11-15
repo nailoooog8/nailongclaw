@@ -455,4 +455,22 @@
     <string name="theme_accent_teal">Deep teal</string>
     <string name="theme_in_use">In use</string>
     <string name="theme_page_foot">All three axes are independent: light/dark, base color, accent color. The chat surface and the native pages follow the same choices — pick here or from the sidebar 主题 popover, both land in the same place.</string>
+
+    <!-- Task outcome notifications (notify/TaskOutcomeNotifier) -->
+    <string name="notification_task_channel_name">Task results</string>
+    <string name="notification_task_channel_description">Tells you when a task finishes while you are away</string>
+    <string name="notification_task_done_title">Task finished</string>
+    <string name="notification_task_failed_title">Task failed</string>
+    <string name="notification_task_cancelled_title">Task cancelled</string>
+    <string name="notification_task_blocked_title">Task blocked</string>
+
+    <!-- Scheduled task notifications (task/ScheduleDispatcher) -->
+    <string name="notification_scheduled_queued_title">Scheduled task queued</string>
+    <string name="notification_scheduled_queued_text">\"%1$s\" is waiting for the running task to finish.</string>
+    <string name="notification_scheduled_started_title">Scheduled task started</string>
+    <string name="notification_scheduled_done_title">Scheduled task done</string>
+    <string name="notification_scheduled_failed_title">Scheduled task failed</string>
+    <string name="notification_scheduled_cancelled_title">Scheduled task cancelled</string>
+    <string name="notification_scheduled_blocked_title">Scheduled task blocked</string>
+    <string name="notification_scheduled_blocked_text">A system dialog stopped it.</string>
 </resources>

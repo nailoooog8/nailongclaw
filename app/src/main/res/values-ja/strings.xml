@@ -452,4 +452,22 @@
     <string name="theme_accent_teal">ディープティール</string>
     <string name="theme_in_use">使用中</string>
     <string name="theme_page_foot">3軸は互いに独立しています：深浅・底色・強調色。チャット画面もネイティブページも同じ選択に従います。このページでもサイドバーの「テーマ」パネルでも、変更は同じ場所に保存されます。</string>
+
+    <!-- タスク結果通知 (notify/TaskOutcomeNotifier) -->
+    <string name="notification_task_channel_name">タスク結果</string>
+    <string name="notification_task_channel_description">離席中にタスクが終わったらお知らせします</string>
+    <string name="notification_task_done_title">タスク完了</string>
+    <string name="notification_task_failed_title">タスク失敗</string>
+    <string name="notification_task_cancelled_title">タスクをキャンセルしました</string>
+    <string name="notification_task_blocked_title">タスクがブロックされました</string>
+
+    <!-- 定期タスク通知 (task/ScheduleDispatcher) -->
+    <string name="notification_scheduled_queued_title">定期タスクを待機中</string>
+    <string name="notification_scheduled_queued_text">「%1$s」は実行中のタスクの終了を待っています。</string>
+    <string name="notification_scheduled_started_title">定期タスクを開始しました</string>
+    <string name="notification_scheduled_done_title">定期タスク完了</string>
+    <string name="notification_scheduled_failed_title">定期タスク失敗</string>
+    <string name="notification_scheduled_cancelled_title">定期タスクをキャンセルしました</string>
+    <string name="notification_scheduled_blocked_title">定期タスクがブロックされました</string>
+    <string name="notification_scheduled_blocked_text">システムダイアログにより停止されました。</string>
 </resources>

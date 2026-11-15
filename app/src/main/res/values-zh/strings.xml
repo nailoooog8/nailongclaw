@@ -452,4 +452,22 @@
     <string name="theme_accent_teal">深青</string>
     <string name="theme_in_use">使用中</string>
     <string name="theme_page_foot">三个维度互不干扰：深浅、底色、强调色各自独立。聊天表面与原生页面跟随同一选择 —— 在本页或侧边栏「主题」面板里改，落的都是同一处。</string>
+
+    <!-- 任务结果通知 (notify/TaskOutcomeNotifier) -->
+    <string name="notification_task_channel_name">任务结果</string>
+    <string name="notification_task_channel_description">任务在你离开时结束时通知你</string>
+    <string name="notification_task_done_title">任务完成</string>
+    <string name="notification_task_failed_title">任务失败</string>
+    <string name="notification_task_cancelled_title">任务已取消</string>
+    <string name="notification_task_blocked_title">任务被拦截</string>
+
+    <!-- 定时任务通知 (task/ScheduleDispatcher) -->
+    <string name="notification_scheduled_queued_title">定时任务已排队</string>
+    <string name="notification_scheduled_queued_text">「%1$s」正在等待当前任务结束。</string>
+    <string name="notification_scheduled_started_title">定时任务已开始</string>
+    <string name="notification_scheduled_done_title">定时任务完成</string>
+    <string name="notification_scheduled_failed_title">定时任务失败</string>
+    <string name="notification_scheduled_cancelled_title">定时任务已取消</string>
+    <string name="notification_scheduled_blocked_title">定时任务被拦截</string>
+    <string name="notification_scheduled_blocked_text">被系统对话框中断。</string>
 </resources>
