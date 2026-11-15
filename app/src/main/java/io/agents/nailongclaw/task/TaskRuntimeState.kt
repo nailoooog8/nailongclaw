@@ -39,6 +39,18 @@ object TaskRuntimeState {
     val snapshot: StateFlow<Snapshot?> = _snapshot.asStateFlow()
 
     fun start(taskText: String) {
+        val current = _snapshot.value
+        if (current?.running == true) {
+            // Already running: the task-accept path in startNewTask publishes
+            // first, and the pill's showTaskNotify fires later (first tool
+            // call). Restarting the clock there would make the elapsed time
+            // jump backwards — keep the original start, only fill a blank
+            // label.
+            if (current.taskText.isBlank() && taskText.isNotBlank()) {
+                _snapshot.value = current.copy(taskText = taskText)
+            }
+            return
+        }
         _snapshot.value = Snapshot(
             running = true,
             taskText = taskText,

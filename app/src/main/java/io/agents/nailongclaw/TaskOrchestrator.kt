@@ -355,6 +355,11 @@ class TaskOrchestrator(
         }
 
         ForegroundService.updateTaskStatus(ClawApplication.instance, "Preparing task...")
+        // 胶囊盲区修复（2026-11-15 模拟器 QA 冒烟发现）：悬浮球/capsule 的
+        // 发布点原本全在首个工具回调之后，任务受理→首轮 LLM 响应之间（本地
+        // 冷模型 10-20 秒）用户什么都看不到。受理即发布；pill 的
+        // showTaskNotify 随后到达时 TaskRuntimeState.start 幂等保持原秒表。
+        io.agents.nailongclaw.task.TaskRuntimeState.start(task)
 
         // Tier 1: Deterministic routing
         val route = pipelineRouter.route(task)

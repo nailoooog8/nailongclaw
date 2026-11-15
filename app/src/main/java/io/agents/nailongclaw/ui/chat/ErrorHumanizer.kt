@@ -70,7 +70,11 @@ object ErrorHumanizer {
 
     private fun matchesContextOverflow(t: String): Boolean =
         t.contains("context length") || t.contains("context window") ||
-            t.contains("maximum context") || t.contains("token limit")
+            t.contains("maximum context") || t.contains("token limit") ||
+            // LiteRT-LM 的溢出原文（本地模型 8192 窗被工具声明+记忆简报吃满，
+            // 模拟器最高频失败）：「Input token ids are too long. Exceeding
+            // the maximum number of tokens allowed」
+            t.contains("maximum number of tokens") || t.contains("token ids are too long")
 
     private fun matchesTimeout(t: String): Boolean =
         t.contains("timed out") || t.contains("timeout") ||

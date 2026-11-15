@@ -1400,6 +1400,15 @@ than having no CI at all. These cases test **the harness**, not the product.
     - 场景 B 是**反向对照**：只让采集失败不算数，必须证明真正的断言还拦得住，否则这个测试等于把冒烟测试关了。本地 Git Bash 5.3.15 实跑，`OVERALL: PASS`。
   - ✅ **已接进 CI**：新增 `smoke-harness-self-test` job（无模拟器、无 APK，约 5 秒），`matrix-summary` 的 `needs` 同时依赖它。
 
+## UX 批（dsh-Go/Operit 调研采纳，2026-11-15 落地，bb3718b..a6e6eed）
+
+- [ ] **H80. 错误人话化 + 任务完成通知 [RELEASE-OK]**: 两腿。①错误人话化：断网（`svc wifi disable`/`svc data disable`）发任务 → 聊天流答案是**一句人话**（如「网络问题——模型服务连不上」），紧随的系统行带 `Raw error: …` 原文；恢复网络重试成功后不再出人话错误。已知形状之外的原样错误（如工具失败）保持 `Error: …` 原文不变（只会多信息不会吃信息）。②完成通知：发一个要跑一阵的任务 → Home 退出 app → 结束时系统通知出现（标题「任务完成/任务失败」），**点通知回主界面**；app 停在前台时结束 → **无**该通知（LOCAL 只在离开时打扰）；SCHEDULED 任务结束**只有** dispatcher 一条通知（无双发）；EXTERNAL 触发的任务总通知。判据：`dumpsys notification --noredact` 里 `NailongClaw_task_channel` 的记录 + 前台/后台两态对比，不认截图。
+- [ ] **H81. 活动胶囊 + Web 面停止入口 [RELEASE-OK]**: 主界面发任务 → composer 上方胶囊出现（「运行中…/工具名 · 第N轮 · m:ss」，秒数每秒自增），渠道/定时任务（模拟器上用 debug 广播驱动）也点亮胶囊；点胶囊 ✕ → 任务终止、胶囊消失、转录出现取消。数据来自悬浮球同一条管道（TaskRuntimeState），悬浮窗权限被拒时胶囊照常工作。判据：`uiautomator dump` 节点 `taskCapsule` `[hidden=false]` + 两次 dump 间文本秒数差 ≥2；停止后节点 `[hidden=true]`。
+- [ ] **H82. 执行过程整轮折叠（原生面）[RELEASE-OK]**: Compose 聊天页跑一个 ≥3 次工具调用的任务 → 结束后该轮 SYSTEM/工具行收成一行「执行过程 · N 次工具调用」→ 点开恢复完整序列、再点收起；**任务运行中最后一段保持展开**（叙述实时可见）；<3 步的轮次和无障碍 gate 提示行**不**折叠（gate 行没有工具步，防修权限指引被藏）。杀进程重进历史照样折叠（渲染层聚合，markdown 不动）。判据：摘要行文本 + 展开后节点数变化；WebView 面不折叠（有意，见 commit f871e9c）。
+- [ ] **H83. 忙时排队 + 中断并发送 [RELEASE-OK]**: 四腿。①任务跑着发第二条 → 不再被拒，出现排队条（标题含「内存队列，退出 app 会清空」的如实标注）+ 系统行 `Queued: …`；任务结束 ~1s 后排队项**自动发出**（用户气泡+打字泡出现）。②草稿非空点红色停止键 = 中断并发送：当前轮取消、草稿不丢、随后自动发出；草稿空 = 纯停止（现状）。③「立即发送」忙时禁用、空闲可用；移除键即时删行。④杀进程重进 → 队列空（设计如此）。判据：排队条节点 + transcript 文本 + 全程无「Another task is still running」拒绝行。
+- [ ] **H84. 悬浮球秒表 [RELEASE-OK]**: 任务运行中悬浮球 RUNNING pill 显示 `Step N · m:ss`（`| tokens | cost` 尾部保留）且秒数自增；结束时 SUCCESS/ERROR pill 秒表停、5s 后回 IDLE。悬浮窗权限缺失时无 pill（ensureShowing 拒绝路径不崩）。判据：两次 screencap/dump 间隔 ≥2s 秒数差 ≥2。
+- [ ] **H85. 权限自检增强（监听与权限页）[RELEASE-OK]**: 监听与权限页权限组出现「影子屏 · 投影授权」行——建屏前「未就绪 · 使用时授权」灰字（点按弹解释 toast，**这是正常状态不是错误**）；授权屏幕捕获并建屏后变「已就绪」强调色；页脚含 vivo/小米「受限制的设置」操作提示。两主面同页（WebView 设置 sheet 的 monitor section 已存在，无需新接线）。判据：行 trailing 文本两态 + `Shadow display created` 日志旁证。
+
 ## SEC. Security — Adversarial Verification (red-team)
 
 Threat model: a hostile app installed on the same phone, or anyone on the same Wi-Fi.
@@ -3357,3 +3366,17 @@ Run on the actual GitHub release APK `PokeClaw_v0.7.0_20260526_101139.apk` after
 | A11Y-r1 | Accessibility-dependent tools can false-fail during transient service rebinds | Fixed 2026-04-10: tools now wait for an enabled service to reconnect before returning `Accessibility service is not running` | Fixed |
 | Q7-local | ~~Stopping a Local task could crash with native `SIGSEGV` / `session already exists` race~~ | Fixed 2026-04-10: local cancel no longer interrupts LiteRT mid-send, and UI cleanup waits until the task-side client has closed cleanly | Fixed |
 | Bgt-1 | Existing installs could stay pinned to the legacy task budget even after code defaults increased | Fixed 2026-04-10: `TaskBudget` now one-time migrates untouched 100K / $0.50 legacy defaults to 250K / $1.00, while preserving explicit user overrides and exposing `250K` in Settings | Fixed |
+
+### 2026-11-15 — UX 批（H80–H85）模拟器冒烟：胶囊盲区缺陷当场抓获，人话规则补 LiteRT 溢出
+
+模拟器 h79（本地 Gemma 4 E2B 在机），APK `NailongClaw_v0.9.0_20261115_201605.apk`（含 20:16 盲区修复重灌）。证据截图 `.auto/ux-*.png`。
+
+- ✅ **H81 胶囊 + Web 停止**：`ux-cap6a.png` —— 广播任务受理后 composer 上方胶囊出现（「运行中… · 0:02 · ✕」），模型冷加载窗口内即显示（盲区修复生效）；单命令链 `broadcast → input tap(980,1696)` 后 logcat 实锤三段：`[chat] stop() — stop requested from the page` → `Current task cancellation requested` → pill 终态。
+- ✅ **H83 排队**：`ux-queue1.png` —— 忙时发送：系统行 `Queued: another task is still running — it will be sent automatically when it finishes.` + 胶囊排队态分支「排队 1 条 · 任务结束后自动发送」同框。`ux-queue2.png` —— 任务收尾后 ~1s 排队项自动发出：用户气泡 `second` + 打字泡「正在思考…」+ 失败答案，全程无拒绝行。
+- ✅ **H80① 人话化**：`ux-queue2.png` —— LiteRT 溢出原文（`Input token ids are too long. Exceeding the maximum number of tokens allowed: 8209 >= 8192`）被渲染成「The conversation ran past the model's context window. Start a new chat or shorten the task.」；当场给 ErrorHumanizer 补了 `maximum number of tokens`/`token ids are too long` 两条规则（模拟器最高频失败，冒烟前不命中）。
+- ✅ **H80② 完成通知**：pm grant POST_NOTIFICATIONS 后，Home 后台跑任务 → 失败 → `dumpsys notification --noredact` 实锤 `NotificationRecord ... channel=NailongClaw_task_channel ... android.title=Task failed`，importance=3，AUTO_CANCEL。
+- ✅ **H85 权限自检**：`ux-monitor.png` —— 「影子屏 · 投影授权」行 trailing「未就绪 · 使用时授权」灰字；页脚含 vivo/小米「受限制的设置」提示行；通知弹出「已允许」随 pm grant 即时刷新（1s 轮询）。
+- ⚠️ **H84 悬浮球秒表模拟器未验**：模拟器无悬浮窗权限（`ensureShowing` 拒绝路径不崩已旁证——任务全程 `view=false` 无异常），pill 秒表待真机。
+- ⚠️ **H82 折叠未触发**：本轮任务全在首轮 LLM 调用即失败（≤3 步），折叠条件（≥3 工具步）未达到，待真机多步任务验。
+- 🐛 **新已知问题（既有，非本批引入）**：本地任务以 8192 溢出失败后，引擎 session 未归还，紧随的下一个本地任务报 `Local model session already in use`（`LocalModelRuntime.kt:103`）——与 Q7-local（cancel 路径已修）不同味，这是**失败路径**的 session 泄漏。建议单独开修。
+- 📝 模拟器操作注记：`input text` 不吃中文（走 ASCII）；系统搜索层会吃点击（先 HOME）；截图 900 宽与设备 1080 需 ×1.2 换算——本轮三次误点皆因此。

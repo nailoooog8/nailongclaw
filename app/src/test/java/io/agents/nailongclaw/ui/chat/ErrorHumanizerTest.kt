@@ -77,6 +77,16 @@ class ErrorHumanizerTest {
     }
 
     @Test
+    fun `litertlm token overflow is recognised as context overflow`() {
+        val line = ErrorHumanizer.humanize(
+            "AI service call failed: Failed to call nativeSendMessage: INVALID_ARGUMENT: " +
+                "Input token ids are too long. Exceeding the maximum number of tokens " +
+                "allowed: 8209 >= 8192, totalTokens=0",
+        )!!
+        assertTrue(line.contains("context window"))
+    }
+
+    @Test
     fun `service not ready`() {
         assertTrue(
             ErrorHumanizer.humanize("AI service not ready")!!.contains("starting"),
