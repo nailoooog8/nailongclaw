@@ -19,6 +19,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
+import android.util.SparseArray;
 import io.agents.nailongclaw.ClawApplication;
 import io.agents.nailongclaw.utils.XLog;
 import io.agents.nailongclaw.utils.KVUtils;
@@ -262,6 +263,19 @@ public class ClawAccessibilityService extends AccessibilityService {
     }
 
     /**
+     * The accessibility windows on [displayId], or null when the platform has
+     * none to report. The no-arg {@link #getWindows()} returns ONLY the
+     * default display's windows — any scan that targets another display (the
+     * shadow screen) must go through this, backed by
+     * {@link #getWindowsOnAllDisplays()} (API 33+; every caller is gated on
+     * TIRAMISU, matching the shadow display's own API gate).
+     */
+    private List<AccessibilityWindowInfo> windowsOnDisplay(int displayId) {
+        SparseArray<List<AccessibilityWindowInfo>> byDisplay = getWindowsOnAllDisplays();
+        return byDisplay == null ? null : byDisplay.get(displayId);
+    }
+
+    /**
      * True when the service sees NO windows at all. Distinct from "windows
      * exist but their roots are unreadable" (a genuine block): the root is
      * null for a beat during every window switch and whenever the foreground
@@ -272,7 +286,9 @@ public class ClawAccessibilityService extends AccessibilityService {
      */
     public boolean hasNoWindows() {
         try {
-            List<AccessibilityWindowInfo> windows = getWindows();
+            List<AccessibilityWindowInfo> windows = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                    ? windowsOnDisplay(Display.DEFAULT_DISPLAY)
+                    : getWindows();
             return windows == null || windows.isEmpty();
         } catch (Exception e) {
             XLog.w(TAG, "hasNoWindows: window scan failed", e);
@@ -674,8 +690,12 @@ public class ClawAccessibilityService extends AccessibilityService {
     /**
      * Collects a tree of the SHADOW display's focused window, or null when no
      * shadow display exists / no window is on it. Strictly display-scoped:
-     * reads windows via {@link #getWindows()} filtered by display id, never
-     * {@link #getRootInActiveWindow()}, which is default-display bound.
+     * reads windows via {@link #windowsOnDisplay(int)} — the no-arg
+     * {@link #getWindows()} returns ONLY the default display's windows, so it
+     * never sees the shadow screen (found on the API 35 emulator 2026-11-15:
+     * the a11y system registered the shadow window, the service could not see
+     * it) — never {@link #getRootInActiveWindow()}, which is default-display
+     * bound.
      */
     public String getShadowScreenTree() {
         AccessibilityNodeInfo root = getShadowWindowRoot();
@@ -737,9 +757,10 @@ public class ClawAccessibilityService extends AccessibilityService {
     /**
      * Depth-first walk mirroring {@link #buildNodeTree}'s id assignment:
      * invisible parents still get their children walked (as in the tree
-     * builder), meaningful nodes consume ids in the same order. Ancestors of a
-     * found node are NOT recycled — the caller owns the found node's whole
-     * ancestor chain from here.
+     * builder), meaningful nodes consume ids in the same order. Ancestors of
+     * a found node are dropped unreycled: recycle() is a deprecated no-op on
+     * 33+ and the shadow path only exists there, so nothing actually leaks —
+     * the matched node itself is handed to the caller, which recycles it.
      */
     private AccessibilityNodeInfo findNodeInTree(AccessibilityNodeInfo node, String nodeId, AtomicInteger counter) {
         if (node == null) {
@@ -802,7 +823,10 @@ public class ClawAccessibilityService extends AccessibilityService {
             return null;
         }
         try {
-            List<AccessibilityWindowInfo> windows = getWindows();
+            // Display-scoped query: the no-arg getWindows() returns only the
+            // default display's windows, which is what this scan wants —
+            // asking for DEFAULT_DISPLAY explicitly keeps that intent honest.
+            List<AccessibilityWindowInfo> windows = windowsOnDisplay(Display.DEFAULT_DISPLAY);
             if (windows == null || windows.isEmpty()) {
                 return null;
             }
@@ -868,7 +892,10 @@ public class ClawAccessibilityService extends AccessibilityService {
             return false;
         }
         try {
-            for (AccessibilityWindowInfo window : getWindows()) {
+            // windowsOnDisplay(shadowId), not the no-arg getWindows(): that
+            // returns only the DEFAULT display's windows and would never see
+            // the shadow screen (API 35 emulator, 2026-11-15).
+            for (AccessibilityWindowInfo window : windowsOnDisplay(shadowId)) {
                 if (window == null || window.getDisplayId() != shadowId) {
                     continue;
                 }
@@ -902,7 +929,7 @@ public class ClawAccessibilityService extends AccessibilityService {
      * {@link #ESCAPE_USER_TAP_WINDOW_MS} (their own doing). Returns the
      * warning to append to a tool result, or null when there is nothing to
      * report. Cheap enough to call after every shadow action: two window
-     * scans, no tree walk.
+     * scans for the verdict plus one for tracking, no tree walk.
      */
     public String shadowEscapeWarning() {
         Integer shadowId = ShadowDisplayManager.getDisplayIdOrNull();
@@ -910,24 +937,108 @@ public class ClawAccessibilityService extends AccessibilityService {
             return null;
         }
         String pkg = shadowTaskPackage;
-        if (pkg == null || pkg.isEmpty()) {
-            return null;
+        String warning = null;
+        if (pkg != null && !pkg.isEmpty()
+                && SystemClock.uptimeMillis() - lastUserTouchAt >= ESCAPE_USER_TAP_WINDOW_MS
+                && isShadowEscape(mainScreenUsage(pkg), shadowDisplayHasPackage(pkg))) {
+            XLog.w(TAG, "Shadow escape: " + pkg + " surfaced on the real screen; pulling back to display " + shadowId);
+            String pullError = openAppOnDisplay(pkg, shadowId);
+            if (pullError != null) {
+                warning = "WARNING: " + pkg + " escaped to the real screen and the pull-back failed (" + pullError
+                        + "). The shadow screen no longer shows it — re-read with shadow_get_screen_info before acting again.";
+            } else {
+                warning = "WARNING: " + pkg + " had escaped to the real screen and was pulled back to the shadow display. "
+                        + "The previous action may have landed on the wrong screen — re-read with shadow_get_screen_info "
+                        + "before acting again.";
+            }
         }
-        if (SystemClock.uptimeMillis() - lastUserTouchAt < ESCAPE_USER_TAP_WINDOW_MS) {
-            return null; // the user is driving the real screen right now
+        // Follow the task: the verdict judged the package this action was
+        // aimed at; now re-point tracking at whatever the shadow display is
+        // driving — an in-shadow link tap may have opened another app.
+        trackShadowForegroundPackage();
+        return warning;
+    }
+
+    /**
+     * Keeps the escape watchdog pointed at the package actually being
+     * automated. shadow_open_app records the launched package, but an
+     * in-shadow navigation (a link tap opening another app) moves the task to
+     * a package the watchdog would otherwise never watch. The shadow
+     * display's focused APPLICATION window is what the tools are driving —
+     * record its package. A launcher or this app's own window on the shadow
+     * display means "no shadow task right now": clear the tracking, so a
+     * system surface on the real screen is never mistaken for an escape.
+     * (IME / systemui / system dialogs are already excluded by the window
+     * type; launchers are TYPE_APPLICATION like any app, hence the name
+     * check.)
+     */
+    private void trackShadowForegroundPackage() {
+        Integer shadowId = ShadowDisplayManager.getDisplayIdOrNull();
+        if (shadowId == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            return;
         }
-        if (!isShadowEscape(mainScreenUsage(pkg), shadowDisplayHasPackage(pkg))) {
-            return null;
+        try {
+            AccessibilityNodeInfo tracked = null;
+            // Display-scoped: the no-arg getWindows() is default-display only
+            // and would never see the shadow screen.
+            List<AccessibilityWindowInfo> windows = windowsOnDisplay(shadowId);
+            for (AccessibilityWindowInfo window : windows == null ? java.util.Collections.<AccessibilityWindowInfo>emptyList() : windows) {
+                if (window == null || window.getDisplayId() != shadowId
+                        || window.getType() != AccessibilityWindowInfo.TYPE_APPLICATION) {
+                    continue;
+                }
+                AccessibilityNodeInfo root = window.getRoot();
+                if (root == null) {
+                    continue;
+                }
+                if (tracked == null || window.isFocused()) {
+                    if (tracked != null) {
+                        tracked.recycle();
+                    }
+                    tracked = root;
+                    if (window.isFocused()) {
+                        break; // the focused window decides
+                    }
+                } else {
+                    root.recycle();
+                }
+            }
+            if (tracked == null) {
+                return; // nothing readable on the shadow display — keep the current tracking
+            }
+            CharSequence pkg = tracked.getPackageName();
+            tracked.recycle();
+            String name = pkg == null ? null : pkg.toString();
+            if (!isTrackableTaskPackage(name, getPackageName())) {
+                if (shadowTaskPackage != null && !shadowTaskPackage.equals(name)) {
+                    XLog.i(TAG, "Shadow task tracking cleared (shadow display shows " + name + ")");
+                    shadowTaskPackage = null;
+                }
+                return;
+            }
+            if (!name.equals(shadowTaskPackage)) {
+                XLog.i(TAG, "Shadow task tracking now " + name);
+                shadowTaskPackage = name;
+            }
+        } catch (Exception e) {
+            XLog.w(TAG, "trackShadowForegroundPackage: window scan failed", e);
         }
-        XLog.w(TAG, "Shadow escape: " + pkg + " surfaced on the real screen; pulling back to display " + shadowId);
-        String pullError = openAppOnDisplay(pkg, shadowId);
-        if (pullError != null) {
-            return "WARNING: " + pkg + " escaped to the real screen and the pull-back failed (" + pullError
-                    + "). The shadow screen no longer shows it — re-read with shadow_get_screen_info before acting again.";
+    }
+
+    /**
+     * Whether a package observed as the shadow display's application window
+     * may become the tracked shadow task. Launchers and this app's own
+     * windows mean no shadow task; anything else the tools could plausibly be
+     * driving is trackable. Pure so the filter is unit-testable.
+     */
+    static boolean isTrackableTaskPackage(String packageName, String ownPackage) {
+        if (packageName == null || packageName.isEmpty()) {
+            return false;
         }
-        return "WARNING: " + pkg + " had escaped to the real screen and was pulled back to the shadow display. "
-                + "The previous action may have landed on the wrong screen — re-read with shadow_get_screen_info "
-                + "before acting again.";
+        if (packageName.equals(ownPackage)) {
+            return false;
+        }
+        return !packageName.contains("launcher");
     }
 
     /**
@@ -954,7 +1065,11 @@ public class ClawAccessibilityService extends AccessibilityService {
             return null;
         }
         AccessibilityWindowInfo fallback = null;
-        for (AccessibilityWindowInfo window : getWindows()) {
+        // windowsOnDisplay(shadowId), not the no-arg getWindows() — that call
+        // is default-display only and would never see the shadow screen (API
+        // 35 emulator, 2026-11-15; on the vivo device it worked only while
+        // the shadow app happened to be the active window's display).
+        for (AccessibilityWindowInfo window : windowsOnDisplay(shadowId)) {
             if (window == null || window.getDisplayId() != shadowId) {
                 continue;
             }

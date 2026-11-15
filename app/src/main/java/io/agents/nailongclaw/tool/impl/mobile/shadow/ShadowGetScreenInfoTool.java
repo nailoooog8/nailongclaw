@@ -63,7 +63,16 @@ public class ShadowGetScreenInfoTool extends BaseTool {
         }
         String tree = service.getShadowScreenTree();
         if (tree == null || tree.isEmpty()) {
-            return ToolResult.error("Shadow display has no readable window. Launch an app onto it first (shadow_open_app).");
+            // An EMPTY shadow screen is the classic escape shape (the task
+            // surfaced on the real screen and took its window away), so the
+            // watchdog must run on this path too — with the check only on the
+            // success path, the warning could never fire exactly when the
+            // escape happened (found on emulator QA 2026-11-15: removing the
+            // shadow-side task silenced the warning and returned a plain
+            // "no readable window" error).
+            String escape = service.shadowEscapeWarning();
+            String message = "Shadow display has no readable window. Launch an app onto it first (shadow_open_app).";
+            return escape != null ? ToolResult.error(message + "\n" + escape) : ToolResult.error(message);
         }
 
         StringBuilder result = new StringBuilder(tree);
