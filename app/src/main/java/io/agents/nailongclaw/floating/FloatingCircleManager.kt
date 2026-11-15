@@ -61,6 +61,47 @@ object FloatingCircleManager {
     private var resultSummary: String = ""
     private var resultSuccess: Boolean = true
 
+    // ==================== 秒表 ====================
+    // RUNNING/TASK_NOTIFY 期间每秒刷新一次 tvTokenStatus（Step N · 0:19）。
+    // TokenUpdate 本来就会改这行字，秒表只是把「每秒都变」变成常态——任务
+    // 长时间不动时用户才有「它还活着吗」的信号。
+
+    /** 本轮任务起点（showTaskNotify 时刻），0 = 没有正在计时的任务。 */
+    private var taskStartedAtMs = 0L
+    /** updateTokenStatus 带来的尾部（" | 33K | $0.01"），秒表刷新时拼回去。 */
+    private var tokenSuffix: String = ""
+    private var elapsedTicker: Runnable? = null
+
+    private fun startElapsedTicker() {
+        if (taskStartedAtMs == 0L) taskStartedAtMs = System.currentTimeMillis()
+        if (elapsedTicker != null) return
+        val ticker = object : Runnable {
+            override fun run() {
+                if (currentState != State.RUNNING && currentState != State.TASK_NOTIFY) {
+                    elapsedTicker = null
+                    return
+                }
+                EasyFloat.getFloatView(FLOAT_TAG)
+                    ?.findViewById<TextView>(R.id.tvTokenStatus)
+                    ?.text = runningStatusText()
+                mainHandler.postDelayed(this, 1000)
+            }
+        }
+        elapsedTicker = ticker
+        mainHandler.post(ticker)
+    }
+
+    private fun stopElapsedTicker() {
+        elapsedTicker?.let { mainHandler.removeCallbacks(it) }
+        elapsedTicker = null
+    }
+
+    private fun runningStatusText(): String {
+        val elapsedSec = ((System.currentTimeMillis() - taskStartedAtMs) / 1000).coerceAtLeast(0)
+        val elapsed = String.format(java.util.Locale.US, "%d:%02d", elapsedSec / 60, elapsedSec % 60)
+        return "Step $currentRound · $elapsed$tokenSuffix"
+    }
+
     private const val TASK_NOTIFY_DURATION_MS = 3000L // task notification shown for 3 seconds before collapsing
 
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -214,6 +255,9 @@ object FloatingCircleManager {
         ThreadUtils.runOnUiThread {
             resultSummary = ""
             currentAction = ""
+            stopElapsedTicker()
+            taskStartedAtMs = 0L
+            tokenSuffix = ""
             io.agents.nailongclaw.task.TaskRuntimeState.stop()
             setState(State.IDLE)
             hide()
@@ -235,6 +279,9 @@ object FloatingCircleManager {
             // Publish to the in-app capsule feed before the view work — the
             // capsule renders from this even when the overlay is refused
             io.agents.nailongclaw.task.TaskRuntimeState.start(taskText)
+            taskStartedAtMs = System.currentTimeMillis()
+            tokenSuffix = ""
+            startElapsedTicker()
             cancelNotifyCollapse()
             setState(State.TASK_NOTIFY)
             // Auto-collapse to RUNNING after 3 seconds (call setState directly, bypassing TASK_NOTIFY guard)
@@ -262,6 +309,7 @@ object FloatingCircleManager {
             currentRound = round
             currentChannel = channel
             io.agents.nailongclaw.task.TaskRuntimeState.update(currentAction, round)
+            startElapsedTicker()
             // If the task notification pill is still showing, only update data; do not switch UI (wait for timer to expire)
             if (currentState == State.TASK_NOTIFY) {
                 return@runOnUiThread
@@ -286,7 +334,8 @@ object FloatingCircleManager {
             io.agents.nailongclaw.task.TaskRuntimeState.update(currentAction, step)
             val view = EasyFloat.getFloatView(FLOAT_TAG) ?: return@runOnUiThread
             val tvStatus = view.findViewById<TextView>(R.id.tvTokenStatus) ?: return@runOnUiThread
-            tvStatus.text = "Step $step | $formattedTokens | $formattedCost"
+            tokenSuffix = " | $formattedTokens | $formattedCost"
+            tvStatus.text = runningStatusText()
 
             // Update pill color based on token state
             val cardRunning = view.findViewById<androidx.cardview.widget.CardView>(R.id.cardRunning) ?: return@runOnUiThread
@@ -385,6 +434,9 @@ object FloatingCircleManager {
         // Show corresponding state
         when (state) {
             State.IDLE -> {
+                stopElapsedTicker()
+                taskStartedAtMs = 0L
+                tokenSuffix = ""
                 cardIdle?.visibility = View.VISIBLE
                 setFloatRootWidth(view, getCircleWidth(view))
             }
@@ -405,17 +457,19 @@ object FloatingCircleManager {
             }
             State.RUNNING -> {
                 cancelNotifyCollapse()
+                startElapsedTicker()
                 // Expand to pill shape for token display
                 setFloatRootWidth(view, WindowManager.LayoutParams.WRAP_CONTENT)
                 cardRunning?.visibility = View.VISIBLE
                 // Update token status text + current action label
                 val tvStatus = view.findViewById<TextView>(R.id.tvTokenStatus)
-                tvStatus?.text = "Step ${currentRound}"
+                tvStatus?.text = runningStatusText()
                 val tvAction = view.findViewById<TextView>(R.id.tvTaskAction)
                 tvAction?.text = if (currentAction.length > 26) currentAction.substring(0, 26) + "…" else currentAction
             }
             State.SUCCESS, State.ERROR -> {
                 cancelNotifyCollapse()
+                stopElapsedTicker()
                 val hasSummary = resultSummary.isNotEmpty()
                 if (hasSummary) {
                     // Result pill: ✓/✗ + summary, tap opens the chat
