@@ -318,21 +318,24 @@ class ForegroundService : Service() {
         super.onCreate()
         _isRunning = true
         createNotificationChannel()
-        if (hasNotificationPermission(this)) {
-            // Typed explicitly: with mediaProjection added to the manifest
-            // types, the two-arg startForeground on API 34+ would claim EVERY
-            // manifest type and demand mediaProjection eligibility on ordinary
-            // restarts. Normal operation only ever claims specialUse.
-            ServiceCompat.startForeground(
-                this,
-                NOTIFICATION_ID,
-                buildNotification(this, DEFAULT_TASK_TITLE, DEFAULT_TASK_TEXT),
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
-            )
-        } else {
-            stopSelf()
-            return
-        }
+        // Typed explicitly: with mediaProjection added to the manifest
+        // types, the two-arg startForeground on API 34+ would claim EVERY
+        // manifest type and demand mediaProjection eligibility on ordinary
+        // restarts. Normal operation only ever claims specialUse.
+        //
+        // Unconditional: a foreground-service notification does NOT require
+        // POST_NOTIFICATIONS — it is shown even when that runtime permission
+        // is missing. The old stopSelf() branch here (fresh installs that had
+        // never granted notifications) left the startForegroundService()
+        // obligation unfulfilled and crashed the whole app with
+        // ForegroundServiceDidNotStartInTimeException the moment the user
+        // consented to screen capture (emulator QA 2026-11-15, API 35).
+        ServiceCompat.startForeground(
+            this,
+            NOTIFICATION_ID,
+            buildNotification(this, DEFAULT_TASK_TITLE, DEFAULT_TASK_TEXT),
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+        )
         healthHandler.post(healthRunnable)
     }
 
