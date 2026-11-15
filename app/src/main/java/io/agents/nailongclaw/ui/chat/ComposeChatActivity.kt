@@ -165,6 +165,7 @@ class ComposeChatActivity : ComponentActivity() {
 
         setContent {
             val activeTasks by activeTaskShellController.activeTasks.collectAsState()
+            val queuedTasks by io.agents.nailongclaw.task.PendingTaskQueue.items.collectAsState()
 
             ChatScreen(
                 messages = _messages.toList(),
@@ -227,6 +228,10 @@ class ComposeChatActivity : ComponentActivity() {
                             .putExtra(ClaudeUiPreviewActivity.EXTRA_SHOW_TASKS, true)
                     )
                 },
+                queuedTasks = queuedTasks,
+                onRemoveQueuedTask = { id -> io.agents.nailongclaw.task.PendingTaskQueue.remove(id) },
+                onSendQueuedTaskNow = { id -> io.agents.nailongclaw.task.PendingTaskQueue.sendNow(id) },
+                onInterruptAndSendTask = { draft -> taskFlowController.interruptAndSend(draft) },
                 onModelSwitch = { modelId, displayName -> switchModel(modelId, displayName) },
                 colors = composeColors,
                 webSearchProvider = _webSearchProvider.value,
@@ -243,6 +248,9 @@ class ComposeChatActivity : ComponentActivity() {
 
         refreshWebSearchStatus()
         refreshSidebarHistory()
+        // 本面成为排队任务的发送面：队列排空走这里，用户气泡和打字泡才落
+        // 在用户发消息的这个转录里（而不是无头 startTask 无人渲染的事件流）。
+        taskFlowController.registerAsQueueSender()
 
         // Restore last conversation if Activity was recreated (e.g., system killed it during a task)
         if (_messages.isEmpty()) {

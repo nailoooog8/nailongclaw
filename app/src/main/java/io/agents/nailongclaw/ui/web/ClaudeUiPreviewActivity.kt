@@ -1063,15 +1063,18 @@ class ClaudeUiPreviewActivity : BaseActivity() {
     private fun publishRuntime() {
         if (!::webView.isInitialized) return
         val snapshot = io.agents.nailongclaw.task.TaskRuntimeState.snapshot.value
-        val payload = if (snapshot == null) {
+        val queuedCount = io.agents.nailongclaw.task.PendingTaskQueue.items.value.size
+        val payload = if (snapshot == null && queuedCount == 0) {
             "null"
         } else {
             buildString {
                 append('{')
-                append("\"taskRunning\":true")
-                append(",\"action\":"); appendJsonString(snapshot.action)
-                append(",\"round\":").append(snapshot.round)
-                append(",\"startedAtMs\":").append(snapshot.startedAtMs)
+                append("\"taskRunning\":").append(snapshot != null)
+                append(",\"action\":")
+                if (snapshot == null) append("null") else appendJsonString(snapshot.action)
+                append(",\"round\":").append(snapshot?.round ?: 0)
+                append(",\"startedAtMs\":").append(snapshot?.startedAtMs ?: 0)
+                append(",\"queuedCount\":").append(queuedCount)
                 append('}')
             }
         }
@@ -1459,10 +1462,16 @@ class ClaudeUiPreviewActivity : BaseActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // 本面成为排队任务的发送面：队列排空走这里，用户气泡才落进这个转录。
+        taskFlowController.registerAsQueueSender()
         // 活动胶囊的推送管道：快照变化 → renderRuntime。webView 尚未就绪时
         // publishRuntime 是安全 no-op；进页面后的首推在 onPageFinished 里。
+        // 排队数也在同一条管道上（combine：任一变化都重推）。
         runtimeScope.launch {
-            TaskRuntimeState.snapshot.collect { publishRuntime() }
+            kotlinx.coroutines.flow.combine(
+                TaskRuntimeState.snapshot,
+                io.agents.nailongclaw.task.PendingTaskQueue.items,
+            ) { _, _ -> Unit }.collect { publishRuntime() }
         }
         // Before anything can call a bridge method: which conversation this
         // surface has open decides what gets saved, restored and listed.

@@ -475,4 +475,9 @@
     <string name="chat_capsule_running">実行中…</string>
     <string name="chat_capsule_round">ラウンド%1$d</string>
     <string name="chat_span_summary">実行ログ · ツール%1$d回</string>
+
+    <!-- 送信待ちキュー (task/PendingTaskQueue + ChatScreen) -->
+    <string name="chat_queue_title">待機中 · %1$d（メモリ上・アプリ終了で消えます）</string>
+    <string name="chat_queue_send_now">今すぐ送信</string>
+    <string name="chat_queue_remove_cd">待機メッセージを削除</string>
 </resources>

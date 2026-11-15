@@ -34,8 +34,10 @@ class AppViewModel : ViewModel() {
         agentConfigProvider = { getAgentConfig() },
         onTaskFinished = {
             // Any task ending is the queue's chance to drain: a scheduled
-            // task that fired while this one ran has been waiting visibly.
+            // task that fired while this one ran has been waiting visibly,
+            // and so has anything the user typed while watching it run.
             io.agents.nailongclaw.task.ScheduleDispatcher.onAnyTaskFinished()
+            io.agents.nailongclaw.task.PendingTaskQueue.drainSoonIfIdle { !isTaskRunning() }
         }
     )
 

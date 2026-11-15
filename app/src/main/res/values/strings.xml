@@ -478,4 +478,9 @@
     <string name="chat_capsule_running">Running…</string>
     <string name="chat_capsule_round">Round %1$d</string>
     <string name="chat_span_summary">Tool activity · %1$d calls</string>
+
+    <!-- Pending task queue strip (task/PendingTaskQueue + ChatScreen) -->
+    <string name="chat_queue_title">Queued · %1$d (in memory, lost if the app exits)</string>
+    <string name="chat_queue_send_now">Send now</string>
+    <string name="chat_queue_remove_cd">Remove queued message</string>
 </resources>

@@ -282,14 +282,21 @@
     var capsule = document.getElementById('taskCapsule');
     if (!capsule) return;
     var running = !!(_runtime && _runtime.taskRunning);
-    capsule.hidden = !running;
+    var queued = _runtime ? (_runtime.queuedCount || 0) : 0;
+    capsule.hidden = !running && queued === 0;
     if (!running) {
       stopRuntimeTick();
+      if (queued > 0) {
+        // 没在跑但有排队（少见：任务在入队瞬间刚好结束）——如实显示等待状态
+        document.getElementById('taskCapsuleLabel').textContent = '排队 ' + queued + ' 条 · 任务结束后自动发送';
+        document.getElementById('taskCapsuleTime').textContent = '';
+      }
       return;
     }
     var label = document.getElementById('taskCapsuleLabel');
     var text = _runtime.action || '运行中…';
     if (_runtime.round > 0) text += ' · 第' + _runtime.round + '轮';
+    if (queued > 0) text += ' · 排队' + queued;
     label.textContent = text;
     startRuntimeTick();
   }

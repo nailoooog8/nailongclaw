@@ -475,4 +475,9 @@
     <string name="chat_capsule_running">运行中…</string>
     <string name="chat_capsule_round">第%1$d轮</string>
     <string name="chat_span_summary">执行过程 · %1$d 次工具调用</string>
+
+    <!-- 排队条 (task/PendingTaskQueue + ChatScreen) -->
+    <string name="chat_queue_title">排队中 · %1$d（内存队列，退出 app 会清空）</string>
+    <string name="chat_queue_send_now">立即发送</string>
+    <string name="chat_queue_remove_cd">移除排队消息</string>
 </resources>

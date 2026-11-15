@@ -151,6 +151,10 @@ fun ChatScreen(
     onStopTask: (String) -> Unit = {},
     onStopAllTasks: () -> Unit = {},
     onOpenLedger: () -> Unit = {},
+    queuedTasks: List<io.agents.nailongclaw.task.PendingTask> = emptyList(),
+    onRemoveQueuedTask: (String) -> Unit = {},
+    onSendQueuedTaskNow: (String) -> Unit = {},
+    onInterruptAndSendTask: (String) -> Unit = {},
     inputEnabled: Boolean = true,
     onModelSwitch: (modelId: String, displayName: String) -> Unit = { _, _ -> },
     colors: PokeclawColors = AbyssDark,
@@ -312,6 +316,16 @@ fun ChatScreen(
                             colors = colors,
                         )
 
+                        // 排队条：忙时发送的消息在这里等，可移除/立即发送
+                        // （立即发送只在任务空闲时可用）。
+                        PendingQueueStrip(
+                            items = queuedTasks,
+                            isTaskRunning = isTaskRunning,
+                            colors = colors,
+                            onRemove = onRemoveQueuedTask,
+                            onSendNow = onSendQueuedTaskNow,
+                        )
+
                         // 活动胶囊：任务跑着的时候（含渠道/定时任务——数据来自
                         // 悬浮球同一条 TaskEvent 管道）在输入条上方显示
                         // 「正在做什么 + 已用秒数」，走开回来一眼看清。
@@ -327,6 +341,7 @@ fun ChatScreen(
                             onSendChat = onSendChat,
                             onSendTask = onSendTask,
                             onStopAll = onStopAllTasks,
+                            onInterruptAndSend = onInterruptAndSendTask,
                             onAttach = onAttach,
                             colors = colors,
                             prefillText = prefillText,
@@ -825,6 +840,74 @@ private fun SpanCollapseHeader(
     }
 }
 
+// ======================== PENDING TASK QUEUE STRIP ========================
+
+/**
+ * 排队条：忙时发送的消息在此等槽位。v1 是内存队列（app 进程死了就没了），
+ * 文案如实标注；每行可移除，「立即发送」只在任务空闲时可用——忙时它会
+ * 落回队列尾部还丢位置，不如等自动排空。
+ */
+@Composable
+private fun PendingQueueStrip(
+    items: List<io.agents.nailongclaw.task.PendingTask>,
+    isTaskRunning: Boolean,
+    colors: PokeclawColors,
+    onRemove: (String) -> Unit,
+    onSendNow: (String) -> Unit,
+) {
+    if (items.isEmpty()) return
+    Surface(
+        color = colors.aiBubble,
+        border = androidx.compose.foundation.BorderStroke(0.5.dp, colors.aiBubbleBorder),
+        shape = RoundedCornerShape(14.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)) {
+            Text(
+                stringResource(R.string.chat_queue_title, items.size),
+                fontSize = 11.sp,
+                color = colors.textTertiary,
+                fontWeight = FontWeight.SemiBold,
+            )
+            items.forEach { item ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(top = 4.dp),
+                ) {
+                    Text(
+                        item.text,
+                        fontSize = 12.sp,
+                        color = colors.textTertiary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    TextButton(
+                        onClick = { onSendNow(item.id) },
+                        enabled = !isTaskRunning,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                    ) {
+                        Text(
+                            stringResource(R.string.chat_queue_send_now),
+                            fontSize = 11.sp,
+                        )
+                    }
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = stringResource(R.string.chat_queue_remove_cd),
+                        tint = colors.textTertiary,
+                        modifier = Modifier
+                            .size(16.dp)
+                            .clickable { onRemove(item.id) },
+                    )
+                }
+            }
+        }
+    }
+}
+
 // ======================== TASK ACTIVITY CAPSULE ========================
 
 /**
@@ -1073,6 +1156,7 @@ private fun ChatInputBar(
     onSendChat: (String) -> Unit,
     onSendTask: (String) -> Unit,
     onStopAll: () -> Unit = {},
+    onInterruptAndSend: (String) -> Unit = {},
     onAttach: () -> Unit,
     colors: PokeclawColors,
     prefillText: String = "",
@@ -1276,7 +1360,15 @@ private fun ChatInputBar(
             FloatingActionButton(
                 onClick = {
                     if (isTaskRunning) {
-                        onStopAll()
+                        if (text.isNotBlank()) {
+                            // dsh-Go 的「中断并发送」：草稿不丢——停掉当前轮，
+                            // 草稿进队列在任务收尾时自动发出。
+                            val draft = text.trim()
+                            text = ""
+                            onInterruptAndSend(draft)
+                        } else {
+                            onStopAll()
+                        }
                     } else if (!isAwaitingReply && inputEnabled && text.isNotBlank()) {
                         if (!isLocalModel || isTaskMode) {
                             onSendTask(text.trim())

@@ -27,6 +27,7 @@ import io.agents.nailongclaw.service.ClawAccessibilityService
 import io.agents.nailongclaw.service.ClawNotificationListener
 import io.agents.nailongclaw.service.ForegroundService
 import io.agents.nailongclaw.service.AutoReplyManager
+import io.agents.nailongclaw.task.PendingTaskQueue
 import io.agents.nailongclaw.task.TaskRecordStore
 import io.agents.nailongclaw.tool.ToolRegistry
 import io.agents.nailongclaw.ui.settings.SettingsActivity
@@ -135,6 +136,29 @@ class TaskFlowController(
     private val pipelineRouter = PipelineRouter(activity)
 
     /**
+     * Make this surface the one drained queue items run on. Explicit (not an
+     * init block) because both activities create this controller lazily —
+     * registration has to happen at onCreate, not at first send.
+     */
+    fun registerAsQueueSender() {
+        PendingTaskQueue.registerSender { text -> sendTask(text) }
+    }
+
+    /**
+     * dsh-Go 的「中断并发送」：停止当前轮，草稿进队列，Cancelled 后的任务
+     * 收尾钩子会把队列发出去。task 恰好在按键前后结束的竞态里退化为直接
+     * 发送——此时槽位已空，排队没有意义。
+     */
+    fun interruptAndSend(text: String) {
+        if (!appViewModel.isTaskRunning()) {
+            sendTask(text)
+            return
+        }
+        PendingTaskQueue.enqueue(text)
+        appViewModel.stopTask()
+    }
+
+    /**
      * Ledger id of the task this controller is currently driving, or null.
      *
      * The orchestrator owns the ledger for every task it runs — one write
@@ -152,8 +176,10 @@ class TaskFlowController(
      */
     fun sendTask(text: String, channel: Channel = Channel.LOCAL) {
         if (appViewModel.isTaskRunning()) {
-            addSystem("Another task is still running. Stop it first.")
-            onTaskTerminal?.invoke(TaskEvent.Failed("Another task is still running. Stop it first."))
+            // 忙时不再把用户的输入扔掉——入队，当前任务结束后由
+            // AppViewModel 的 onTaskFinished 钩子自动发出（见 PendingTaskQueue）。
+            PendingTaskQueue.enqueue(text)
+            addSystem("Queued: another task is still running — it will be sent automatically when it finishes.")
             return
         }
 
