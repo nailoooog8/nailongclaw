@@ -102,9 +102,14 @@ public class InputTextTool extends BaseTool {
             clearNodeText(targetNode);
         }
 
-        // Strategy 1: try ACTION_SET_TEXT (standard approach)
-        // Note: ACTION_SET_TEXT overwrites existing text; for append mode we must concatenate
-        if (trySetTextAndVerify(targetNode, text, clearFirst)) {
+        // Strategy 1: one ACTION_SET_TEXT, then verify by reading the node
+        // back (dsh-Go: one actual write, success only when the field really
+        // holds it). The candidate text comes back so the clipboard fallback
+        // below can re-check before it would double-apply an append.
+        // Note: ACTION_SET_TEXT overwrites existing text; for append mode we
+        // must concatenate.
+        String setTextCandidate = trySetText(targetNode, text, clearFirst);
+        if (setTextCandidate != null && nodeTextMatches(targetNode, setTextCandidate)) {
             return ToolResult.success(clearFirst ? "Input text: " + text : "Appended text: " + text);
         }
 
@@ -117,6 +122,18 @@ public class InputTextTool extends BaseTool {
         targetNode = waitForTargetEditable(service, targetCoords);
         if (targetNode == null) {
             return ToolResult.error("Failed to recover text field before clipboard paste");
+        }
+
+        // Last-moment re-check: the SET_TEXT may have landed after strategy 1's
+        // 1s poll gave up (slow app, or the app applied it with a transform
+        // delay). Appending or clearing now would duplicate the text or wipe
+        // it. If the exact candidate is on the field, the write actually
+        // succeeded — report it and stop before the second write.
+        if (setTextCandidate != null && targetNode.refresh()) {
+            CharSequence current = targetNode.getText();
+            if (current != null && setTextCandidate.contentEquals(current)) {
+                return ToolResult.success(clearFirst ? "Input text: " + text : "Appended text: " + text);
+            }
         }
 
         if (clearFirst) {
@@ -169,21 +186,36 @@ public class InputTextTool extends BaseTool {
      * API's return value alone — a "success" the model would act on while the
      * field stayed empty. Failure here falls through to the clipboard channel,
      * which is a different mechanism rather than a repeat.
+     *
+     * @return the candidate text the single SET_TEXT wrote (what the field
+     * should hold if the write landed), or null when the write itself was
+     * refused — verification, including a late one right before the clipboard
+     * fallback, is the caller's job via {@link #nodeTextMatches}.
      */
-    private boolean trySetTextAndVerify(AccessibilityNodeInfo node, String text, boolean clearFirst) {
+    private String trySetText(AccessibilityNodeInfo node, String text, boolean clearFirst) {
         CharSequence existing = node.getText();
         String candidateText = clearFirst ? text : ((existing != null ? existing.toString() : "") + text);
         Bundle args = new Bundle();
         args.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, candidateText);
         if (!node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)) {
-            return false;
+            return null; // write refused — the clipboard channel is a different mechanism, not a repeat
         }
+        return candidateText;
+    }
+
+    /**
+     * Read-back poll: only the exact expected text on the node counts as
+     * success, because some apps apply SET_TEXT asynchronously — the write
+     * API's return value alone is not proof (dsh-Go). 100ms interval, 1s
+     * deadline.
+     */
+    private boolean nodeTextMatches(AccessibilityNodeInfo node, String expected) {
         for (int attempt = 0; attempt < READ_BACK_ATTEMPTS; attempt++) {
             if (!node.refresh()) {
                 return false; // node went stale mid-verification
             }
             CharSequence current = node.getText();
-            if (current != null && candidateText.contentEquals(current)) {
+            if (current != null && expected.contentEquals(current)) {
                 return true;
             }
             try {

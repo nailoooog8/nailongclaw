@@ -3,6 +3,7 @@
 
 package io.agents.nailongclaw.tool.impl;
 
+import android.os.SystemClock;
 import android.view.accessibility.AccessibilityNodeInfo;
 
 import io.agents.nailongclaw.ClawApplication;
@@ -100,10 +101,43 @@ public class OpenAppTool extends BaseTool {
         dismissChainLaunchDialog(service);
 
         String message = "Opened app: " + packageName;
-        if (service.getContentVersion() == before) {
+        if (service.getContentVersion() == before && !awaitContentChange(service, before, COLD_START_SETTLE_MS)) {
             return ToolResult.success(message + noChangeWarning("the launch"));
         }
         return ToolResult.success(message);
+    }
+
+    /**
+     * Extra wait for a slow cold start after the dialog-dismiss settle. The
+     * ~1.8s the dialog scan costs is not enough for cold starts on slower
+     * devices — the app window lands after the compare and the tripwire
+     * warned on perfectly healthy launches. An app window reaching the
+     * foreground always bumps the content version (window-state events), so
+     * "still no change" after the full budget is a real no-op launch, while
+     * every change exits early — event-driven like the rest of this batch,
+     * never a blind sleep of the whole budget.
+     */
+    private static final long COLD_START_SETTLE_MS = 4000L;
+
+    /**
+     * Polls the content version every 200ms for up to [timeoutMs], returning
+     * true at the first change. Interrupt restores the flag and reports no
+     * change (the caller then warns — the safe direction).
+     */
+    private static boolean awaitContentChange(ClawAccessibilityService service, long before, long timeoutMs) {
+        long deadline = SystemClock.uptimeMillis() + timeoutMs;
+        while (SystemClock.uptimeMillis() < deadline) {
+            try {
+                Thread.sleep(200L);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+            if (service.getContentVersion() != before) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
