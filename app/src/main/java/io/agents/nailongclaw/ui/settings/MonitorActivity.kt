@@ -64,6 +64,7 @@ class MonitorActivity : BaseActivity() {
     private var overlayItem: io.agents.nailongclaw.widget.MenuItem? = null
     private var batteryItem: io.agents.nailongclaw.widget.MenuItem? = null
     private var storageItem: io.agents.nailongclaw.widget.MenuItem? = null
+    private var shadowItem: io.agents.nailongclaw.widget.MenuItem? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -87,7 +88,9 @@ class MonitorActivity : BaseActivity() {
             CdsUi.styleChromeText(this, cds, 11f)
             text = "「监听」是 NailongClaw 替你看着屏幕与通知的能力：无障碍服务读屏幕才能点得了屏幕，" +
                 "通知使用权让远程消息能触发任务。关掉任一监听，对应能力随之停用。\n" +
-                "状态每秒刷新；被系统杀掉的服务这里会立刻显示断开。"
+                "状态每秒刷新；被系统杀掉的服务这里会立刻显示断开。\n" +
+                "厂商提示：部分手机（vivo/小米等）首次进系统设置时开关置灰并提示「受限制的设置」——" +
+                "在该页点一次开关、确认提示后再开即可。"
         }
 
         buildMonitorGroup()
@@ -167,6 +170,22 @@ class MonitorActivity : BaseActivity() {
             leadingIcon = R.drawable.ic_storage,
             title = "存储访问",
             onClick = { open(AppRequirement.STORAGE) },
+            showDivider = true
+        )
+        shadowItem = permissionGroup.addMenuItem(
+            leadingIcon = R.drawable.ic_window,
+            title = "影子屏 · 投影授权",
+            onClick = {
+                Toast.makeText(
+                    this,
+                    if (io.agents.nailongclaw.service.ShadowDisplayManager.isCreated()) {
+                        "影子屏已就绪"
+                    } else {
+                        "任务需要时才弹系统投影确认框，未就绪是正常状态"
+                    },
+                    Toast.LENGTH_LONG
+                ).show()
+            },
             showDivider = false
         )
     }
@@ -205,9 +224,15 @@ class MonitorActivity : BaseActivity() {
         storageItem?.setTrailingText(
             if (capabilities.storageAccessGranted) "已允许" else "未允许"
         )
+        shadowItem?.setTrailingText(
+            if (capabilities.shadowDisplayReady) "已就绪" else "未就绪 · 使用时授权"
+        )
         listOf(overlayItem, batteryItem, storageItem).forEach {
             it?.setTrailingTextColor(cds.textSecondary)
         }
+        shadowItem?.setTrailingTextColor(
+            if (capabilities.shadowDisplayReady) cds.accent else cds.textMuted
+        )
     }
 
     private fun toggleKeepAlive() {

@@ -50,6 +50,12 @@ data class AppCapabilitySnapshot(
     val overlayGranted: Boolean,
     val batteryOptimizationIgnored: Boolean,
     val storageAccessGranted: Boolean,
+    /**
+     * 影子屏（MediaProjection 虚拟屏）当前是否已建。投影授权是一次性
+     * token，没有「系统层永久已授权」可查——这一位只回答「现在有没有屏」，
+     * 未就绪是正常状态（下次任务会弹系统确认框），不是错误。
+     */
+    val shadowDisplayReady: Boolean,
 ) {
     val canRunInteractiveTask: Boolean
         get() = accessibilityState == ServiceBindingState.READY
@@ -104,6 +110,8 @@ object AppCapabilityCoordinator {
             overlayGranted = Settings.canDrawOverlays(context),
             batteryOptimizationIgnored = isIgnoringBatteryOptimizations(context),
             storageAccessGranted = hasStorageAccess(context),
+            shadowDisplayReady = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                io.agents.nailongclaw.service.ShadowDisplayManager.isCreated(),
         )
     }
 
