@@ -1061,13 +1061,32 @@
   var menuBtn = document.getElementById('menuBtn');
   var navScrim = document.getElementById('navScrim');
 
-  function closeNav() { document.body.classList.remove('nav-open'); }
+  /* 抽屉开合同样经 notifyNavOpen 告诉 Kotlin，Android BACK 键据此先关抽屉
+     再退出应用（设置面板/模型卡/任务页/定时页的同款纪律，见各自的桥方法）。
+     桌面宽度下 nav-open 从未被加上，这套通知整体空转。 */
+  function notifyNavOpen(open) {
+    if (window.PokeClawChat && window.PokeClawChat.notifyNavOpen) {
+      window.PokeClawChat.notifyNavOpen(!!open);
+    }
+  }
+
+  function openNav() {
+    document.body.classList.add('nav-open');
+    notifyNavOpen(true);
+    maybeShowCoachMark();
+  }
+
+  function closeNav() {
+    document.body.classList.remove('nav-open');
+    notifyNavOpen(false);
+  }
+
+  function navIsOpen() {
+    return document.body.classList.contains('nav-open');
+  }
 
   if (menuBtn) {
-    menuBtn.addEventListener('click', function () {
-      document.body.classList.add('nav-open');
-      maybeShowCoachMark();
-    });
+    menuBtn.addEventListener('click', openNav);
   }
   if (navScrim) {
     navScrim.addEventListener('click', closeNav);
@@ -3051,6 +3070,9 @@
     openSettingsView: openSettingsView,
     closeSettingsView: closeSettingsView,
     settingsViewIsOpen: settingsViewIsOpen,
+    openNav: openNav,
+    closeNav: closeNav,
+    navIsOpen: navIsOpen,
     openModelsView: openModelsView,
     closeModelsView: closeModelsView,
     modelsViewIsOpen: modelsViewIsOpen,

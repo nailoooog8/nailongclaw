@@ -2157,6 +2157,14 @@ adb logcat -d | grep "opened with the task ledger requested"
 
 Format: `[date] [status] [test-id] description`
 
+### 2026-11-19（晚二）— P3 修复轮：抽屉 BACK / 构建指纹死重 / WebActivity scheme 白名单
+
+debug 构建装 h79 AVD（API 35）；单测 **675/0**（670 + `WebUrlPolicyTest` 5 例）。证据 `.auto/p3_round.log`。
+
+- ✅ **P3 · 导航抽屉的 BACK（BACKLOG filed 2026-10-24，H29 ⑤ 遗留）**：抽屉开着按 BACK 直接退出应用——四个全屏 sheet 都有 `notify*View` 上报开合、BACK 先关后 exit，唯独会话抽屉没有，而它恰是唯一「关闭手势不是硬件键」的遮层。修：`cds.js` 的 `openNav()`/`closeNav()` 经 `notifyNavOpen` 上报（`closeNav` 与 `navIsOpen` 一并进 `window.__cds`），`ClaudeUiPreviewActivity` 加 `@Volatile navDrawerOpen` + BACK 链**末枝**（z-index 查过：sheet 70 > 侧栏 40，万一叠层仍按视觉层级收）。**模拟器复验**：`am start` 进主面 → 点汉堡（logcat `[chat] notifyNavOpen(true)`）→ BACK → `[chat] notifyNavOpen(false)` 且 `ResumedActivity` 仍是同一个 `ClaudeUiPreviewActivity t62`（未退 launcher3）；对照：无遮层时 BACK 照旧退出，新枝无误触发。
+- ✅ **P3 · 构建指纹死重（BACKLOG · 构建）**：`.pcfp` asset 任务删除（AAPT 从不打包点开头文件，两包双确认），`BuildConfig.BUILD_FINGERPRINT` 补三个真读者（关于页「构建指纹」行 / 调试报告 summary.txt / GitHub issue body）。查案发现连 BuildConfig 字段当时也是零读者。**模拟器复验**：关于页 uiautomator 实测 `text="构建指纹"` + `text="9f5c6d8|20261119_223758|chenweisheng2008"`，行 bounds 不裁（1080 宽）。顺带给 `widget_menu_item.xml` 的 `tvTrailing` 补 `ellipsize=end`（长尾部值原本会把 weight=1 的标题挤没）。
+- ✅ **P3 · F10 `WebActivity` scheme 白名单（Info，零调用方）**：新增 `ui/web/WebUrlPolicy.kt`——只放行绝对 `http`/`https` 且 authority 非空，其余（其他 scheme / 无 scheme 相对值 / 畸形 authority）一律拒；`onCreate` 拒绝即 `finish()`，`shouldOverrideUrlLoading` 对页内跳转同样拒（吞掉不转交系统）。纯字符串实现（不用 `android.net.Uri`）→ 5 例 JVM 单测。类 KDoc 写明「zero callers today」，后来者接线时第一眼看到。
+
 ### 2026-11-19（晚）— Rebrand 漏网清尾：ChatTopBar 标题不再写死「PokeClaw」（P3）
 
 debug 构建装 h79 AVD（API 35）；`adb root` 后 `am start -n io.agents.nailongclaw/.ui.chat.ComposeChatActivity` 开原生聊天页 → 截图 `.auto/h88-title.png`：标题栏「NailongClaw」，「Nailong」正文色 +「Claw」强调色，双色字标与修复前同构。单测 **670/0**（与修前一致——本改动无逻辑面）。

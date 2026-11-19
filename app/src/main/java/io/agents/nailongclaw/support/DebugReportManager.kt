@@ -71,6 +71,7 @@ object DebugReportManager {
             appendLine()
             appendLine("App")
             appendLine("- Version: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
+            appendLine("- Build fingerprint: ${BuildConfig.BUILD_FINGERPRINT}")
             appendLine("- Debug build: ${BuildConfig.DEBUG}")
             appendLine("- Package: ${BuildConfig.APPLICATION_ID}")
             appendLine()

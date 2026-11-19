@@ -14,10 +14,17 @@ import android.webkit.WebViewClient
 import android.widget.ProgressBar
 import io.agents.nailongclaw.R
 import io.agents.nailongclaw.base.BaseActivity
+import io.agents.nailongclaw.utils.XLog
 import io.agents.nailongclaw.widget.CommonToolbar
 
 /**
  * Web screen - general-purpose browser
+ *
+ * ⚠️ **This activity has no callers** (`WebActivity.start` has zero call sites
+ * in the repo). It enables JavaScript and loads any URL it is handed, so it is
+ * kept alive by [WebUrlPolicy] rather than removed: if a future change wires
+ * it up, that change must not silently activate a screen that can be pointed
+ * at `intent:`/`javascript:`/`file:` URLs. Tracked as BACKLOG P3 · F10.
  */
 class WebActivity : BaseActivity() {
 
@@ -26,6 +33,7 @@ class WebActivity : BaseActivity() {
     private lateinit var progressBar: ProgressBar
 
     companion object {
+        private const val TAG = "WebActivity"
         private const val EXTRA_URL = "extra_url"
         private const val EXTRA_TITLE = "extra_title"
 
@@ -49,8 +57,13 @@ class WebActivity : BaseActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_web)
 
-        val url = intent.getStringExtra(EXTRA_URL)
-        if (url.isNullOrEmpty()) {
+        val loadUrl = intent.getStringExtra(EXTRA_URL)
+            ?.takeIf { WebUrlPolicy.isSupported(it) }
+            ?.trim()
+        if (loadUrl == null) {
+            // Fail closed: a refused URL finishes the activity instead of
+            // falling through to a WebView that would load it anyway.
+            XLog.e(TAG, "Refusing to open unsupported URL")
             finish()
             return
         }
@@ -59,7 +72,7 @@ class WebActivity : BaseActivity() {
 
         initToolbar(defaultTitle)
         initProgressBar()
-        initWebView(url)
+        initWebView(loadUrl)
     }
 
     private fun initToolbar(defaultTitle: String?) {
@@ -93,7 +106,18 @@ class WebActivity : BaseActivity() {
 
             webViewClient = object : WebViewClient() {
                 override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
-                    url?.let { view?.loadUrl(it) }
+                    // The same gate as onCreate, applied to in-page navigations:
+                    // a loaded page can redirect to any scheme, and only
+                    // http/https is let through. Refused schemes are swallowed
+                    // (return true without loading) rather than handed to the
+                    // system, so a page cannot bounce the user into another
+                    // app's intent handler.
+                    val target = url?.takeIf { WebUrlPolicy.isSupported(it) }
+                    if (target == null) {
+                        XLog.e(TAG, "Blocked navigation to unsupported URL")
+                        return true
+                    }
+                    view?.loadUrl(target.trim())
                     return true
                 }
             }

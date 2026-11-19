@@ -54,11 +54,14 @@
             android:background="@drawable/bg_red_dot"
             android:visibility="gone" />
 
-        <!-- 尾部文字 -->
+        <!-- 尾部文字。ellipsize=end 是防御：构建指纹这类长值会把
+             weight=1 的标题挤没，截断尾部比挤掉标题可读。 -->
         <TextView
             android:id="@+id/tvTrailing"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
             android:textColor="@color/colorTextTertiary"
             android:textSize="12dp"
             android:visibility="gone"

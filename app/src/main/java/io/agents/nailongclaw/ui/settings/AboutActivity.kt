@@ -81,6 +81,22 @@ class AboutActivity : BaseActivity() {
             setLeadingIconColor(cds.textPrimary)
             setTrailingIconColor(cds.textMuted)
         }
+        // 构建指纹。它和调试报告 summary.txt 里的同一行同源
+        // （BuildConfig.BUILD_FINGERPRINT）——旧实现往 assets/.pcfp 写的 hex
+        // 从未进过包（AAPT 丢点开头文件），也不会有第二套格式。窄屏上尾部
+        // 省略的是构建者名，完整值以调试报告为准。
+        aboutGroup.addMenuItem(
+            leadingIcon = android.R.drawable.ic_menu_manage,
+            title = "构建指纹",
+            onClick = {},
+            showDivider = true
+        ).apply {
+            setTitleColor(cds.textPrimary)
+            setTrailingText(BuildConfig.BUILD_FINGERPRINT)
+            setTrailingTextColor(cds.textSecondary)
+            setLeadingIconColor(cds.textPrimary)
+            setTrailingIconColor(cds.textMuted)
+        }
         aboutGroup.addMenuItem(
             leadingIcon = android.R.drawable.ic_menu_send,
             title = "GitHub",
@@ -318,6 +334,8 @@ class AboutActivity : BaseActivity() {
             - Manufacturer: ${Build.MANUFACTURER}
             - Model: ${Build.MODEL}
             - Android: ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})
+            - App version: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})
+            - Build fingerprint: ${BuildConfig.BUILD_FINGERPRINT}
 
             ## Attachments
             - Attach this ZIP from NailongClaw: `${report.name}`

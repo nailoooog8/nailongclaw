@@ -129,6 +129,18 @@ class ClaudeUiPreviewActivity : BaseActivity() {
     private var settingsViewOpen = false
 
     /**
+     * Whether the phone-width session drawer (`body.nav-open`) is open.
+     *
+     * Same cross-thread shape and same discipline as [settingsViewOpen]: the
+     * page reports every open/close transition through `notifyNavOpen`, and
+     * this flag exists only so BACK closes the drawer instead of leaving the
+     * app. On desktop widths the drawer never opens (no hamburger), so the
+     * flag simply stays false and BACK falls through unchanged.
+     */
+    @Volatile
+    private var navDrawerOpen = false
+
+    /**
      * Whether the model card is open. Same cross-thread shape as the task-page
      * level below: written on the JavaScript thread by `notifyModelsView`, read
      * on MAIN by BACK.
@@ -974,6 +986,21 @@ class ClaudeUiPreviewActivity : BaseActivity() {
             XLog.e(TAG, "[chat] notifyModelsView($open)")
             runOnUiThread { modelsViewOpen = open }
         }
+
+        /**
+         * JS → Kotlin: the phone-width session drawer opened or closed.
+         *
+         * The last of the BACK-covered overlays to get a flag (settings sheet,
+         * model card, task page and schedule queue had one). Without it BACK
+         * exited the app while the drawer was up — the one overlay whose
+         * close gesture (scrim tap) is not a hardware key. Desktop widths
+         * never open the drawer, so the flag stays false there.
+         */
+        @JavascriptInterface
+        fun notifyNavOpen(open: Boolean) {
+            XLog.e(TAG, "[chat] notifyNavOpen($open)")
+            runOnUiThread { navDrawerOpen = open }
+        }
     }
 
     /**
@@ -1655,6 +1682,14 @@ class ClaudeUiPreviewActivity : BaseActivity() {
                 } else if (modelsViewOpen) {
                     webView.evaluateJavascript(
                         "window.__cds && window.__cds.closeModelsView();", null
+                    )
+                } else if (navDrawerOpen) {
+                    // 抽屉排在最后：cds.css 里 sheet 是 z-index 70、侧栏 40，
+                    // 全屏 sheet 在视觉上盖住抽屉，所以 BACK 先收 sheet。
+                    // 两者实际互斥（侧栏「设置」行先 closeNav 再开面板），
+                    // 这个顺序只是让万一叠层时的行为仍符合视觉层级。
+                    webView.evaluateJavascript(
+                        "window.__cds && window.__cds.closeNav();", null
                     )
                 } else {
                     isEnabled = false

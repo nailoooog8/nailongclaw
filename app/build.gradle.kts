@@ -288,24 +288,12 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
 }
 
-tasks.register("injectBuildFingerprint") {
-    doLast {
-        val gitHash = try {
-            val p = Runtime.getRuntime().exec("git rev-parse HEAD")
-            val r = BufferedReader(InputStreamReader(p.inputStream))
-            r.readLine()?.trim() ?: "unknown"
-        } catch (_: Exception) { "unknown" }
-        val ts = System.currentTimeMillis()
-        val builder = System.getenv("BUILDER_ID") ?: System.getProperty("user.name") ?: "local"
-        val fp = "t=$ts\nc=$gitHash\nb=$builder\nv=${android.defaultConfig.versionName}"
-        val hexEncoded = fp.toByteArray().joinToString("") { "%02x".format(it) }
-        file("src/main/assets/.pcfp").apply {
-            parentFile.mkdirs()
-            writeText(hexEncoded)
-        }
-    }
-}
-tasks.named("preBuild") { dependsOn("injectBuildFingerprint") }
+// 构建指纹曾经有两套写入、零处读取：本文件的 injectBuildFingerprint 任务往
+// src/main/assets/.pcfp 写 hex（AAPT 不打包点开头的文件，两个包双确认它从未
+// 进过 APK），以及 defaultConfig 的 BuildConfig.BUILD_FINGERPRINT（Kotlin 里
+// 同样没有读者）。删掉资产任务这一套，只留 BuildConfig 字段，并让它真的有
+// 读者：AboutActivity 的「构建指纹」行 + DebugReportManager 的 summary.txt。
+// 指纹格式 = "<git短哈希>|<构建时间 yyyyMMdd_HHmmss>|<构建者>"。
 tasks.named("preBuild") { dependsOn(syncClaudeUiMockup) }
 
 androidComponents {
