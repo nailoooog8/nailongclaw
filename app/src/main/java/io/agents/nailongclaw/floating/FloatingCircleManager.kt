@@ -84,6 +84,8 @@ object FloatingCircleManager {
                 EasyFloat.getFloatView(FLOAT_TAG)
                     ?.findViewById<TextView>(R.id.tvTokenStatus)
                     ?.text = runningStatusText()
+                // 秒表文字每秒都在变宽（0:09 → 0:59 → 10:00），pill 窗口要跟着长。
+                EasyFloat.getFloatView(FLOAT_TAG)?.let { syncFloatWindowSize(it) }
                 mainHandler.postDelayed(this, 1000)
             }
         }
@@ -172,6 +174,16 @@ object FloatingCircleManager {
                     }
                     // Initialize state
                     updateStateView(view, currentState)
+                    // 首建竞态（H84）：createdResult 是 ParentFrameLayout.onLayout
+                    // 调出来的，此刻这次 measure/layout 已经跑完——在这里把
+                    // floatRoot 宽度改成 WRAP_CONTENT 的 requestLayout 会被当次
+                    // 布局吞掉，窗口停在创建时的 56dp，pill 内容被裁成圆球，第一
+                    // 个任务的四态截图全同。等首帧过去再重放一次状态，宽度变更
+                    // 才会落到一次真正的遍历里。
+                    view?.post {
+                        updateStateView(view, currentState)
+                        syncFloatWindowSize(view)
+                    }
                     // Detect position after layout to prevent the bubble from getting stuck off-screen
                     view?.post {
                         ensureFloatInBounds(view)
@@ -198,6 +210,7 @@ object FloatingCircleManager {
                     isShowing = true
                     // Restore UI state when overlay reappears after app switch
                     updateStateView(view, currentState)
+                    syncFloatWindowSize(view)
                 }
 
                 override fun touchEvent(view: View, event: MotionEvent) {
@@ -336,6 +349,7 @@ object FloatingCircleManager {
             val tvStatus = view.findViewById<TextView>(R.id.tvTokenStatus) ?: return@runOnUiThread
             tokenSuffix = " | $formattedTokens | $formattedCost"
             tvStatus.text = runningStatusText()
+            syncFloatWindowSize(view)
 
             // Update pill color based on token state
             val cardRunning = view.findViewById<androidx.cardview.widget.CardView>(R.id.cardRunning) ?: return@runOnUiThread
@@ -364,6 +378,7 @@ object FloatingCircleManager {
             val view = EasyFloat.getFloatView(FLOAT_TAG) ?: return@runOnUiThread
             val tvAction = view.findViewById<TextView>(R.id.tvTaskAction) ?: return@runOnUiThread
             tvAction.text = if (action.length > 26) action.substring(0, 26) + "…" else action
+            syncFloatWindowSize(view)
         }
     }
 
@@ -404,7 +419,44 @@ object FloatingCircleManager {
         currentState = state
         val view = EasyFloat.getFloatView(FLOAT_TAG)
         XLog.i("FloatingCircle", "setState: $state, view=${view != null}, isShowing=$isShowing")
-        view?.let { updateStateView(it, state) }
+        view?.let {
+            updateStateView(it, state)
+            // 见 syncFloatWindowSize：窗口长肉不能只靠 root view 的
+            // layoutParams，显式把实测尺寸写进 EasyFloat 窗口 LayoutParams。
+            it.post { syncFloatWindowSize(it) }
+        }
+    }
+
+    /**
+     * 把 EasyFloat 窗口尺寸显式同步成 floatRoot 的目标尺寸。
+     *
+     * 窗口 LayoutParams 从创建起就是 WRAP_CONTENT，长肉全靠「内容
+     * requestLayout → 重新 measure」这条路；而 setFloatRootWidth 只改 root
+     * view 自己的 layoutParams、从不告诉窗口。首建那次状态又活在
+     * ParentFrameLayout.onLayout 里（见 createdResult 的注释），requestLayout
+     * 被当次布局吞掉，窗口就按创建时的 56dp 定死，pill 加宽的内容整段裁掉
+     * （H84：`dumpsys window` 实测 RUNNING 期间窗口仍是 147×147）。
+     *
+     * 这里用 EasyFloat.updateFloat 的 width/height 把尺寸写进窗口
+     * LayoutParams（-1 才是「保持不变」，其余值覆盖并 updateViewLayout），
+     * 窗口大小从此不依赖 measure 管道有没有被吞。
+     *
+     * 尺寸取值规则：layoutParams 里写死的值优先（圆形态的 56dp），只有
+     * WRAP_CONTENT 的 pill 态才用手动量出来的自然宽度。不能无脑用 wrap 测量
+     * 值——cardIdle/cardSuccess 是 match_parent，父容器按 UNSPECIFIED 量时会
+     * 塌到里面的 32dp 图标大小，圆球会被裁成图标角（2026-11-19 首轮修复的
+     * 回归，已在此更正）。
+     */
+    private fun syncFloatWindowSize(view: View) {
+        val root = view.findViewById<View>(R.id.floatRoot) ?: return
+        val lp = root.layoutParams
+        val widthSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+        val heightSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+        root.measure(widthSpec, heightSpec)
+        val width = if (lp != null && lp.width > 0) lp.width else root.measuredWidth
+        val height = if (lp != null && lp.height > 0) lp.height else root.measuredHeight
+        if (width <= 0 || height <= 0) return
+        EasyFloat.updateFloat(FLOAT_TAG, -1, -1, width, height)
     }
 
     /**
