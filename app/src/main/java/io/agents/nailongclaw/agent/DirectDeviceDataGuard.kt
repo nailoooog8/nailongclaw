@@ -33,7 +33,7 @@ internal class DirectDeviceDataGuard private constructor(
         return "\n\n" + """
             ## Task Guard: Direct Device Data
             This request is about the user's real phone data, not a generic chatbot-only question.
-            You ARE allowed to access this data with PokeClaw tools.
+            You ARE allowed to access this data with NailongClaw tools.
             Never claim that you cannot access the user's clipboard, notifications, phone state, installed apps, or current screen when a matching tool exists.
             Empty or missing data is still a valid result. For example, an empty clipboard or no notifications should be reported plainly, not treated as a failure.
 
