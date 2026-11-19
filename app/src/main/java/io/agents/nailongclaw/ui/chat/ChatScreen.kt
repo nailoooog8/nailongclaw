@@ -181,6 +181,13 @@ fun ChatScreen(
     // Settings/model changes cannot leave the toolbar UI out of sync.
     var selectedTab by remember { mutableStateOf(if (isLocalModel) "local" else "cloud") }
     val isLocalUI = selectedTab == "local"
+    // 「任务运行中」的两个来源：入参 isTaskRunning 是本面经 TaskFlowController
+    // 发起的任务（发送瞬间就置位），TaskRuntimeState 总线是悬浮球/活动胶囊同
+    // 一条 TaskEvent 流——渠道、定时、外部自动化任务都从这过。只认前者时，另
+    // 一面发起的任务运行中，本面的停止/排队按钮仍停留在普通发送态，点下去走
+    // 的是排队而不是停止（2026-11-15 UX 批抓的跨面状态源缺陷）。
+    val runtimeSnapshot by io.agents.nailongclaw.task.TaskRuntimeState.snapshot.collectAsState()
+    val taskRunning = isTaskRunning || runtimeSnapshot?.running == true
     // Skill dialog and activation states
     var showMonitorSheet by remember { mutableStateOf(false) }
     var showSendSheet by remember { mutableStateOf(false) }
@@ -320,7 +327,7 @@ fun ChatScreen(
                         // （立即发送只在任务空闲时可用）。
                         PendingQueueStrip(
                             items = queuedTasks,
-                            isTaskRunning = isTaskRunning,
+                            isTaskRunning = taskRunning,
                             colors = colors,
                             onRemove = onRemoveQueuedTask,
                             onSendNow = onSendQueuedTaskNow,
@@ -333,7 +340,7 @@ fun ChatScreen(
 
                         ChatInputBar(
                             isAwaitingReply = isAwaitingReply,
-                            isTaskRunning = isTaskRunning,
+                            isTaskRunning = taskRunning,
                             inputEnabled = inputEnabled,
                             isTaskMode = isTaskMode,
                             isLocalModel = isLocalUI,
@@ -376,7 +383,7 @@ fun ChatScreen(
                         MessageList(
                             messages = messages,
                             colors = colors,
-                            isTaskRunning = isTaskRunning,
+                            isTaskRunning = taskRunning,
                             onBackgroundTap = dismissKeyboard,
                             modifier = Modifier.fillMaxSize(),
                         )
