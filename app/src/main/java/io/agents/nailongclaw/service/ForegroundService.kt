@@ -23,6 +23,71 @@ import io.agents.nailongclaw.ServiceBindingState
 import io.agents.nailongclaw.utils.XLog
 
 /**
+ * The one window in which a foreground-service start can still kill the
+ * whole process.
+ *
+ * `startForegroundService()` registers an obligation: the service MUST
+ * reach `startForeground()` within ~5s or the system throws
+ * `ForegroundServiceDidNotStartInTimeException` at the app. Calling
+ * `stopService()` in the gap between the dispatch and the service's
+ * creation leaves that obligation unfulfillable — the service is never
+ * brought up, so `onCreate`'s `startForeground` never runs. That is
+ * exactly what a fast-failing task does: the task fails in ~26ms (a11y
+ * missing), the terminal path calls `resetToIdle()` → `stop()`, and the
+ * process dies 5s later (v068-fgs-race's "onCreate starts foreground"
+ * fix only covers the case where the service was already created).
+ *
+ * So the stop is deferred instead: the service is allowed to come up,
+ * fulfil the obligation, and then stop itself. Extracted from the service
+ * companion (which is full of Android types) so the state machine is
+ * testable on the JVM.
+ */
+internal class ForegroundStartGuard {
+
+    @Volatile
+    private var dispatchInFlight = false
+
+    @Volatile
+    private var stopRequestedWhileStarting = false
+
+    /** A `startForegroundService` dispatch was accepted by the system. */
+    fun onDispatched() {
+        dispatchInFlight = true
+        // A new start supersedes any stop that arrived while a previous
+        // one was still coming up — that stop was about the old task.
+        stopRequestedWhileStarting = false
+    }
+
+    /** The dispatch itself failed (e.g. background-start refusal). */
+    fun onDispatchFailed() {
+        dispatchInFlight = false
+    }
+
+    /** The service object exists; `onCreate` owns the obligation now. */
+    fun onServiceCreated() {
+        dispatchInFlight = false
+    }
+
+    /**
+     * Whether [ForegroundService.stop] must NOT cancel the launch yet.
+     * Side effect: remembers that a stop is waiting, so the service can
+     * honour it once it has called `startForeground`.
+     */
+    fun deferStop(serviceRunning: Boolean): Boolean {
+        if (serviceRunning || !dispatchInFlight) return false
+        stopRequestedWhileStarting = true
+        return true
+    }
+
+    /** Read-and-clear, from `onStartCommand` after `startForeground`. */
+    fun consumeStopAfterStart(): Boolean {
+        val pending = stopRequestedWhileStarting
+        stopRequestedWhileStarting = false
+        return pending
+    }
+}
+
+/**
  * Foreground service for active task / monitor notifications only.
  */
 class ForegroundService : Service() {
@@ -45,6 +110,8 @@ class ForegroundService : Service() {
             TASK,
             MONITOR,
         }
+
+        private val startGuard = ForegroundStartGuard()
 
         @Volatile
         private var _isRunning = false
@@ -210,12 +277,14 @@ class ForegroundService : Service() {
                 } else {
                     context.startService(intent)
                 }
+                startGuard.onDispatched()
                 true
             } catch (e: Exception) {
                 // API 31+ throws ForegroundServiceStartNotAllowedException when the
                 // app is in the background. Surface it instead of only logging,
                 // but only when we still hold an Activity to show it on.
                 XLog.w(TAG, "Foreground service start blocked or failed", e)
+                startGuard.onDispatchFailed()
                 if (context !is android.app.Application) {
                     runCatching {
                         Toast.makeText(
@@ -257,15 +326,32 @@ class ForegroundService : Service() {
                 } else {
                     context.startService(intent)
                 }
+                startGuard.onDispatched()
                 null
             } catch (e: Exception) {
                 XLog.w(TAG, "Projection foreground-service start failed", e)
+                startGuard.onDispatchFailed()
                 "${e.javaClass.simpleName}: ${e.message}"
             }
         }
 
         fun stop(context: Context) {
             _mode = ForegroundMode.IDLE
+            if (startGuard.deferStop(_isRunning)) {
+                // A startForegroundService() dispatch is still in the air and the
+                // service has not been created yet. Cancelling the launch here
+                // strands the 5s startForeground obligation — the service never
+                // reaches onCreate, and the system kills the process with
+                // ForegroundServiceDidNotStartInTimeException. Let it come up
+                // (onCreate starts foreground unconditionally) and have
+                // onStartCommand run this stop once the obligation is met.
+                XLog.i(TAG, "stop() deferred — foreground service still starting")
+                runCatching {
+                    val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                    manager.cancel(NOTIFICATION_ID)
+                }
+                return
+            }
             val intent = Intent(context, ForegroundService::class.java)
             context.stopService(intent)
             runCatching {
@@ -317,6 +403,7 @@ class ForegroundService : Service() {
     override fun onCreate() {
         super.onCreate()
         _isRunning = true
+        startGuard.onServiceCreated()
         createNotificationChannel()
         // Typed explicitly: with mediaProjection added to the manifest
         // types, the two-arg startForeground on API 34+ would claim EVERY
@@ -416,6 +503,18 @@ class ForegroundService : Service() {
             // Re-sync to actual state: keep running only if monitoring or a
             // channel still needs it, otherwise shut down cleanly.
             _mode = ForegroundMode.IDLE
+            if (!syncToBackgroundState(applicationContext)) {
+                stopSelf()
+            }
+        } else if (startGuard.consumeStopAfterStart()) {
+            // stop() arrived while this service was still being created (a task
+            // failed in the gap between startForegroundService() and onCreate).
+            // The startForeground above has now met the obligation, so it is
+            // finally safe to go down — re-running the idle sync keeps the
+            // keep-alive reasons (monitor / channels / accessibility) winning,
+            // exactly as the deferred stop() intended.
+            _mode = ForegroundMode.IDLE
+            XLog.i(TAG, "Honouring stop() deferred while the service was starting")
             if (!syncToBackgroundState(applicationContext)) {
                 stopSelf()
             }
