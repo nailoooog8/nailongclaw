@@ -1,4 +1,8 @@
-# PokeClaw Backlog
+# NailongClaw Backlog
+
+> 2026-11-19：标题由 `PokeClaw Backlog` 改名——历史条目保留旧名（归属与 DCO 需要），
+> 但当前态索引按文档卫生规矩用新产品名（README/CONTRIBUTING 同）。`PokeClawChat`
+> 桥名、版权头按改名轮决定有意保留，不在本列。
 
 Items go in, get prioritized, get done, get crossed out. Simple.
 
