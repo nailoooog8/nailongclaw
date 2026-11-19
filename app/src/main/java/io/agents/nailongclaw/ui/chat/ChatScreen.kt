@@ -74,6 +74,16 @@ import java.util.Locale
 
 // ======================== THEME COLORS ========================
 
+/**
+ * The tail of the app name the wordmark paints in the accent colour:
+ * `NailongClaw` renders as "Nailong" in text colour + "Claw" in accent.
+ *
+ * The name itself is read from `R.string.app_name` — the previous inline
+ * `append("Poke") + append("Claw")` literal was missed by the 2026-11-15
+ * rebrand sweep, which only scanned the resource files.
+ */
+private const val BRAND_ACCENT_SUFFIX = "Claw"
+
 data class PokeclawColors(
     val background: Color,
     val surface: Color,
@@ -453,11 +463,17 @@ private fun ChatTopBar(
 
         TopAppBar(
             title = {
+                val appName = stringResource(R.string.app_name)
                 Text(
                     buildAnnotatedString {
-                        append("Poke")
-                        withStyle(SpanStyle(color = colors.accent)) {
-                            append("Claw")
+                        val accentFrom = appName.indexOf(BRAND_ACCENT_SUFFIX)
+                        if (accentFrom > 0) {
+                            append(appName.substring(0, accentFrom))
+                            withStyle(SpanStyle(color = colors.accent)) {
+                                append(appName.substring(accentFrom))
+                            }
+                        } else {
+                            append(appName)
                         }
                     },
                     fontWeight = FontWeight.Bold,

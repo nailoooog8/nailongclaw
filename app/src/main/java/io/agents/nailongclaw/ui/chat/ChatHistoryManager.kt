@@ -13,7 +13,9 @@ import java.util.Locale
 /**
  * Saves and loads chat conversations as markdown files.
  *
- * Storage: /storage/emulated/0/PokeClaw/chats/
+ * Storage: <external files dir>/chats — i.e.
+ * /storage/emulated/0/Android/data/io.agents.nailongclaw/files/chats/
+ * (app-scoped, so it moved with the applicationId; nothing to migrate)
  * Format: 2026-04-04-send-hi-to-mom.md
  *
  * Each file:
