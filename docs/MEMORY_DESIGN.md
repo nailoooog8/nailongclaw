@@ -98,7 +98,7 @@
 |---|---|---|
 | 判断「要不要记」 | 模型在**它本来就要跑的工具循环里**决定调不调 `memory_save` | 无额外 LLM 调用 |
 | 执行写入 | `MemorySaveTool.execute` → `MemoryStore.remember()`（[MemoryStore.kt:176](app/src/main/java/io/agents/nailongclaw/agent/memory/MemoryStore.kt#L176)）→ 纯本地 JSON 写盘 | 毫秒级，同步无阻塞 |
-| 读入提示 | `MemoryStore.briefing()`（[DefaultAgentService.kt:485](app/src/main/java/io/agents/nailongclaw/agent/DefaultAgentService.kt#L485)）→ 纯本地打分 | 亚毫秒级 |
+| 读入提示 | `MemoryStore.briefing()`（[MemoryStore.kt:714](app/src/main/java/io/agents/nailongclaw/agent/memory/MemoryStore.kt#L714)，调用点 `DefaultAgentService.kt:563`）→ 纯本地打分 | 亚毫秒级 |
 
 **抽取即决策、由同一轮生成顺带完成**——这正是我们相对 Mem0 / LangMem 的**优势**，不是需要修掉的缺陷。
 引入异步队列只会增加「记忆什么时候落盘」的不确定性，而换不来延迟收益。

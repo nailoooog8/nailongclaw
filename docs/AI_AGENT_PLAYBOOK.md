@@ -190,9 +190,11 @@ adb shell pm clear io.agents.nailongclaw
 ### Build + install signed release locally
 
 ```bash
-source ~/.config/pokeclaw/release-signing.env   # exports KEYSTORE_FILE etc.
+# 签名值二选一：环境变量，或仓库根 local.properties（gitignored）
+# 四键 KEYSTORE_FILE / KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD；
+# 读取方 app/build.gradle.kts 的 readSigningValue 先读 env、再读 local.properties
 cd ~/dev/pokeclaw
-NAILONGCLAW_VERSION_CODE=29 NAILONGCLAW_VERSION_NAME=0.7.1 ./gradlew assembleRelease
+NAILONGCLAW_VERSION_CODE=34 NAILONGCLAW_VERSION_NAME=0.9.0 ./gradlew assembleRelease
 adb install -r app/build/outputs/apk/release/NailongClaw_v*.apk
 ```
 
