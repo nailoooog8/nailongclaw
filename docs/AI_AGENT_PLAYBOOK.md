@@ -90,11 +90,11 @@ If a side-project repo's `origin` is `git@github.com:agents-io/...`, push fails 
 git remote set-url origin git@github.com-personal:agents-io/REPO.git
 ```
 
-PokeClaw is already configured correctly; other side-projects may not be. See `~/MyGithub/agentic-journal/projects/3-ship/playbooks/side-project-repo-setup-checklist-2026-05-25.md`.
+NailongClaw is already configured correctly; other side-projects may not be. See `~/MyGithub/agentic-journal/projects/3-ship/playbooks/side-project-repo-setup-checklist-2026-05-25.md`.
 
 ### 7. CI signing secrets ARE installed — don't trust stale `CLAUDE.local.md`
 
-`CLAUDE.local.md` until 2026-05-26 said "GitHub Actions 仲未有 stable signing secrets". This was OUTDATED. The secrets (`ANDROID_KEYSTORE_B64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`) were installed 2026-04-28 and the v0.6.12 release used them. Always verify with `gh secret list -R agents-io/PokeClaw` before assuming.
+`CLAUDE.local.md` until 2026-05-26 said "GitHub Actions 仲未有 stable signing secrets". This was OUTDATED. The secrets (`ANDROID_KEYSTORE_B64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD`) were installed 2026-04-28 and the v0.6.12 release used them. Always verify with `gh secret list -R nailoooog8/nailongclaw` before assuming.
 
 ### 8. Emulator Matrix CI workflow has two known gotchas
 
@@ -191,7 +191,7 @@ adb shell pm clear io.agents.nailongclaw
 
 ```bash
 source ~/.config/pokeclaw/release-signing.env   # exports KEYSTORE_FILE etc.
-cd ~/MyGithub/PokeClaw
+cd ~/dev/pokeclaw
 NAILONGCLAW_VERSION_CODE=29 NAILONGCLAW_VERSION_NAME=0.7.1 ./gradlew assembleRelease
 adb install -r app/build/outputs/apk/release/NailongClaw_v*.apk
 ```
@@ -224,9 +224,9 @@ adb shell run-as io.agents.nailongclaw ls -t cache/debug_reports/ | head -1
 grep -E "versionCode|versionName" app/build.gradle.kts | head -2
 # Should show your new version. If not, bump them, commit, push, THEN tag.
 git tag -a vX.Y.Z -m "vX.Y.Z — short description"
-git push pokeclaw vX.Y.Z
+git push origin vX.Y.Z
 # CI workflow `Release APK` will sign + publish within ~10min. Watch:
-gh run list -R agents-io/PokeClaw --workflow 'Release APK' --limit 1
+gh run list -R nailoooog8/nailongclaw --workflow 'Release APK' --limit 1
 ```
 
 ### Reply on user-reported OEM issues
@@ -234,7 +234,7 @@ gh run list -R agents-io/PokeClaw --workflow 'Release APK' --limit 1
 After release goes live, reply on every open OEM-specific issue:
 
 ```bash
-gh issue comment $NUM -R agents-io/PokeClaw -b "$(cat reply-draft.md)"
+gh issue comment $NUM -R nailoooog8/nailongclaw -b "$(cat reply-draft.md)"
 ```
 
 Drafts for the current 6 open OEM threads live in `docs/community-issue-replies.md`. Each cites a specific version — don't post unless that version is actually published, or you'll send users hunting for an APK that doesn't exist yet.
@@ -243,10 +243,10 @@ Drafts for the current 6 open OEM threads live in `docs/community-issue-replies.
 
 ## 🎯 Strategic frame — re-read every session
 
-For the long-term-decision context (acquisition target, moat, exit shape), see in this order:
+For the long-term-decision context of **this fork**, read in this order:
 
-1. `STRATEGY.md` — exit shape ($50-100M strategic acquisition by 2027-Q2, NOT acqui-hire), why mobile-agent harness is Stainless-shape, AI capability compounds so today's bottlenecks shrink fast
-2. `EXECUTION_PLAN.md` — Phase 1 (shipped v0.7.0) → Phase 6 (decision gate). Maps every open issue + backlog item to a phase
-3. `ARCHITECTURE_DECISIONS.md` — D1-D8, the load-bearing design choices an acquirer's tech-DD engineer needs to understand in 15 min
+1. `CLAUDE.md` — project rules and direction principles (generic Android mobile-agent harness, deterministic problems before stochastic tuning)
+2. `AI_INDEX.md` — repo map and direction rules
+3. `BACKLOG.md` — live priorities; the file this fork actually executes against
 
-Memory file `~/.claude/projects/-home-nicole/memory/MEMORY.md` has the user-level context (Nicole's background, preferences, related projects).
+`STRATEGY.md` / `EXECUTION_PLAN.md` are the upstream author's exit-plan documents, preserved verbatim for Apache-2.0 §4 attribution only — **this fork does not inherit any of it** (see their header disclaimers and `README.md`「上游状态与归属」). Don't treat their phases, valuation framing or acquirer outreach as current priorities.

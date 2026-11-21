@@ -1,4 +1,4 @@
-# PokeClaw Architecture Reconstruction
+# NailongClaw Architecture Reconstruction
 
 This document exists to keep the next refactor wave behavior-safe.
 
@@ -409,7 +409,7 @@ Introduce a coordinator/repository that distinguishes:
 
 - Fresh reinstall after `adb install -r` can clear `enabled_accessibility_services`; app Settings now shows `Disabled` instead of stale `Enabled`
 - Re-enabling Accessibility via secure settings reproduces the enabled-but-rebinding state; app Settings now shows `Connecting` instead of collapsing it into `Disabled`
-- Notification Access row now derives from system listener settings and correctly shows `Disabled` when PokeClaw is absent from `enabled_notification_listeners`
+- Notification Access row now derives from system listener settings and correctly shows `Disabled` when NailongClaw is absent from `enabled_notification_listeners`
 - Notification-listener `onListenerConnected()` no longer drags SettingsActivity to foreground on every reconnect; return-to-app now only happens when the in-app permission flow explicitly armed a pending flag
 
 ## Phase 4 — Structured Monitor Targets
