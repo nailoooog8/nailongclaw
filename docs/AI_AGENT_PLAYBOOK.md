@@ -194,7 +194,8 @@ adb shell pm clear io.agents.nailongclaw
 # 四键 KEYSTORE_FILE / KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD；
 # 读取方 app/build.gradle.kts 的 readSigningValue 先读 env、再读 local.properties
 cd ~/dev/pokeclaw
-NAILONGCLAW_VERSION_CODE=34 NAILONGCLAW_VERSION_NAME=0.9.0 ./gradlew assembleRelease
+# 版本号默认在 app/build.gradle.kts（随发布 bump），env 只在需要覆盖时给——下面是 v0.9.1 当时的示例值
+NAILONGCLAW_VERSION_CODE=63 NAILONGCLAW_VERSION_NAME=0.9.1 ./gradlew assembleRelease
 adb install -r app/build/outputs/apk/release/NailongClaw_v*.apk
 ```
 
