@@ -350,6 +350,31 @@
     <string name="channel_pair_pin_hint">Enter 6-digit PIN</string>
     <string name="channel_pair_pin_invalid">PIN must be a 6-digit number</string>
     <string name="channel_pair_pin_saved">Pairing PIN updated</string>
+
+    <!-- Paired senders (ChannelSecurityGuard whitelist settings) -->
+    <string name="menu_paired_senders">Paired senders</string>
+    <string name="channel_pair_screen_title">Paired senders</string>
+    <string name="channel_pair_row_summary">%1$d paired</string>
+    <string name="channel_pair_group_paired">Paired (%1$d)</string>
+    <string name="channel_pair_group_pending">Pending re-bind (%1$d)</string>
+    <string name="channel_pair_row_channel_date">%1$s · paired %2$s</string>
+    <string name="channel_pair_paired_at_unknown">pairing date unknown</string>
+    <string name="channel_pair_pending_badge">Pending re-bind</string>
+    <string name="channel_pair_empty">No paired senders yet.\n\nTo pair one: open the Channels page to see the pairing PIN, then send “/bind” followed by that PIN to the bot from the channel app (Telegram / WeChat / QQ / Discord / Douyin). Paired senders show up here.</string>
+    <string name="channel_pair_footer">Authorisation is per channel: the same sender must pair separately on each one. Everything is stored only on this device.\n\n“Pending re-bind” entries lost their access in an upgrade and authorise nothing; the badge clears once the sender pairs again, or you can delete the record.</string>
+    <string name="channel_pair_revoke_title">Revoke this sender?</string>
+    <string name="channel_pair_revoke_message">%1$s will no longer be able to send tasks through %2$s. To regain access it must send /bind with the pairing PIN again.</string>
+    <string name="channel_pair_revoke_action">Revoke</string>
+    <string name="channel_pair_revoke_done">Revoked — this sender must pair again</string>
+    <string name="channel_pair_forget_title">Delete this record?</string>
+    <string name="channel_pair_forget_message">%1$s already lost access in the upgrade. Deleting the record changes no permissions — it only removes the reminder.</string>
+    <string name="channel_pair_forget_action">Delete record</string>
+    <string name="channel_pair_forget_done">Record deleted</string>
+    <string name="channel_pair_clear_row">Clear all paired senders</string>
+    <string name="channel_pair_clear_title">Clear all paired senders?</string>
+    <string name="channel_pair_clear_message">Every sender on every channel is revoked, including pending re-bind records. Anything still connected loses access until it sends /bind again.</string>
+    <string name="channel_pair_clear_action">Clear all</string>
+    <string name="channel_pair_clear_done">All pairing cleared</string>
     <string name="menu_qq">QQ</string>
     <string name="menu_douyin">Douyin</string>
     <string name="menu_channel_pin">Pairing PIN</string>

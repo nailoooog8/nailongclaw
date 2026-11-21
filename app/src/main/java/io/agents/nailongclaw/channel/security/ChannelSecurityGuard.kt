@@ -21,11 +21,31 @@ object ChannelSecurityGuard {
     private const val KEY_CHANNEL_PAIR_PIN = "KEY_CHANNEL_PAIR_PIN"
     private const val KEY_CHANNEL_WHITELIST = "KEY_CHANNEL_WHITELIST"
 
+    /** `<entryKey>=<pairedAtMillis>` pairs recording when each sender was first paired. */
+    private const val KEY_CHANNEL_PAIR_TIMES = "KEY_CHANNEL_PAIR_TIMES"
+
+    /**
+     * Bare sender ids quarantined by [purgeLegacyEntries]: paired before the
+     * whitelist became per-channel (SECURITY_AUDIT_R2 F1), so their channel
+     * can no longer be confirmed and they authorise nothing. They are kept —
+     * instead of silently dropped — so the settings UI can show the user that
+     * these senders lost access in the upgrade and must /bind again, rather
+     * than letting the whitelist quietly empty itself without a trace.
+     */
+    private const val KEY_CHANNEL_PENDING_REBIND = "KEY_CHANNEL_PENDING_REBIND"
+
     /** Separates the channel name from the sender id inside one entry. */
     private const val KEY_SEPARATOR = '|'
 
     /** Separates entries in the persisted string. */
     private const val ENTRY_SEPARATOR = ","
+
+    /**
+     * Clock seam for [KEY_CHANNEL_PAIR_TIMES], isolated for the same reason
+     * `ExternalAutomationGuard` isolates its storage seams: tests need to pin
+     * "when pairing happened" without waiting on a real clock.
+     */
+    internal var nowMillis: () -> Long = { System.currentTimeMillis() }
 
     /** Guards the one-shot legacy migration; see [purgeLegacyEntries]. */
     @Volatile
@@ -117,16 +137,31 @@ object ChannelSecurityGuard {
 
     /**
      * Add a sender ID to whitelist.
+     *
+     * Also resolves the F1 pending-re-bind state: a pending record has no
+     * channel, so once this id is authorised on *any* channel again its
+     * upgrade migration is over and the record must not keep showing as
+     * "pending re-bind" in the settings UI.
      */
     @Synchronized
     fun addSenderToWhitelist(channel: Channel, senderId: String) {
         if (senderId.isBlank()) return
+        val trimmed = senderId.trim()
         val current = getWhitelist().toMutableMap()
         val existing = current[channel]?.toMutableSet() ?: LinkedHashSet()
-        existing.add(senderId.trim())
+        val isNew = existing.add(trimmed)
         current[channel] = existing
         persist(current)
-        XLog.i(TAG, "Added sender ${redactId(senderId)} to whitelist on ${channel.name}")
+        if (isNew) {
+            // First pairing wins: re-sending /bind must not move the date
+            // the user actually paired.
+            val times = getPairTimes().toMutableMap()
+            times.putIfAbsent(entryKeyOf(channel, trimmed), nowMillis())
+            persistPairTimes(times)
+        }
+        val pending = getPendingRebindIds().toMutableSet()
+        if (pending.remove(trimmed)) persistPending(pending)
+        XLog.i(TAG, "Added sender ${redactId(trimmed)} to whitelist on ${channel.name}")
     }
 
     /**
@@ -136,10 +171,14 @@ object ChannelSecurityGuard {
     fun removeSenderFromWhitelist(channel: Channel, senderId: String) {
         val current = getWhitelist().toMutableMap()
         val existing = current[channel]?.toMutableSet() ?: return
-        if (existing.remove(senderId.trim())) {
+        val trimmed = senderId.trim()
+        if (existing.remove(trimmed)) {
             current[channel] = existing
             persist(current)
-            XLog.i(TAG, "Removed sender ${redactId(senderId)} from whitelist on ${channel.name}")
+            val times = getPairTimes().toMutableMap()
+            times.remove(entryKeyOf(channel, trimmed))
+            persistPairTimes(times)
+            XLog.i(TAG, "Removed sender ${redactId(trimmed)} from whitelist on ${channel.name}")
         }
     }
 
@@ -154,13 +193,75 @@ object ChannelSecurityGuard {
     /** Raw `CHANNEL|senderId` entries, for display and migration checks. */
     @Synchronized
     fun getWhitelistEntries(): Set<String> = getWhitelist()
-        .flatMap { (channel, ids) -> ids.map { entryKey(channel, it) } }
+        .flatMap { (channel, ids) -> ids.map { entryKeyOf(channel, it) } }
         .toSet()
+
+    /**
+     * When each whitelisted entry was first paired, keyed by [entryKeyOf].
+     * A missing key means the entry was paired before this was recorded (or
+     * the timestamp write was lost) — the UI says "unknown" instead of
+     * inventing a date.
+     */
+    @Synchronized
+    fun getPairTimes(): Map<String, Long> {
+        val raw = storage.getString(KEY_CHANNEL_PAIR_TIMES, "")
+        if (raw.isEmpty()) return emptyMap()
+        val out = LinkedHashMap<String, Long>()
+        for (piece in raw.split(ENTRY_SEPARATOR)) {
+            val trimmed = piece.trim()
+            if (trimmed.isEmpty()) continue
+            val eq = trimmed.indexOf('=')
+            if (eq <= 0) continue
+            val millis = trimmed.substring(eq + 1).toLongOrNull() ?: continue
+            out[trimmed.substring(0, eq)] = millis
+        }
+        return out
+    }
+
+    private fun persistPairTimes(times: Map<String, Long>) {
+        if (times.isEmpty()) {
+            storage.remove(KEY_CHANNEL_PAIR_TIMES)
+        } else {
+            storage.putString(
+                KEY_CHANNEL_PAIR_TIMES,
+                times.entries.joinToString(ENTRY_SEPARATOR) { "${it.key}=${it.value}" }
+            )
+        }
+    }
+
+    /**
+     * Bare sender ids waiting for a re-`/bind` after the F1 migration; see
+     * [purgeLegacyEntries]. They authorise nothing — this list is display
+     * metadata for the settings UI, never consulted by [verify].
+     */
+    @Synchronized
+    fun getPendingRebindIds(): Set<String> {
+        val raw = storage.getString(KEY_CHANNEL_PENDING_REBIND, "")
+        if (raw.isEmpty()) return emptySet()
+        return raw.split(ENTRY_SEPARATOR).map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+    }
+
+    private fun persistPending(ids: Set<String>) {
+        if (ids.isEmpty()) {
+            storage.remove(KEY_CHANNEL_PENDING_REBIND)
+        } else {
+            storage.putString(KEY_CHANNEL_PENDING_REBIND, ids.joinToString(ENTRY_SEPARATOR))
+        }
+    }
+
+    /** Drop one pending-re-bind record from the settings UI ("forget this sender"). */
+    @Synchronized
+    fun removePendingRebindId(senderId: String) {
+        val trimmed = senderId.trim()
+        if (trimmed.isEmpty()) return
+        val pending = getPendingRebindIds().toMutableSet()
+        if (pending.remove(trimmed)) persistPending(pending)
+    }
 
     private fun persist(map: Map<Channel, Set<String>>) {
         val flat = map.entries
             .filter { it.value.isNotEmpty() }
-            .flatMap { (channel, ids) -> ids.map { entryKey(channel, it) } }
+            .flatMap { (channel, ids) -> ids.map { entryKeyOf(channel, it) } }
             .toMutableList()
         if (flat.isEmpty()) {
             storage.remove(KEY_CHANNEL_WHITELIST)
@@ -170,12 +271,22 @@ object ChannelSecurityGuard {
     }
 
     /**
-     * Drop entries written before the whitelist was scoped per channel.
+     * Migrate entries written before the whitelist was scoped per channel.
      *
-     * They cannot be attributed to a channel, so keeping them would either
-     * preserve the cross-channel collision this change fixes, or guess. Guessing
-     * is the worse failure, so they are discarded and the affected sender must
-     * send /bind again. Runs at most once per process.
+     * They cannot be attributed to a channel, so keeping them in the whitelist
+     * would either preserve the cross-channel collision this change fixes, or
+     * guess. Guessing is the worse failure, so they are dropped from the
+     * whitelist and the affected sender must send /bind again — but instead of
+     * vanishing without a trace they are quarantined under
+     * [KEY_CHANNEL_PENDING_REBIND] as a *pending re-bind* record, so the
+     * settings UI can show the user that these senders lost access in the
+     * upgrade instead of a silently emptied whitelist. A successful /bind
+     * ([addSenderToWhitelist]) resolves the record.
+     *
+     * Entries that carry the scoped separator but name an unknown channel are
+     * corruption, not legacy ids, and are dropped outright. Runs at most once
+     * per process; the settings UI calls it before listing so records appear
+     * even if no message has arrived yet.
      */
     @Synchronized
     fun purgeLegacyEntries() {
@@ -186,12 +297,21 @@ object ChannelSecurityGuard {
         val entries = raw.split(ENTRY_SEPARATOR).map { it.trim() }.filter { it.isNotEmpty() }
         val kept = entries.filter { parseEntry(it) != null }
         if (kept.size == entries.size) return
+        // Legacy entries are bare pre-per-channel ids: no separator. Anything
+        // with a separator that still fails to parse is malformed, not legacy.
+        val quarantined = entries
+            .filter { parseEntry(it) == null && !it.contains(KEY_SEPARATOR) }
+            .toSet()
         if (kept.isEmpty()) storage.remove(KEY_CHANNEL_WHITELIST)
         else storage.putString(KEY_CHANNEL_WHITELIST, kept.joinToString(ENTRY_SEPARATOR))
+        if (quarantined.isNotEmpty()) {
+            persistPending(getPendingRebindIds() + quarantined)
+        }
         XLog.w(
             TAG,
-            "Discarded ${entries.size - kept.size} unscoped whitelist entr(ies) written before " +
-                "per-channel authorisation. Affected senders must send /bind again. Kept ${kept.size}."
+            "Quarantined ${quarantined.size} unscoped whitelist entr(ies) written before " +
+                "per-channel authorisation as pending re-bind; they no longer authorise anything. " +
+                "Affected senders must send /bind again. Kept ${kept.size}."
         )
     }
 
@@ -208,18 +328,19 @@ object ChannelSecurityGuard {
     }
 
     /**
-     * Key format for a whitelist entry: `<CHANNEL><SEP><senderId>`.
+     * Key format for a whitelist entry: `<CHANNEL><SEP><senderId>`. This is
+     * the key [getWhitelistEntries] and [getPairTimes] are keyed by.
      *
      * Scoping by channel matters because sender ids are only unique *within* a
      * channel. Telegram user ids, QQ open ids and Douyin open ids are all
      * numeric, so a single flat set let an id authorised on one platform
      * authorise the same id on another. Entries written before this was scoped
-     * carry no channel and are dropped by [purgeLegacyEntries].
+     * carry no channel and are quarantined by [purgeLegacyEntries].
      */
-    private fun entryKey(channel: Channel, senderId: String): String =
+    fun entryKeyOf(channel: Channel, senderId: String): String =
         "${channel.name}$KEY_SEPARATOR${senderId.trim()}"
 
-    /** Inverse of [entryKey]; null when the entry is not in scoped form. */
+    /** Inverse of [entryKeyOf]; null when the entry is not in scoped form. */
     private fun parseEntry(entry: String): Pair<Channel, String>? {
         val sep = entry.indexOf(KEY_SEPARATOR)
         if (sep <= 0) return null
@@ -231,11 +352,15 @@ object ChannelSecurityGuard {
     }
 
     /**
-     * Clear whitelist.
+     * Clear whitelist — and with it every trace of pairing: the recorded pair
+     * times and the pending-re-bind records. "Clear all" in the settings UI
+     * must not leave half the state behind.
      */
     @Synchronized
     fun clearWhitelist() {
         storage.remove(KEY_CHANNEL_WHITELIST)
+        storage.remove(KEY_CHANNEL_PAIR_TIMES)
+        storage.remove(KEY_CHANNEL_PENDING_REBIND)
     }
 
     /**

@@ -350,6 +350,31 @@
     <string name="channel_pair_pin_hint">6桁のPINコードを入力</string>
     <string name="channel_pair_pin_invalid">PINコードは6桁の数字である必要があります</string>
     <string name="channel_pair_pin_saved">ペアリングPINが更新されました</string>
+
+    <!-- ペアリング済み送信者（ChannelSecurityGuard ホワイトリスト設定） -->
+    <string name="menu_paired_senders">ペアリング済みの送信者</string>
+    <string name="channel_pair_screen_title">ペアリング済みの送信者</string>
+    <string name="channel_pair_row_summary">%1$d件ペアリング済み</string>
+    <string name="channel_pair_group_paired">ペアリング済み（%1$d）</string>
+    <string name="channel_pair_group_pending">再バインド待ち（%1$d）</string>
+    <string name="channel_pair_row_channel_date">%1$s · %2$sにペアリング</string>
+    <string name="channel_pair_paired_at_unknown">ペアリング日時不明</string>
+    <string name="channel_pair_pending_badge">再バインド待ち</string>
+    <string name="channel_pair_empty">ペアリング済みの送信者はまだいません。\n\nペアリング方法：チャンネルページでペアリングPINを確認し、対応するアプリ（Telegram / WeChat / QQ / Discord / 抖音）からボットに「/bind」に続けてPINを送信してください。ペアリング済みの送信者はここに表示されます。</string>
+    <string name="channel_pair_footer">権限はチャンネルごとに独立しています。同じ送信者でもチャンネルごとにペアリングが必要です。データはすべて端末内にのみ保存されます。\n\n「再バインド待ち」はアップグレード移行の記録です。これらの送信者はすでに権限を持っておらず、再ペアリングすると解除されます。記録はタップして削除できます。</string>
+    <string name="channel_pair_revoke_title">この送信者の権限を取り消しますか？</string>
+    <string name="channel_pair_revoke_message">取り消すと、%1$s は %2$s からタスクを送れなくなります。再度 /bind でペアリングすると復元できます。</string>
+    <string name="channel_pair_revoke_action">取り消す</string>
+    <string name="channel_pair_revoke_done">取り消しました——この送信者は再ペアリングが必要です</string>
+    <string name="channel_pair_forget_title">この記録を削除しますか？</string>
+    <string name="channel_pair_forget_message">%1$s はアップグレード時にアクセス権を失っています。記録を削除しても権限は変わりません。これはリマインダーを取り除くだけです。</string>
+    <string name="channel_pair_forget_action">記録を削除</string>
+    <string name="channel_pair_forget_done">記録を削除しました</string>
+    <string name="channel_pair_clear_row">すべてのペアリングを削除</string>
+    <string name="channel_pair_clear_title">すべてのペアリングを削除しますか？</string>
+    <string name="channel_pair_clear_message">すべてのチャンネルの全送信者（再バインド待ちを含む）が取り消されます。接続中の送信者は再び /bind するまでアクセスできません。</string>
+    <string name="channel_pair_clear_action">すべて削除</string>
+    <string name="channel_pair_clear_done">すべてのペアリングを削除しました</string>
     <string name="menu_qq">QQ</string>
     <string name="menu_douyin">抖音</string>
     <string name="menu_channel_pin">セキュリティペアリングPIN</string>

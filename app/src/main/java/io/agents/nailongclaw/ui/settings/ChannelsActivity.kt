@@ -11,6 +11,7 @@ import android.widget.Toast
 import androidx.lifecycle.ViewModelProvider
 import io.agents.nailongclaw.R
 import io.agents.nailongclaw.automation.ExternalAutomationGuard
+import io.agents.nailongclaw.channel.security.ChannelSecurityGuard
 import io.agents.nailongclaw.base.BaseActivity
 import io.agents.nailongclaw.ui.cds.CdsUi
 import io.agents.nailongclaw.utils.KVUtils
@@ -213,6 +214,22 @@ class ChannelsActivity : BaseActivity() {
             setTrailingIconColor(cds.textMuted)
         }
 
+        // The whitelist that PIN guards: who may actually talk to the bot.
+        // The count includes pending re-bind records so an upgrade that
+        // quarantined entries is visible from the entry page too.
+        entryGroup.addMenuItem(
+            leadingIcon = android.R.drawable.ic_menu_agenda,
+            title = getString(R.string.menu_paired_senders),
+            onClick = { startActivity(android.content.Intent(this, ChannelPairActivity::class.java)) },
+            showDivider = true
+        ).apply {
+            setTitleColor(cds.textPrimary)
+            setTrailingText(getString(R.string.channel_pair_row_summary, pairedSenderCount()))
+            setTrailingTextColor(cds.textSecondary)
+            setLeadingIconColor(cds.textPrimary)
+            setTrailingIconColor(cds.textMuted)
+        }
+
         entryGroup.addMenuItem(
             leadingIcon = R.drawable.ic_lan_config,
             title = getString(R.string.menu_lan_config),
@@ -265,6 +282,11 @@ class ChannelsActivity : BaseActivity() {
             setTrailingIconColor(cds.textMuted)
         }
     }
+
+    /** Active whitelist entries plus pending re-bind records, for the row summary. */
+    private fun pairedSenderCount(): Int =
+        ChannelSecurityGuard.getWhitelist().values.sumOf { it.size } +
+            ChannelSecurityGuard.getPendingRebindIds().size
 
     private fun lanTrailingText(): String =
         if (io.agents.nailongclaw.server.ConfigServerManager.isRunning()) {

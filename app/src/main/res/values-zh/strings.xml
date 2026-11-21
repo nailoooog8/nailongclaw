@@ -350,6 +350,31 @@
     <string name="channel_pair_pin_hint">输入6位数字配对码</string>
     <string name="channel_pair_pin_invalid">PIN码必须为6位数字</string>
     <string name="channel_pair_pin_saved">配对 PIN 已更新</string>
+
+    <!-- 已配对的发送者（ChannelSecurityGuard 白名单设置） -->
+    <string name="menu_paired_senders">已配对的发送者</string>
+    <string name="channel_pair_screen_title">已配对的发送者</string>
+    <string name="channel_pair_row_summary">%1$d 个已配对</string>
+    <string name="channel_pair_group_paired">已配对（%1$d）</string>
+    <string name="channel_pair_group_pending">待重绑（%1$d）</string>
+    <string name="channel_pair_row_channel_date">%1$s · 配对于 %2$s</string>
+    <string name="channel_pair_paired_at_unknown">配对时间未知</string>
+    <string name="channel_pair_pending_badge">待重绑</string>
+    <string name="channel_pair_empty">还没有已配对的发送者。\n\n配对方法：在「渠道接入」页查看配对 PIN，然后在对应软件（Telegram / 微信 / QQ / Discord / 抖音）里给机器人发送「/bind 配对码」，配对成功后会出现在这里。</string>
+    <string name="channel_pair_footer">授权按渠道隔离：同一位发送者要在每个渠道分别配对。所有数据只保存在本机。\n\n「待重绑」是升级迁移的遗留：这些发送者已失去授权、什么都不再放行；对方重新 /bind 配对后徽标自动消失，也可以点击条目删除记录。</string>
+    <string name="channel_pair_revoke_title">撤销这位发送者的授权？</string>
+    <string name="channel_pair_revoke_message">撤销后，%1$s 将无法再通过 %2$s 下达任务；要恢复访问，需要重新发送 /bind 配对。</string>
+    <string name="channel_pair_revoke_action">撤销授权</string>
+    <string name="channel_pair_revoke_done">已撤销——该发送者需重新配对</string>
+    <string name="channel_pair_forget_title">删除这条记录？</string>
+    <string name="channel_pair_forget_message">%1$s 在升级后已失去授权。删除记录不会改变任何权限，只是移除这条提醒。</string>
+    <string name="channel_pair_forget_action">删除记录</string>
+    <string name="channel_pair_forget_done">记录已删除</string>
+    <string name="channel_pair_clear_row">清空全部已配对</string>
+    <string name="channel_pair_clear_title">清空全部已配对？</string>
+    <string name="channel_pair_clear_message">将撤销所有渠道上的全部发送者（含待重绑记录），已接入的发送者全部失去授权，需要逐个重新 /bind。</string>
+    <string name="channel_pair_clear_action">全部清空</string>
+    <string name="channel_pair_clear_done">已清空全部配对</string>
     <string name="menu_qq">QQ</string>
     <string name="menu_douyin">抖音</string>
     <string name="menu_channel_pin">安全配对 PIN</string>

@@ -232,7 +232,7 @@ class ChannelSecurityGuardTest {
     }
 
     @Test
-    fun `unscoped legacy entries are discarded instead of matching any channel`() {
+    fun `unscoped legacy entries are quarantined as pending re-bind instead of matching any channel`() {
         // Simulate a whitelist written before entries were channel-scoped.
         inMemoryStorage.putString("KEY_CHANNEL_WHITELIST", "10086,20087")
 
@@ -245,6 +245,9 @@ class ChannelSecurityGuardTest {
         // Fail closed: the unscoped id must not authorise anything.
         assertTrue(bind is ChannelSecurityGuard.Decision.Reject)
         assertTrue(ChannelSecurityGuard.getWhitelist().isEmpty())
+        // Quarantined, not silently dropped: the settings UI shows them as
+        // pending re-bind so the upgrade does not unpair without a trace.
+        assertEquals(setOf("10086", "20087"), ChannelSecurityGuard.getPendingRebindIds())
     }
 
     @Test
@@ -265,5 +268,6 @@ class ChannelSecurityGuardTest {
 
         assertTrue(decision is ChannelSecurityGuard.Decision.Allow)
         assertFalse(ChannelSecurityGuard.isSenderWhitelisted(Channel.TELEGRAM, "999999"))
+        assertEquals(setOf("999999"), ChannelSecurityGuard.getPendingRebindIds())
     }
 }
