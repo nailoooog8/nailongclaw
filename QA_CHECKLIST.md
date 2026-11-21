@@ -2157,6 +2157,16 @@ adb logcat -d | grep "opened with the task ledger requested"
 
 Format: `[date] [status] [test-id] description`
 
+### 2026-11-21（晚四）— v0.9.1 发布：RELEASING.md 全链走完，发布门禁经用户决定豁免
+
+- [NOTE] — **发布动作**：版本默认键 34/0.9.0 → **63/0.9.1**（`app/build.gradle.kts`，local.properties 无覆盖键故默认值即生效；63 压过 QA 机已装 vc62 与公开线 vc34，两个已装面都能覆盖升级）；README Changelog 加 v0.9.1 条目（CI 的 release-notes 抽取按 `### v0.9.1\b` 锚定，抽取脚本已核读）。本地 `:app:assembleRelease` EXIT=0（5m06s，R8 + lintVital 全跑）；产物 `NailongClaw_v0.9.1_20261121_211645.apk`：aapt 实测 `versionCode='63' versionName='0.9.1'`，apksigner 验签通过（DN `CN=PokeClaw, O=nailoooog8`，证书 SHA-256 `7c2d6dd5…`），本地包 SHA-256 `9673fef7…`。main 推送 gh api 核对一致（`618e7a5` = 本地）；tag `v0.9.1` 推送触发 **Release APK** + **Firebase Test Lab real device smoke** 两个 run。
+- [NOTE] — **门禁豁免（用户明确决定）**：BACKLOG P0 PROCESS GATE（signed release 先跑 V/W/X/Y+J+K+P 再推 tag）本轮豁免——vivo 未接、真机全量 QA 不可行；当晚模拟器面（小遗留 7 件 + 三并行①②③）已复验全过（见晚三段）。**欠账两条**：①真机门禁 QA 随下一轮 vivo QA 一并补（FGS 缝隙复现/H78 b/f/g/SEC22/R4-R1 正向本就是同一轮的活）；②**覆盖升级链 v0.9.0→v0.9.1 从未实证**——v0.9.0 是新 applicationId 首发无人可从 v0.8.x 升上来，CI secret keystore 与本地 keystore 同一性这回才第一次被真实验证（不一致的话公开用户就地卡升级，装 v0.9.1 须卸载重装）。
+- [FAIL] — tag run 44908607065（Release APK）41s 挂在 `Prepare release signing`：`ANDROID_KEYSTORE_B64`/`ANDROID_KEYSTORE_PASSWORD`/`ANDROID_KEY_PASSWORD` 三个 secrets 缺失（只有 ALIAS 在），workflow 按设计 fail-closed「Refusing to publish a public APK without a stable signing key」。**查史：v0.9.0 的 tag run（40637976018，2026-10-28）同样挂在缺 secrets**——v0.9.0 Release 是用户手动发的，secrets 在本仓库从未配成。
+- [PASS] — 改走 v0.9.0 同款手动路径：README 抽 notes（与 CI 同逻辑）+ 本地 SHA256SUMS.txt + `gh release create v0.9.1`（keystore 不出机器）。Release 资产核对：`NailongClaw_v0.9.1_20261121_211645.apk`（106,858,095 B）+ `SHA256SUMS.txt`，标题「NailongClaw v0.9.1 · 本地模式收口 + 安全/稳定性累积」，正文为 README v0.9.1 条目。https://github.com/nailoooog8/nailongclaw/releases/tag/v0.9.1
+- [FAIL] — tag run 44908607103（Firebase Test Lab smoke）挂在缺 `GCP_PROJECT_ID`/`GCP_SA_KEY_JSON`（OEM_COVERAGE_TIERS.md T2 门控，fail-closed）——非本次引入、不阻塞发布，属仓库 secrets 长期缺口。
+- [PASS] — main push run 44908578344（Build Debug APK）3m15s 绿——推送提交（63/0.9.1 + changelog）编译信号正面。
+- [NOTE] — **CI secrets 缺口是遗留决策**：补 `ANDROID_KEYSTORE_*`（keystore base64 上云，CI 全自动发版）还是保持手动路径（keystore 只在本地），需用户拍板；`v0.9.1→` 下次发版前定。**覆盖升级链 v0.9.0→v0.9.1 实证**也待装机（CI secret 与本地 keystore 的同一性未验证过，本包是本地 keystore 签的，公开用户从 v0.9.0 升级是否顺畅取决于当时 CI 包与本包同钥——v0.9.0 包即用户手动上传的本地钥包，同一性成立）。
+
 ### 2026-11-21（晚二）— 小遗留清理轮：三实现轮遗留清单的可修项 7 件收编（代码落，模拟器未逐项复验）
 
 分支 `qa/small-leftovers` 单 commit cherry-pick 回主干 `9afa811`；合并门 `compileDebugKotlin testDebugUnitTest` **746/0**（736 基线 + 10 新例）EXIT=0，`.auto/leftovers_gate.log`。改动 16 文件 +326/-68。模拟器未逐项复验（均为低风险小额：计数/文案/委托/死代码）→ **同日晚三 h79 复验**（HEAD `e3f0a0c` debug 包 `_205232` 覆盖安装，可验面全过，见下方晚三复验段）。
