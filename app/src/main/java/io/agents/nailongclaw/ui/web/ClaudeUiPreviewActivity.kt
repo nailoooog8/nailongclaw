@@ -30,10 +30,8 @@ import androidx.core.view.updatePadding
 import androidx.webkit.WebViewAssetLoader
 import io.agents.nailongclaw.BuildConfig
 import io.agents.nailongclaw.R
-import io.agents.nailongclaw.agent.CloudProvider
 import io.agents.nailongclaw.agent.EffortLevel
 import io.agents.nailongclaw.agent.SearchProvider
-import io.agents.nailongclaw.agent.llm.LocalModelManager
 import io.agents.nailongclaw.agent.llm.ModelConfigRepository
 import io.agents.nailongclaw.agent.mcp.McpConfirmationCoordinator
 import io.agents.nailongclaw.agent.mcp.McpConfirmationGate
@@ -622,16 +620,17 @@ class ClaudeUiPreviewActivity : BaseActivity() {
          * JS → Kotlin: the model card's rows — every model this install can
          * select, each with the state that decides whether it can be.
          *
-         * Assembled here rather than in [ModelCatalogBridge] because every input
-         * needs Android: the local catalog reads the model directory and the
-         * device's RAM, and cloud keys live in encrypted prefs. The bridge only
-         * decides what a row *means*, so the parts that need a Context stay on
-         * this side and the parts that decide stay pure and tested.
+         * The assembly lives in [ModelCatalogSource] (every input needs
+         * Android: the local catalog reads the model directory and the device's
+         * RAM, and cloud keys live in encrypted prefs), so the Compose chat
+         * screen's dropdown eats the exact same rows. The bridge only decides
+         * what a row *means*, so the parts that need a Context stay in the
+         * source and the parts that decide stay pure and tested.
          */
         @JavascriptInterface
         fun readModelCatalog(): String = ModelCatalogBridge.statusPayload(
-            options = collectModelOptions(),
-            active = activeModelSelection(),
+            options = ModelCatalogSource.options(this@ClaudeUiPreviewActivity),
+            active = ModelCatalogSource.activeSelection(),
         )
 
         /**
@@ -655,13 +654,13 @@ class ClaudeUiPreviewActivity : BaseActivity() {
          */
         @JavascriptInterface
         fun selectModel(kind: String?, id: String?, provider: String?): String {
-            val options = collectModelOptions()
+            val options = ModelCatalogSource.options(this@ClaudeUiPreviewActivity)
             val selection = ModelCatalogBridge.resolveSelection(options, kind, id, provider)
             if (selection == null) {
                 XLog.e(TAG, "[chat] selectModel($kind/$id/$provider) ignored — not selectable here")
-                return ModelCatalogBridge.statusPayload(options, activeModelSelection())
+                return ModelCatalogBridge.statusPayload(options, ModelCatalogSource.activeSelection())
             }
-            activateModelSelection(selection)
+            ModelCatalogSource.activate(this@ClaudeUiPreviewActivity, selection)
             XLog.e(TAG, "[chat] selectModel -> ${selection.key}")
             // Same pair LlmConfigActivity's save performs, plus the session
             // reload that page gets for free from onResume — this surface does
@@ -679,7 +678,10 @@ class ClaudeUiPreviewActivity : BaseActivity() {
                 }
             }
             publishModelStatus()
-            return ModelCatalogBridge.statusPayload(collectModelOptions(), selection)
+            return ModelCatalogBridge.statusPayload(
+                ModelCatalogSource.options(this@ClaudeUiPreviewActivity),
+                selection,
+            )
         }
 
         /**
@@ -1151,126 +1153,6 @@ class ClaudeUiPreviewActivity : BaseActivity() {
         webView.post {
             webView.evaluateJavascript("window.__cds && window.__cds.setBrandInfo($json);", null)
         }
-    }
-
-    /**
-     * Every model this install can select, as card rows.
-     *
-     * Local first, then cloud in [CloudProvider] declaration order — the same
-     * order the native 模型与任务 page lists, so the two doors cannot disagree
-     * about which model is which. The custom endpoint is appended last and only
-     * when one is actually configured: [CloudProvider.CUSTOM] declares no
-     * models of its own, and without the synthesized row the card would show
-     * nothing selected while the agent runs on it.
-     */
-    private fun collectModelOptions(): List<ModelCatalogBridge.ModelOption> {
-        val snapshot = ModelConfigRepository.snapshot()
-        val local = LocalModelManager.catalog(this).map { entry ->
-            val availability = LocalModelManager.availabilityForModel(this, entry.model, snapshot.local)
-            ModelCatalogBridge.ModelOption(
-                kind = ModelCatalogBridge.KIND_LOCAL,
-                id = entry.model.id,
-                label = entry.model.displayName,
-                meta = localModelMeta(entry.model),
-                usable = availability.isAvailable,
-                supported = entry.isSupported,
-            )
-        }
-        val cloud = CloudProvider.entries
-            .filter { it != CloudProvider.CUSTOM }
-            .flatMap { provider ->
-                val hasKey = hasCloudKey(provider.name)
-                provider.models.map { model ->
-                    ModelCatalogBridge.ModelOption(
-                        kind = ModelCatalogBridge.KIND_CLOUD,
-                        id = model.id,
-                        label = model.displayName,
-                        meta = "${model.tier.label} · ${formatContextSize(model.contextSize)}",
-                        provider = provider.name,
-                        providerLabel = provider.displayName,
-                        usable = hasKey,
-                    )
-                }
-            }
-        val custom = ModelCatalogBridge.customCloudOption(
-            providerName = snapshot.defaultCloud.providerName,
-            modelName = snapshot.defaultCloud.modelName,
-            hasKey = hasCloudKey(CloudProvider.CUSTOM.name),
-        )
-        return local + cloud + listOfNotNull(custom)
-    }
-
-    /** Which row the agent is actually using right now. */
-    private fun activeModelSelection(): ModelCatalogBridge.ActiveSelection {
-        val snapshot = ModelConfigRepository.snapshot()
-        return if (snapshot.isLocalActive()) {
-            ModelCatalogBridge.ActiveSelection(
-                kind = ModelCatalogBridge.KIND_LOCAL,
-                id = snapshot.local.modelId,
-            )
-        } else {
-            ModelCatalogBridge.ActiveSelection(
-                kind = ModelCatalogBridge.KIND_CLOUD,
-                id = snapshot.activeCloud.modelName,
-                provider = snapshot.activeCloud.providerName,
-            )
-        }
-    }
-
-    /**
-     * Write the selection.
-     *
-     * The local branch resolves the file the same way LlmConfigActivity does —
-     * a managed download and a user-linked file live in different places, and
-     * asking for the managed path of a linked model would activate a file that
-     * is not there.
-     */
-    private fun activateModelSelection(selection: ModelCatalogBridge.ActiveSelection) {
-        if (selection.kind == ModelCatalogBridge.KIND_LOCAL) {
-            val snapshot = ModelConfigRepository.snapshot()
-            val entry = LocalModelManager.catalog(this)
-                .firstOrNull { it.model.id == selection.id } ?: return
-            val availability = LocalModelManager.availabilityForModel(this, entry.model, snapshot.local)
-            val path = when (availability.source) {
-                LocalModelManager.AvailabilitySource.MANAGED_DOWNLOAD ->
-                    LocalModelManager.getModelPath(this, entry.model)
-                LocalModelManager.AvailabilitySource.LINKED_FILE -> snapshot.local.modelPath
-                LocalModelManager.AvailabilitySource.MISSING -> null
-            }
-            if (path.isNullOrBlank()) {
-                XLog.e(TAG, "[chat] activate local '${selection.id}' refused — no file on disk")
-                return
-            }
-            ModelConfigRepository.saveLocalDefault(path, entry.model.id, activateNow = true)
-            return
-        }
-        // No explicit base URL: activateCloudSelection then reuses the stored
-        // default for this provider, which is where a custom endpoint's URL
-        // lives. Passing the provider default here would wipe it.
-        ModelConfigRepository.activateCloudSelection(
-            modelId = selection.id,
-            explicitProviderName = selection.provider,
-        )
-    }
-
-    /**
-     * Whether a provider has a key, resolved exactly the way the runtime
-     * resolves it (per-provider first, the legacy single key as fallback) — a
-     * row marked usable here must be a row the client can actually build.
-     */
-    private fun hasCloudKey(provider: String): Boolean =
-        KVUtils.getApiKeyForProvider(provider)
-            .ifEmpty { KVUtils.getLlmApiKey() }
-            .isNotBlank()
-
-    /** Size and RAM requirement, or a plain label for a user-supplied file. */
-    private fun localModelMeta(model: LocalModelManager.ModelInfo): String =
-        if (model.isCustom) "自定义模型文件"
-        else "${model.sizeBytes / 1_000_000} MB · 需 ${model.minRamGb}GB+ 内存"
-
-    private fun formatContextSize(tokens: Int): String = when {
-        tokens >= 1_000_000 -> "${tokens / 1_000_000}M"
-        else -> "${tokens / 1_000}K"
     }
 
     /**

@@ -233,11 +233,13 @@
     <string name="chat_tab_local">本地</string>
     <string name="chat_tab_cloud">云端</string>
     <string name="chat_cd_switch_model">切换模型</string>
-    <string name="chat_no_api_key">未配置 API Key</string>
-    <string name="chat_configure_api_key">配置 API Key…</string>
-    <string name="chat_on_device_tag">（端侧）</string>
-    <string name="chat_no_local_model">未下载本地模型</string>
-    <string name="chat_download_models">下载模型…</string>
+    <string name="chat_model_group_local">本地模型</string>
+    <string name="chat_model_group_cloud">云端模型</string>
+    <string name="chat_model_tag_in_use">使用中</string>
+    <string name="chat_model_tag_not_downloaded">未下载</string>
+    <string name="chat_model_tag_over_ram">内存不足</string>
+    <string name="chat_model_tag_no_key">未配置密钥</string>
+    <string name="chat_manage_models_keys">管理模型与密钥…</string>
     <string name="chat_permissions_needed">需要权限，点击前往开启</string>
 
     <string name="chat_token_cost_info"> · %1$s 消耗 · %2$s</string>

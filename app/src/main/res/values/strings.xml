@@ -233,11 +233,13 @@
     <string name="chat_tab_local">Local</string>
     <string name="chat_tab_cloud">Cloud</string>
     <string name="chat_cd_switch_model">Switch model</string>
-    <string name="chat_no_api_key">No API key configured</string>
-    <string name="chat_configure_api_key">Configure API key…</string>
-    <string name="chat_on_device_tag"> (On-device)</string>
-    <string name="chat_no_local_model">No local model downloaded</string>
-    <string name="chat_download_models">Download models…</string>
+    <string name="chat_model_group_local">On-device models</string>
+    <string name="chat_model_group_cloud">Cloud models</string>
+    <string name="chat_model_tag_in_use">In use</string>
+    <string name="chat_model_tag_not_downloaded">Not downloaded</string>
+    <string name="chat_model_tag_over_ram">Needs more memory</string>
+    <string name="chat_model_tag_no_key">No API key</string>
+    <string name="chat_manage_models_keys">Manage models &amp; keys…</string>
     <string name="chat_permissions_needed">Permissions needed. Tap to fix.</string>
 
     <string name="chat_token_cost_info"> · %1$s tokens · %2$s</string>

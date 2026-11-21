@@ -136,6 +136,78 @@ object ModelCatalogBridge {
         return ActiveSelection(kind = match.kind, id = match.id, provider = match.provider)
     }
 
+    // ── default rows ────────────────────────────────────────────────────────
+    //
+    // The Compose chat screen's Local/Cloud tabs are the second consumer of
+    // this projection: tapping a tab means "switch me to that side's default",
+    // and which row that is has to be decided here — not in the tab's click
+    // handler — so the two surfaces cannot disagree about what the default is.
+    // These replaced the old `"LOCAL"` / `"NONE"` pseudo-model ids the tab used
+    // to send: both cases name a real row now, and when no real row exists the
+    // answer is null (nothing to switch to), never a magic id.
+
+    /**
+     * The row the 本地 tab stands for: the configured local default when there
+     * is one, otherwise the first local row that can actually run (something
+     * downloaded on this device even though no default was saved). Null when
+     * neither exists — a device with nothing downloaded has no local mode to
+     * switch to.
+     */
+    fun localDefaultRow(
+        options: List<ModelOption>,
+        configuredLocalModelId: String?,
+    ): ModelOption? {
+        val localRows = options.filter { it.kind == KIND_LOCAL }
+        configuredLocalModelId?.trim()?.takeIf { it.isNotEmpty() }?.let { wanted ->
+            localRows.firstOrNull { it.id.equals(wanted, ignoreCase = true) }?.let { return it }
+        }
+        return localRows.firstOrNull { it.usable && it.supported }
+    }
+
+    /**
+     * The row the 云端 tab stands for: the stored cloud default, matched by
+     * provider *and* model — the same two-part identity a card tap carries.
+     * Null when no default model was ever configured; a provider with a key
+     * but no chosen model is not a row, so there is nothing to switch to.
+     *
+     * An unusable row (key since cleared) is still returned: the projection
+     * reports state, the switch guard refuses — mirroring how the card lists
+     * the row and disables the tap.
+     */
+    fun cloudDefaultRow(
+        options: List<ModelOption>,
+        providerName: String,
+        modelName: String,
+    ): ModelOption? {
+        val wantedModel = modelName.trim()
+        if (wantedModel.isEmpty()) return null
+        val wantedProvider = providerName.trim()
+        return options.firstOrNull { option ->
+            option.kind == KIND_CLOUD &&
+                option.provider.equals(wantedProvider, ignoreCase = true) &&
+                option.id.equals(wantedModel, ignoreCase = true)
+        }
+    }
+
+    /**
+     * Whether a cloud row names a model its provider actually declares.
+     *
+     * The guard for a switch that arrives as a row rather than through
+     * [resolveSelection] (which checks the same identity against the freshly
+     * assembled options). Reads the declarations, not the key state — an
+     * undeclared id is a stale or forged row; a declared id without a key is
+     * simply refused later by the usable flag. CUSTOM declares nothing (the
+     * model name is whatever the user typed), so it passes on a non-blank id.
+     */
+    fun isDeclaredCloudModel(providerName: String, modelId: String): Boolean {
+        val provider = CloudProvider.entries.firstOrNull {
+            it.name.equals(providerName.trim(), ignoreCase = true)
+        } ?: return false
+        val wanted = modelId.trim()
+        if (provider == CloudProvider.CUSTOM) return wanted.isNotEmpty()
+        return provider.models.any { it.id.equals(wanted, ignoreCase = true) }
+    }
+
     /**
      * The custom-endpoint row, when the user has configured one.
      *

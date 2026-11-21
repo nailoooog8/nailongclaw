@@ -16,6 +16,7 @@ import io.agents.nailongclaw.agent.llm.LlmSessionManager
 import io.agents.nailongclaw.agent.llm.LocalModelManager
 import io.agents.nailongclaw.agent.llm.LocalModelRuntime
 import io.agents.nailongclaw.agent.llm.ModelConfigRepository
+import io.agents.nailongclaw.ui.web.ModelCatalogBridge
 import io.agents.nailongclaw.utils.XLog
 import com.google.ai.edge.litertlm.Contents
 import com.google.ai.edge.litertlm.Conversation
@@ -448,35 +449,80 @@ class ChatSessionController(
         }
     }
 
-    fun switchModel(modelId: String, displayName: String) {
-        if (modelId == "NONE") {
-            sink.modelStatus = "No model selected"
-            isModelReady = false
-            setButtonsEnabled(false)
-            XLog.i(TAG, "switchModel: NONE — no model configured for current tab")
+    /**
+     * Switch to one row of the model catalog — the same projection the WebView
+     * main surface's model card draws ([ModelCatalogBridge]), fed by
+     * [io.agents.nailongclaw.ui.web.ModelCatalogSource]. The dropdown and the
+     * tabs both hand over a row; this controller is the only place that turns
+     * it into a runtime re-wire.
+     *
+     * The guard mirrors [ModelCatalogBridge.resolveSelection] — the card's own
+     * switch gate — so the two doors keep one rule: a row the card would
+     * refuse (file not downloaded, over RAM, no key) is refused here too,
+     * writing nothing. Beyond the row's flags, the local file is re-resolved
+     * from disk at switch time (the flags were read when the catalog was
+     * assembled; the file can vanish in between) and a cloud row must name a
+     * model its provider actually declares. The old `"LOCAL"` / `"NONE"`
+     * pseudo-model ids died with this signature: every caller now points at a
+     * real row, and "nothing configured" simply never reaches this method.
+     *
+     * A task already in flight keeps the client it started with — switching
+     * changes the *next* message, not one being answered.
+     */
+    fun switchModel(row: ModelCatalogBridge.ModelOption) {
+        if (!row.usable || !row.supported) {
+            XLog.i(TAG, "switchModel: ${row.key} refused — not usable on this device")
             return
         }
-        if (modelId == "LOCAL") {
-            val localConfig = ModelConfigRepository.snapshot().local
-            if (!localConfig.isConfigured) {
-                sink.modelStatus = "No model selected"
-                isModelReady = false
-                setButtonsEnabled(false)
-                XLog.i(TAG, "switchModel: LOCAL requested but no local default configured")
-                return
-            }
-            ModelConfigRepository.activateLocal(localConfig.modelPath, localConfig.modelId)
-            sink.modelStatus = "● ${localConfig.displayName} · On-device"
-            addSystem("Switched to local model")
-            loadModelIfReady()
-        } else {
-            localUiGeneration++
-            ModelConfigRepository.activateCloudSelection(modelId)
-            suppressNextCloudSwitchMessage = true
-            loadModelIfReady()
-            addSystem("Switched to $displayName")
+        when (row.kind) {
+            ModelCatalogBridge.KIND_LOCAL -> switchToLocalRow(row)
+            ModelCatalogBridge.KIND_CLOUD -> switchToCloudRow(row)
+            else -> XLog.i(TAG, "switchModel: unknown kind '${row.kind}' refused")
         }
-        XLog.i(TAG, "Model switched to: $modelId ($displayName)")
+    }
+
+    private fun switchToLocalRow(row: ModelCatalogBridge.ModelOption) {
+        val snapshot = ModelConfigRepository.snapshot()
+        val entry = LocalModelManager.catalog(activity)
+            .firstOrNull { it.model.id == row.id } ?: run {
+            XLog.i(TAG, "switchModel: local '${row.id}' refused — not in the catalog")
+            return
+        }
+        val availability = LocalModelManager.availabilityForModel(activity, entry.model, snapshot.local)
+        val path = when (availability.source) {
+            LocalModelManager.AvailabilitySource.MANAGED_DOWNLOAD ->
+                LocalModelManager.getModelPath(activity, entry.model)
+            LocalModelManager.AvailabilitySource.LINKED_FILE -> snapshot.local.modelPath
+            LocalModelManager.AvailabilitySource.MISSING -> null
+        }
+        if (path.isNullOrBlank()) {
+            XLog.i(TAG, "switchModel: local '${row.id}' refused — no file on disk")
+            return
+        }
+        ModelConfigRepository.activateLocal(path, entry.model.id)
+        sink.modelStatus = "● ${row.label} · On-device"
+        addSystem("Switched to ${row.label}")
+        loadModelIfReady()
+        XLog.i(TAG, "Model switched to: ${row.key} (${row.label})")
+    }
+
+    private fun switchToCloudRow(row: ModelCatalogBridge.ModelOption) {
+        if (!ModelCatalogBridge.isDeclaredCloudModel(row.provider, row.id)) {
+            XLog.i(TAG, "switchModel: cloud '${row.key}' refused — not declared by its provider")
+            return
+        }
+        localUiGeneration++
+        // The provider rides the row — switching to another provider's model
+        // must switch the endpoint with it, which the old model-id-only call
+        // could not express.
+        ModelConfigRepository.activateCloudSelection(
+            modelId = row.id,
+            explicitProviderName = row.provider,
+        )
+        suppressNextCloudSwitchMessage = true
+        loadModelIfReady()
+        addSystem("Switched to ${row.label}")
+        XLog.i(TAG, "Model switched to: ${row.key} (${row.label})")
     }
 
     fun startNewConversationRuntime() {

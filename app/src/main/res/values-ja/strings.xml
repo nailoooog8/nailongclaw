@@ -233,11 +233,13 @@
     <string name="chat_tab_local">ローカル</string>
     <string name="chat_tab_cloud">クラウド</string>
     <string name="chat_cd_switch_model">モデルを切り替え</string>
-    <string name="chat_no_api_key">API キーが未設定</string>
-    <string name="chat_configure_api_key">API キーを設定…</string>
-    <string name="chat_on_device_tag">（オンデバイス）</string>
-    <string name="chat_no_local_model">ローカルモデル未ダウンロード</string>
-    <string name="chat_download_models">モデルをダウンロード…</string>
+    <string name="chat_model_group_local">ローカルモデル</string>
+    <string name="chat_model_group_cloud">クラウドモデル</string>
+    <string name="chat_model_tag_in_use">使用中</string>
+    <string name="chat_model_tag_not_downloaded">未ダウンロード</string>
+    <string name="chat_model_tag_over_ram">メモリ不足</string>
+    <string name="chat_model_tag_no_key">キー未設定</string>
+    <string name="chat_manage_models_keys">モデルとキーを管理…</string>
     <string name="chat_permissions_needed">権限が必要です。タップして修正</string>
 
     <string name="chat_token_cost_info"> · %1$s トークン · %2$s</string>

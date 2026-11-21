@@ -44,6 +44,7 @@ import io.agents.nailongclaw.agent.SearchProvider
 import io.agents.nailongclaw.agent.skill.Skill
 import io.agents.nailongclaw.agent.skill.SkillCategory
 import io.agents.nailongclaw.agent.skill.SkillRegistry
+import io.agents.nailongclaw.ui.web.ModelCatalogBridge
 import io.agents.nailongclaw.utils.KVUtils
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -166,7 +167,12 @@ fun ChatScreen(
     onSendQueuedTaskNow: (String) -> Unit = {},
     onInterruptAndSendTask: (String) -> Unit = {},
     inputEnabled: Boolean = true,
-    onModelSwitch: (modelId: String, displayName: String) -> Unit = { _, _ -> },
+    /** The full model catalog to draw in the top bar's dropdown, already grouped. */
+    modelMenu: List<ModelMenuProjection.Group> = emptyList(),
+    /** Switch to a specific catalog row (dropdown tap). */
+    onModelSwitch: (ModelCatalogBridge.ModelOption) -> Unit = {},
+    /** Switch to a side's default row ("local" / "cloud" tab tap); may no-op when that side has none. */
+    onSwitchToTab: (String) -> Unit = {},
     colors: PokeclawColors = AbyssDark,
     webSearchProvider: String = SearchProvider.DEEPSEEK.name,
     webSearchConfigured: Boolean = false,
@@ -186,10 +192,13 @@ fun ChatScreen(
     var prefillIsTask by remember { mutableStateOf(false) }
     // Task mode state — lifted here so content area can react
     var isTaskMode by remember { mutableStateOf(false) }
-    // Local/Cloud tab — controls UI presentation AND triggers model switch.
-    // Keep the tab aligned with the actual active model so returning from
-    // Settings/model changes cannot leave the toolbar UI out of sync.
-    var selectedTab by remember { mutableStateOf(if (isLocalModel) "local" else "cloud") }
+    // Local/Cloud tab — derived from the actual active model, never from the
+    // tap. A tab whose side has nothing to switch to does not switch (the
+    // activity resolves the side's default row and refuses when there is
+    // none), and a pill that followed the tap while the model stayed put
+    // would lie. There is no remembered tab state left, so returning from
+    // Settings/model changes cannot desync the toolbar either.
+    val selectedTab = if (isLocalModel) "local" else "cloud"
     val isLocalUI = selectedTab == "local"
     // 「任务运行中」的两个来源：入参 isTaskRunning 是本面经 TaskFlowController
     // 发起的任务（发送瞬间就置位），TaskRuntimeState 总线是悬浮球/活动胶囊同
@@ -211,10 +220,6 @@ fun ChatScreen(
             kotlinx.coroutines.delay(2000)
             activatingSkill = null
         }
-    }
-
-    LaunchedEffect(isLocalModel) {
-        selectedTab = if (isLocalModel) "local" else "cloud"
     }
 
     ModalNavigationDrawer(
@@ -260,40 +265,12 @@ fun ChatScreen(
                         sessionCost = sessionCost,
                         isLocalModel = isLocalModel,
                         selectedTab = selectedTab,
-                        onTabChange = { tab ->
-                            selectedTab = tab
-                            val kvUtils = io.agents.nailongclaw.utils.KVUtils
-                            if (tab == "cloud") {
-                                // Check if cloud default model is configured
-                                if (kvUtils.hasDefaultCloudModel()) {
-                                    val modelId = kvUtils.getDefaultCloudModel()
-                                    val provider = io.agents.nailongclaw.agent.CloudProvider.fromName(
-                                        kvUtils.getDefaultCloudProvider().ifBlank { kvUtils.getLlmProvider() }
-                                    )
-                                    val displayName = provider.models.find { it.id == modelId }?.displayName ?: modelId
-                                    onModelSwitch(modelId, displayName)
-                                } else {
-                                    // No cloud model configured — signal "no model" state
-                                    io.agents.nailongclaw.utils.XLog.i("ChatScreen", "Cloud tab: no default cloud model configured")
-                                    onModelSwitch("NONE", "")
-                                }
-                            } else {
-                                // Check if local default model is configured
-                                if (kvUtils.hasDefaultLocalModel()) {
-                                    val localPath = kvUtils.getLocalModelPath()
-                                    val name = java.io.File(localPath).nameWithoutExtension
-                                        .replace("-", " ").replace("_", " ")
-                                    onModelSwitch("LOCAL", name)
-                                } else {
-                                    // No local model configured — signal "no model" state
-                                    io.agents.nailongclaw.utils.XLog.i("ChatScreen", "Local tab: no default local model configured")
-                                    onModelSwitch("NONE", "")
-                                }
-                            }
-                        },
+                        onTabChange = onSwitchToTab,
                         onMenuClick = { scope.launch { drawerState.open() } },
                         onSettings = onOpenSettings,
+                        modelMenu = modelMenu,
                         onModelSwitch = onModelSwitch,
+                        onManageModels = onOpenModels,
                         colors = colors,
                     )
                     if (activeTasks.isNotEmpty()) {
@@ -447,7 +424,9 @@ private fun ChatTopBar(
     onTabChange: (String) -> Unit,
     onMenuClick: () -> Unit,
     onSettings: () -> Unit,
-    onModelSwitch: (modelId: String, displayName: String) -> Unit = { _, _ -> },
+    modelMenu: List<ModelMenuProjection.Group>,
+    onModelSwitch: (ModelCatalogBridge.ModelOption) -> Unit = {},
+    onManageModels: () -> Unit,
     colors: PokeclawColors,
 ) {
     // Token count color: grey → blue → amber → red
@@ -568,91 +547,86 @@ private fun ChatTopBar(
                 )
             }
         }
-            // Model switcher dropdown — only show configured/downloaded models
+            // Model switcher dropdown — the full catalog the WebView main
+            // surface's model card draws: 本地/云端 groups, every provider's
+            // models, per-row status tags, and the same tap gate
+            // (usable && supported). Drawn from [ModelMenuProjection], which
+            // maps [ModelCatalogBridge]'s projection; this UI invents nothing
+            // and reads no config, so the two surfaces cannot drift.
             DropdownMenu(
                 expanded = showModelMenu,
                 onDismissRequest = { showModelMenu = false },
             ) {
-                val kvUtils = io.agents.nailongclaw.utils.KVUtils
-                val apiKey = kvUtils.getLlmApiKey()
-                val baseUrl = kvUtils.getLlmBaseUrl()
-                val currentModel = kvUtils.getLlmModelName()
-
-                if (selectedTab == "cloud") {
-                    // Cloud models: from configured provider
-                    if (apiKey.isNotEmpty()) {
-                        val activeProvider = io.agents.nailongclaw.agent.CloudProvider.entries.find {
-                            it.defaultBaseUrl == baseUrl
-                        }
-                        val modelsToShow = activeProvider?.models
-                            ?: io.agents.nailongclaw.agent.CloudProvider.OPENAI.models
-                        modelsToShow.forEach { model ->
-                            DropdownMenuItem(
-                                text = {
+                modelMenu.forEachIndexed { groupIndex, group ->
+                    if (groupIndex > 0) HorizontalDivider()
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                when (group.kind) {
+                                    ModelCatalogBridge.KIND_LOCAL -> stringResource(R.string.chat_model_group_local)
+                                    ModelCatalogBridge.KIND_CLOUD -> stringResource(R.string.chat_model_group_cloud)
+                                    else -> group.kind
+                                },
+                                fontSize = 11.sp,
+                                color = colors.textTertiary,
+                            )
+                        },
+                        onClick = {},
+                        enabled = false,
+                    )
+                    group.rows.forEach { row ->
+                        DropdownMenuItem(
+                            enabled = row.selectable,
+                            text = {
+                                Column {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Text(
-                                            model.displayName,
+                                            row.option.label,
                                             fontSize = 13.sp,
-                                            fontWeight = if (model.id == currentModel && !isLocalModel) FontWeight.Bold else FontWeight.Normal,
+                                            fontWeight = if (row.isActive) FontWeight.Bold else FontWeight.Normal,
+                                            color = if (row.isActive) colors.accent else colors.textPrimary,
                                         )
-                                        if (model.id == currentModel && !isLocalModel) {
+                                        if (row.isActive) {
                                             Spacer(Modifier.width(6.dp))
                                             Text("✓", fontSize = 12.sp, color = colors.accent)
                                         }
                                     }
-                                },
-                                onClick = {
-                                    showModelMenu = false
-                                    onModelSwitch(model.id, model.displayName)
-                                },
-                            )
-                        }
-                    } else {
-                        // No API key configured
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.chat_no_api_key), fontSize = 13.sp, color = colors.textTertiary) },
-                            onClick = { showModelMenu = false; onSettings() },
-                        )
-                    }
-                    HorizontalDivider()
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.chat_configure_api_key), fontSize = 13.sp, color = colors.accent) },
-                        onClick = { showModelMenu = false; onSettings() },
-                    )
-                } else {
-                    // Local models: downloaded models
-                    val localPath = kvUtils.getLocalModelPath()
-                    if (localPath.isNotEmpty() && java.io.File(localPath).exists()) {
-                        val localName = java.io.File(localPath).nameWithoutExtension
-                            .replace("-", " ").replace("_", " ")
-                        DropdownMenuItem(
-                            text = {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text("$localName${stringResource(R.string.chat_on_device_tag)}", fontSize = 13.sp,
-                                        fontWeight = if (isLocalModel) FontWeight.Bold else FontWeight.Normal)
-                                    if (isLocalModel) {
-                                        Spacer(Modifier.width(6.dp))
-                                        Text("✓", fontSize = 12.sp, color = colors.accent)
+                                    val subtitle = if (row.option.providerLabel.isBlank()) {
+                                        row.option.meta
+                                    } else {
+                                        "${row.option.providerLabel} · ${row.option.meta}"
                                     }
+                                    if (subtitle.isNotBlank()) {
+                                        Text(subtitle, fontSize = 11.sp, color = colors.textTertiary)
+                                    }
+                                }
+                            },
+                            trailingIcon = row.tag?.let { tag ->
+                                {
+                                    Text(
+                                        when (tag) {
+                                            ModelMenuProjection.RowTag.ACTIVE -> stringResource(R.string.chat_model_tag_in_use)
+                                            ModelMenuProjection.RowTag.NOT_DOWNLOADED -> stringResource(R.string.chat_model_tag_not_downloaded)
+                                            ModelMenuProjection.RowTag.OVER_RAM -> stringResource(R.string.chat_model_tag_over_ram)
+                                            ModelMenuProjection.RowTag.NO_KEY -> stringResource(R.string.chat_model_tag_no_key)
+                                        },
+                                        fontSize = 11.sp,
+                                        color = colors.textTertiary,
+                                    )
                                 }
                             },
                             onClick = {
                                 showModelMenu = false
-                                onModelSwitch("LOCAL", localName)
+                                onModelSwitch(row.option)
                             },
                         )
-                    } else {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.chat_no_local_model), fontSize = 13.sp, color = colors.textTertiary) },
-                            onClick = { showModelMenu = false; onSettings() },
-                        )
                     }
-                    HorizontalDivider()
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.chat_download_models), fontSize = 13.sp, color = colors.accent) },
-                        onClick = { showModelMenu = false; onSettings() },
-                    )
                 }
+                HorizontalDivider()
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.chat_manage_models_keys), fontSize = 13.sp, color = colors.accent) },
+                    onClick = { showModelMenu = false; onManageModels() },
+                )
             }
         }
         HorizontalDivider(color = colors.divider, thickness = 0.5.dp)

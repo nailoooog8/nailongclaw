@@ -23,6 +23,8 @@ import io.agents.nailongclaw.automation.ExternalAutomationEntrypoint
 import io.agents.nailongclaw.appViewModel
 import io.agents.nailongclaw.channel.Channel
 import io.agents.nailongclaw.floating.FloatingCircleManager
+import io.agents.nailongclaw.ui.web.ModelCatalogBridge
+import io.agents.nailongclaw.ui.web.ModelCatalogSource
 import io.agents.nailongclaw.ui.settings.LlmConfigActivity
 import io.agents.nailongclaw.ui.settings.SettingsActivity
 import io.agents.nailongclaw.ui.settings.WebSearchActivity
@@ -63,6 +65,13 @@ class ComposeChatActivity : ComponentActivity() {
     // Session-level token tracking for chat mode
     private val _sessionTokens = mutableStateOf(0)
     private val _sessionCost = mutableStateOf(0.0)
+    // Model dropdown — the same catalog projection the WebView main surface's
+    // model card draws, grouped by [ModelMenuProjection]. Refreshed on entry,
+    // on resume (a model may have been downloaded or keyed in the 模型 page)
+    // and after every switch, so the rows cannot outlive the config they
+    // were read from.
+    private val _modelMenu = mutableStateOf<List<ModelMenuProjection.Group>>(emptyList())
+    private var modelOptions: List<ModelCatalogBridge.ModelOption> = emptyList()
     // Smart-search card state — refreshed on resume so a key saved in the
     // web-search settings page shows up without leaving and re-entering chat.
     private val _webSearchProvider = mutableStateOf(SearchProvider.DEEPSEEK.name)
@@ -232,7 +241,9 @@ class ComposeChatActivity : ComponentActivity() {
                 onRemoveQueuedTask = { id -> io.agents.nailongclaw.task.PendingTaskQueue.remove(id) },
                 onSendQueuedTaskNow = { id -> io.agents.nailongclaw.task.PendingTaskQueue.sendNow(id) },
                 onInterruptAndSendTask = { draft -> taskFlowController.interruptAndSend(draft) },
-                onModelSwitch = { modelId, displayName -> switchModel(modelId, displayName) },
+                onModelSwitch = { row -> switchModel(row) },
+                onSwitchToTab = { tab -> switchToTab(tab) },
+                modelMenu = _modelMenu.value,
                 colors = composeColors,
                 webSearchProvider = _webSearchProvider.value,
                 webSearchConfigured = _webSearchConfigured.value,
@@ -248,6 +259,7 @@ class ComposeChatActivity : ComponentActivity() {
 
         refreshWebSearchStatus()
         refreshSidebarHistory()
+        refreshModelMenu()
         // 本面成为排队任务的发送面：队列排空走这里，用户气泡和打字泡才落
         // 在用户发消息的这个转录里（而不是无头 startTask 无人渲染的事件流）。
         taskFlowController.registerAsQueueSender()
@@ -307,6 +319,9 @@ class ComposeChatActivity : ComponentActivity() {
         _isTaskRunning.value = appViewModel.isTaskRunning()
         refreshSidebarHistory()
         refreshWebSearchStatus()
+        // A model downloaded or keyed in the 模型 page while we were away, or
+        // switched on the WebView main surface, has to show in the dropdown.
+        refreshModelMenu()
         permHandler.removeCallbacks(permPoller)
         permHandler.postDelayed(permPoller, 1000)
         activeTaskShellController.onResume()
@@ -449,13 +464,56 @@ class ComposeChatActivity : ComponentActivity() {
         }
     }
 
-    private fun switchModel(modelId: String, displayName: String) {
-        chatSessionController.switchModel(modelId, displayName)
+    /**
+     * Switch to a catalog row the dropdown handed over.
+     *
+     * The controller re-checks the row (usable flags, local file on disk,
+     * declared cloud model) and refuses to write anything for a row the
+     * WebView model card would refuse too; this side then mirrors the switch
+     * into the pieces of UI that read the active mode, and refreshes the
+     * dropdown so the checkmark follows the row actually written.
+     */
+    private fun switchModel(row: ModelCatalogBridge.ModelOption) {
+        chatSessionController.switchModel(row)
         _isLocalModelActive.value = ModelConfigRepository.isLocalActive()
-        if (modelId != "NONE") {
-            syncTaskAgentConfig()
+        refreshModelMenu()
+        syncTaskAgentConfig()
+        XLog.i(TAG, "Model switched to: ${row.key} (${row.label})")
+    }
+
+    /**
+     * The 本地/云端 tabs: switch to that side's default row.
+     *
+     * "Which row is the default" is decided by [ModelCatalogBridge] (the
+     * configured local default, else something on this device that can run;
+     * the stored cloud default) so the two chat surfaces cannot disagree. A
+     * side with no row to point at does not switch — there is no model to
+     * select, and unlike the old `"NONE"` pseudo-model the tap neither
+     * pretends to change the model nor kills the one still running; the
+     * dropdown is where the side's real rows (and what they lack) are listed.
+     */
+    private fun switchToTab(tab: String) {
+        val snapshot = ModelConfigRepository.snapshot()
+        val row = if (tab == "local") {
+            ModelCatalogBridge.localDefaultRow(modelOptions, snapshot.local.modelId)
+        } else {
+            ModelCatalogBridge.cloudDefaultRow(
+                modelOptions,
+                snapshot.defaultCloud.providerName,
+                snapshot.defaultCloud.modelName,
+            )
         }
-        XLog.i(TAG, "Model switched to: $modelId ($displayName)")
+        if (row == null) {
+            XLog.i(TAG, "switchToTab($tab): no default row on this side — nothing to switch to")
+            return
+        }
+        switchModel(row)
+    }
+
+    /** Re-assemble the catalog and re-project the dropdown from it. */
+    private fun refreshModelMenu() {
+        modelOptions = ModelCatalogSource.options(this)
+        _modelMenu.value = ModelMenuProjection.menu(modelOptions, ModelCatalogSource.activeSelection())
     }
 
     private fun newChat() {
