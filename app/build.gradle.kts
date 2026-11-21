@@ -112,8 +112,8 @@ android {
         applicationId = "io.agents.nailongclaw"
         minSdk = 28
         targetSdk = 36
-        versionCode = readLocalOrEnvInt("NAILONGCLAW_VERSION_CODE", 34)
-        versionName = readLocalOrEnvString("NAILONGCLAW_VERSION_NAME", "0.9.0")
+        versionCode = readLocalOrEnvInt("NAILONGCLAW_VERSION_CODE", 63)
+        versionName = readLocalOrEnvString("NAILONGCLAW_VERSION_NAME", "0.9.1")
         // BuildConfig.VERSION_INFO（branch_sha）曾是零读者死重（2026-11-19
         // BACKLOG 顺带发现，仓库里除本行注入外没有任何 Kotlin/XML/脚本引用），
         // 2026-11-21 与 BuildConfig.BUILD_FINGERPRINT 的处置对照后删除：
