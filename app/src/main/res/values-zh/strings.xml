@@ -240,6 +240,10 @@
     <string name="chat_model_tag_over_ram">内存不足</string>
     <string name="chat_model_tag_no_key">未配置密钥</string>
     <string name="chat_manage_models_keys">管理模型与密钥…</string>
+    <!-- 下拉无可切行时的空态文案，与 WebView 模型卡片(models-empty)对齐。 -->
+    <string name="chat_model_menu_empty">没有可选模型。在「模型与任务」里下载本地模型，或填写云端服务商的密钥。</string>
+    <!-- 本地/云端 tab 解析不出默认行时的 toast。 -->
+    <string name="chat_model_no_switchable">当前没有可切换的模型</string>
     <string name="chat_permissions_needed">需要权限，点击前往开启</string>
 
     <string name="chat_token_cost_info"> · %1$s 消耗 · %2$s</string>

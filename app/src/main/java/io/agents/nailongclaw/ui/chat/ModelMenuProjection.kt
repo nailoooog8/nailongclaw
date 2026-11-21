@@ -85,6 +85,17 @@ object ModelMenuProjection {
         }
     }
 
+    /**
+     * True when the menu has no rows at all — the case the WebView model card
+     * answers with its 没有可选模型 footer (`cds.js`: `if (!models.length)`).
+     * The Compose dropdown draws the same empty-state line instead of a bare
+     * divider and the manage entry. Rows that exist but are not selectable
+     * (not downloaded, no key) do NOT count as empty: both surfaces list them
+     * disabled, with the tag naming what they lack — that is more information
+     * than a "no models" line.
+     */
+    fun isEmptyMenu(menu: List<Group>): Boolean = menu.all { it.rows.isEmpty() }
+
     private fun ModelCatalogBridge.ModelOption.toRow(
         active: ModelCatalogBridge.ActiveSelection,
     ): Row {

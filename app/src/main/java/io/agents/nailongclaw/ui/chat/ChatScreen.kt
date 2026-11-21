@@ -622,6 +622,23 @@ private fun ChatTopBar(
                         )
                     }
                 }
+                // No rows at all (nothing downloaded, no provider keyed): say
+                // so, like the WebView model card's 没有可选模型 footer — a
+                // dropdown that is only a divider and the manage entry reads
+                // as broken rather than as "there is nothing to switch to".
+                if (ModelMenuProjection.isEmptyMenu(modelMenu)) {
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                stringResource(R.string.chat_model_menu_empty),
+                                fontSize = 12.sp,
+                                color = colors.textTertiary,
+                            )
+                        },
+                        onClick = {},
+                        enabled = false,
+                    )
+                }
                 HorizontalDivider()
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.chat_manage_models_keys), fontSize = 13.sp, color = colors.accent) },

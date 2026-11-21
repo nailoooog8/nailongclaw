@@ -227,51 +227,28 @@ object KVUtils {
     fun getDouyinWebhookUrl(): String = getEncryptedString(KEY_DOUYIN_WEBHOOK_URL, "")
     fun setDouyinWebhookUrl(value: String) = putEncryptedString(KEY_DOUYIN_WEBHOOK_URL, value)
 
-    // ==================== Channel Security & Whitelist ====================
-    private const val KEY_CHANNEL_SECURITY_ENABLED = "KEY_CHANNEL_SECURITY_ENABLED"
-    private const val KEY_CHANNEL_PAIR_PIN = "KEY_CHANNEL_PAIR_PIN"
-    private const val KEY_CHANNEL_WHITELIST_PREFIX = "KEY_CHANNEL_WHITELIST_"
+    // ==================== Channel Security ====================
+    // The pairing PIN and the security switch have exactly one writer:
+    // [io.agents.nailongclaw.channel.security.ChannelSecurityGuard]. This
+    // object used to hold its own copy of the same MMKV keys and a second
+    // PIN generator; the two halves only met by sharing MMKV.defaultMMKV(),
+    // so "who wrote this key" depended on which entry point the caller
+    // happened to use. These four delegating shims keep the historical
+    // call sites working against the guard, which reads/writes the same
+    // keys — already-generated PINs and the toggle's default (enabled)
+    // are unchanged.
+    fun isChannelSecurityEnabled(): Boolean =
+        io.agents.nailongclaw.channel.security.ChannelSecurityGuard.isSecurityEnabled()
 
-    fun isChannelSecurityEnabled(): Boolean = getBoolean(KEY_CHANNEL_SECURITY_ENABLED, true)
-    fun setChannelSecurityEnabled(enabled: Boolean) = putBoolean(KEY_CHANNEL_SECURITY_ENABLED, enabled)
+    fun setChannelSecurityEnabled(enabled: Boolean) =
+        io.agents.nailongclaw.channel.security.ChannelSecurityGuard.setSecurityEnabled(enabled)
 
-    fun getChannelPairPin(): String {
-        var pin = getString(KEY_CHANNEL_PAIR_PIN, "")
-        if (pin.isBlank() || pin.length != 6) {
-            val random = java.security.SecureRandom()
-            pin = (random.nextInt(900000) + 100000).toString()
-            setChannelPairPin(pin)
-        }
-        return pin
-    }
+    fun getChannelPairPin(): String =
+        io.agents.nailongclaw.channel.security.ChannelSecurityGuard.getPairPin()
 
-    fun setChannelPairPin(pin: String): Boolean = putString(KEY_CHANNEL_PAIR_PIN, pin)
-
-    fun getChannelWhitelist(channel: String): Set<String> {
-        val key = KEY_CHANNEL_WHITELIST_PREFIX + channel.lowercase()
-        val raw = getString(key, "")
-        if (raw.isBlank()) return emptySet()
-        return raw.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
-    }
-
-    fun addChannelWhitelist(channel: String, senderId: String): Boolean {
-        if (senderId.isBlank()) return false
-        val current = getChannelWhitelist(channel).toMutableSet()
-        current.add(senderId.trim())
-        val key = KEY_CHANNEL_WHITELIST_PREFIX + channel.lowercase()
-        return putString(key, current.joinToString(","))
-    }
-
-    fun removeChannelWhitelist(channel: String, senderId: String): Boolean {
-        if (senderId.isBlank()) return false
-        val current = getChannelWhitelist(channel).toMutableSet()
-        val removed = current.remove(senderId.trim())
-        if (removed) {
-            val key = KEY_CHANNEL_WHITELIST_PREFIX + channel.lowercase()
-            return putString(key, current.joinToString(","))
-        }
-        return false
-    }
+    /** Writes through the guard — the guard trims, so callers stay honest. */
+    fun setChannelPairPin(pin: String) =
+        io.agents.nailongclaw.channel.security.ChannelSecurityGuard.setPairPin(pin)
 
     // ==================== LAN Config Service ====================
     private const val KEY_CONFIG_SERVER_ENABLED = "KEY_CONFIG_SERVER_ENABLED"

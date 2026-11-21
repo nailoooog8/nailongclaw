@@ -240,6 +240,10 @@
     <string name="chat_model_tag_over_ram">メモリ不足</string>
     <string name="chat_model_tag_no_key">キー未設定</string>
     <string name="chat_manage_models_keys">モデルとキーを管理…</string>
+    <!-- ドロップダウンに切替可能な行がない場合の空状態。Web モデルカード(models-empty)と同じ文意。 -->
+    <string name="chat_model_menu_empty">利用できるモデルがありません。「モデルとタスク」でローカルモデルをダウンロードするか、クラウドプロバイダーのキーを入力してください。</string>
+    <!-- ローカル/クラウドタブで既定行を解決できないときのトースト。 -->
+    <string name="chat_model_no_switchable">切り替え可能なモデルがありません</string>
     <string name="chat_permissions_needed">権限が必要です。タップして修正</string>
 
     <string name="chat_token_cost_info"> · %1$s トークン · %2$s</string>

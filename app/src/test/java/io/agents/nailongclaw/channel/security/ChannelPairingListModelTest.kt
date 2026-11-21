@@ -307,4 +307,39 @@ class ChannelPairingListModelTest {
         assertFalse(ChannelSecurityGuard.isSenderWhitelisted(Channel.QQ, "10086"))
         assertTrue(buildModel().pendingRows.isEmpty())
     }
+
+    // ---- Entry-page trailing count (ChannelsActivity "Paired senders") ----
+
+    @Test
+    fun `the entry-page count equals the rows the whitelist page renders`() {
+        // Same input, same number: the 渠道接入页 links to the whitelist page,
+        // and a trailing count that disagrees with the list behind the link
+        // reads as a bug. Active on two channels + one quarantined id = 3 rows.
+        ChannelSecurityGuard.addSenderToWhitelist(Channel.TELEGRAM, "tg_1")
+        ChannelSecurityGuard.addSenderToWhitelist(Channel.TELEGRAM, "tg_2")
+        ChannelSecurityGuard.addSenderToWhitelist(Channel.QQ, "qq_1")
+        seedLegacyWhitelist("10086")
+        ChannelSecurityGuard.purgeLegacyEntries()
+
+        val count = ChannelPairingListModel.summaryCount(
+            whitelist = ChannelSecurityGuard.getWhitelist(),
+            pairTimes = ChannelSecurityGuard.getPairTimes(),
+            pendingIds = ChannelSecurityGuard.getPendingRebindIds(),
+        )
+        assertEquals(4, count)
+        assertEquals(buildModel().rows.size, count)
+    }
+
+    @Test
+    fun `the entry-page count counts a stale pending id once, as the list does`() {
+        // Defence against the same inconsistent storage the list defends
+        // against: a pending id that is also whitelisted anywhere renders as
+        // one active row, so the trailing count must not add it twice.
+        val count = ChannelPairingListModel.summaryCount(
+            whitelist = mapOf(Channel.TELEGRAM to setOf("10086")),
+            pairTimes = emptyMap(),
+            pendingIds = setOf("10086", "20087"),
+        )
+        assertEquals(2, count)
+    }
 }

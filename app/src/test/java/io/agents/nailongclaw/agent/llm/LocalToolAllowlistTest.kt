@@ -178,6 +178,36 @@ class LocalToolAllowlistTest {
         }
     }
 
+    @Test
+    fun `the device context tool count is what the request declares`() {
+        // DefaultAgentService.buildDeviceContext reports "- Registered Tools: N"
+        // from specsForRequest(...).size — the count the request actually
+        // declares. It used to report ToolRegistry.getAllTools().size (44) even
+        // on the local path, where only the allowlist cut goes out, so the
+        // device info promised tools the on-device model could not call.
+        val full = specs(registryNames)
+        assertEquals(
+            "local declares only the allowlist cut",
+            26,
+            LocalToolAllowlist.specsForRequest(full, LlmProvider.LOCAL, false).size
+        )
+        assertEquals(
+            "local with a shadow display still declares the same cut",
+            26,
+            LocalToolAllowlist.specsForRequest(full, LlmProvider.LOCAL, true).size
+        )
+        assertEquals(
+            "cloud without a display declares everything except the shadow tools",
+            39,
+            LocalToolAllowlist.specsForRequest(full, LlmProvider.OPENAI, false).size
+        )
+        assertEquals(
+            "cloud with a display declares the whole registry",
+            44,
+            LocalToolAllowlist.specsForRequest(full, LlmProvider.OPENAI, true).size
+        )
+    }
+
     // ── Honest degradation ─────────────────────────────────────────────────────
 
     @Test

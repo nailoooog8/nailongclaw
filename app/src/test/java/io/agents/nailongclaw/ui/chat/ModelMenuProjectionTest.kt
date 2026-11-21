@@ -251,4 +251,31 @@ class ModelMenuProjectionTest {
         assertFalse(noKey.selectable)
         assertEquals(ModelMenuProjection.RowTag.NO_KEY, noKey.tag)
     }
+
+    // ── empty state ─────────────────────────────────────────────────────────
+
+    @Test
+    fun `a menu with no rows at all is the dropdown's empty state`() {
+        // Same trigger as the web card's 没有可选模型 footer (cds.js:
+        // `if (!models.length)`) — an empty catalog. The Compose dropdown
+        // draws the empty-state line for exactly this case, so both doors
+        // answer "there is nothing to switch to" the same way.
+        assertTrue(
+            ModelMenuProjection.isEmptyMenu(
+                ModelMenuProjection.menu(emptyList(), active(local()))
+            )
+        )
+    }
+
+    @Test
+    fun `rows that exist but are not selectable are not the empty state`() {
+        // Not-downloaded local model only: the row is listed disabled with its
+        // tag, like the card — the user can see the model exists and what it
+        // lacks, which says more than a "no models" line would.
+        val menu = ModelMenuProjection.menu(
+            listOf(local("gemma4-e2b", usable = false)),
+            active(local()),
+        )
+        assertFalse(ModelMenuProjection.isEmptyMenu(menu))
+    }
 }

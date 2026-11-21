@@ -21,6 +21,14 @@ object ChannelSecurityGuard {
     private const val KEY_CHANNEL_PAIR_PIN = "KEY_CHANNEL_PAIR_PIN"
     private const val KEY_CHANNEL_WHITELIST = "KEY_CHANNEL_WHITELIST"
 
+    /**
+     * The pairing PIN is the only secret this guard mints, so it comes from a
+     * CSPRNG, not Kotlin's default `random()` (ThreadLocalRandom-backed, fine
+     * for shuffling, not for a guessable credential). Same 6-digit space the
+     * deleted KVUtils generator used — pins already on disk are never touched.
+     */
+    private val pinRandom = java.security.SecureRandom()
+
     /** `<entryKey>=<pairedAtMillis>` pairs recording when each sender was first paired. */
     private const val KEY_CHANNEL_PAIR_TIMES = "KEY_CHANNEL_PAIR_TIMES"
 
@@ -103,13 +111,15 @@ object ChannelSecurityGuard {
     }
 
     /**
-     * Get or generate the 6-digit channel pairing PIN.
+     * Get or generate the 6-digit channel pairing PIN. Single writer for
+     * `KEY_CHANNEL_PAIR_PIN` — [io.agents.nailongclaw.utils.KVUtils]'s channel
+     * methods delegate here, so both entry points see one stored value.
      */
     @Synchronized
     fun getPairPin(): String {
         var pin = storage.getString(KEY_CHANNEL_PAIR_PIN, "")
         if (pin.isEmpty()) {
-            pin = (100000..999999).random().toString()
+            pin = (pinRandom.nextInt(900000) + 100000).toString()
             storage.putString(KEY_CHANNEL_PAIR_PIN, pin)
         }
         return pin

@@ -11,6 +11,7 @@ import android.widget.Toast
 import androidx.lifecycle.ViewModelProvider
 import io.agents.nailongclaw.R
 import io.agents.nailongclaw.automation.ExternalAutomationGuard
+import io.agents.nailongclaw.channel.security.ChannelPairingListModel
 import io.agents.nailongclaw.channel.security.ChannelSecurityGuard
 import io.agents.nailongclaw.base.BaseActivity
 import io.agents.nailongclaw.ui.cds.CdsUi
@@ -283,10 +284,27 @@ class ChannelsActivity : BaseActivity() {
         }
     }
 
-    /** Active whitelist entries plus pending re-bind records, for the row summary. */
-    private fun pairedSenderCount(): Int =
-        ChannelSecurityGuard.getWhitelist().values.sumOf { it.size } +
-            ChannelSecurityGuard.getPendingRebindIds().size
+    /**
+     * Row count for the "Paired senders" trailing text.
+     *
+     * Counted through [ChannelPairingListModel.summaryCount] — the same model
+     * the whitelist page renders — so the two numbers cannot disagree (e.g. a
+     * pending id that is whitelisted somewhere counts once, as one row).
+     *
+     * The legacy purge runs first, exactly as `ChannelPairActivity.renderAll`
+     * does: it is one-shot per process and the first `verify()` may never have
+     * run, so without it the F1-quarantined entries are counted as neither
+     * whitelisted nor pending and this number reads low until the whitelist
+     * page (or an incoming message) triggers the migration.
+     */
+    private fun pairedSenderCount(): Int {
+        ChannelSecurityGuard.purgeLegacyEntries()
+        return ChannelPairingListModel.summaryCount(
+            whitelist = ChannelSecurityGuard.getWhitelist(),
+            pairTimes = ChannelSecurityGuard.getPairTimes(),
+            pendingIds = ChannelSecurityGuard.getPendingRebindIds(),
+        )
+    }
 
     private fun lanTrailingText(): String =
         if (io.agents.nailongclaw.server.ConfigServerManager.isRunning()) {

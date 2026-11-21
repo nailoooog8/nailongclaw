@@ -4,6 +4,7 @@
 package io.agents.nailongclaw.ui.chat
 
 import io.agents.nailongclaw.AppCapabilityCoordinator
+import io.agents.nailongclaw.R
 import io.agents.nailongclaw.ServiceBindingState
 import android.content.Intent
 import android.os.Bundle
@@ -491,6 +492,10 @@ class ComposeChatActivity : ComponentActivity() {
      * select, and unlike the old `"NONE"` pseudo-model the tap neither
      * pretends to change the model nor kills the one still running; the
      * dropdown is where the side's real rows (and what they lack) are listed.
+     *
+     * The tap still says something — a toast, not a dialog: "nothing happened"
+     * after a deliberate tap looks like the app dropped it. A dialog would
+     * interrupt a chat flow over a state the dropdown already explains.
      */
     private fun switchToTab(tab: String) {
         val snapshot = ModelConfigRepository.snapshot()
@@ -505,6 +510,7 @@ class ComposeChatActivity : ComponentActivity() {
         }
         if (row == null) {
             XLog.i(TAG, "switchToTab($tab): no default row on this side — nothing to switch to")
+            Toast.makeText(this, R.string.chat_model_no_switchable, Toast.LENGTH_SHORT).show()
             return
         }
         switchModel(row)

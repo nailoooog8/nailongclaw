@@ -114,7 +114,10 @@ android {
         targetSdk = 36
         versionCode = readLocalOrEnvInt("NAILONGCLAW_VERSION_CODE", 34)
         versionName = readLocalOrEnvString("NAILONGCLAW_VERSION_NAME", "0.9.0")
-        buildConfigField("String", "VERSION_INFO", getVersionGit())
+        // BuildConfig.VERSION_INFO（branch_sha）曾是零读者死重（2026-11-19
+        // BACKLOG 顺带发现，仓库里除本行注入外没有任何 Kotlin/XML/脚本引用），
+        // 2026-11-21 与 BuildConfig.BUILD_FINGERPRINT 的处置对照后删除：
+        // BUILD_FINGERPRINT 有真读者（AboutActivity + DebugReportManager），保留。
         buildConfigField("String", "APP_ORIGIN", "\"NailongClaw | github.com/nailoooog8/nailongclaw\"")
         // Where the in-app update checker polls. Must point at THIS fork's releases:
         // with the upstream URL, anyone who installed this fork's APK would be told
@@ -309,19 +312,8 @@ androidComponents {
     }
 }
 
-fun getVersionGit(): String {
-    val process1 = Runtime.getRuntime().exec("git rev-parse --abbrev-ref HEAD")
-    val reader1 = BufferedReader(InputStreamReader(process1.inputStream))
-    val branch = reader1.readLine()?.trim()
-    reader1.close()
-
-    val process2 = Runtime.getRuntime().exec("git rev-parse HEAD")
-    val reader2 = BufferedReader(InputStreamReader(process2.inputStream))
-    val sha1 = reader2.readLine()?.trim()
-    reader2.close()
-    // 将数据拼接起来，如果只需要SHA-1 那么就可以不执行process1命令
-    return "\"" + branch + "_" + sha1 + "\""
-}
+// getVersionGit()（branch_sha，BuildConfig.VERSION_INFO 的注入源）已随该零读者
+// 字段一并删除——见 defaultConfig 里的注释。
 
 fun getBuildFingerprint(): String {
     val gitHash = try {

@@ -240,6 +240,11 @@
     <string name="chat_model_tag_over_ram">Needs more memory</string>
     <string name="chat_model_tag_no_key">No API key</string>
     <string name="chat_manage_models_keys">Manage models &amp; keys…</string>
+    <!-- Empty state when the dropdown has no switchable rows at all — mirrors
+         the WebView model card's 没有可选模型 footer (cds.js models-empty). -->
+    <string name="chat_model_menu_empty">No models available yet. Download an on-device model in Model &amp; Task, or add a cloud provider API key.</string>
+    <!-- Toast when a 本地/云端 tab cannot resolve a default row to switch to. -->
+    <string name="chat_model_no_switchable">No model available to switch to</string>
     <string name="chat_permissions_needed">Permissions needed. Tap to fix.</string>
 
     <string name="chat_token_cost_info"> · %1$s tokens · %2$s</string>

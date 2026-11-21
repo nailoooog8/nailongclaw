@@ -95,4 +95,22 @@ object ChannelPairingListModel {
             .map { PairingRow.PendingRebind(it) }
         return PairingListModel(active + pending)
     }
+
+    /**
+     * The number the 渠道接入页's "Paired senders" trailing text shows.
+     *
+     * Derived through [build] rather than counted off the raw maps, so the
+     * entry page cannot disagree with the whitelist page it links to: both
+     * display the same row model, including the rule that a pending id that
+     * is whitelisted somewhere is not a second row. The caller must have run
+     * [ChannelSecurityGuard.purgeLegacyEntries] first (same ritual as
+     * ChannelPairActivity.renderAll) — before the one-shot migration the
+     * quarantined entries are neither whitelisted nor pending, and any count
+     * taken then reads low.
+     */
+    fun summaryCount(
+        whitelist: Map<Channel, Set<String>>,
+        pairTimes: Map<String, Long>,
+        pendingIds: Set<String>,
+    ): Int = build(whitelist, pairTimes, pendingIds).rows.size
 }

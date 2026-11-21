@@ -300,7 +300,19 @@ class DefaultAgentService : AgentService {
         pkg.substringAfterLast('.')
     }
 
-    private fun buildDeviceContext(): String {
+    /**
+     * Device block of the system prompt.
+     *
+     * [declaredToolCount] must be the number of tool specs the *request about
+     * to go out* will declare ([requestToolSpecs]), not the registry size:
+     * the registry keeps every tool registered, but the LOCAL path declares
+     * only the allowlist cut (26 of ~44) and a request with no shadow display
+     * prunes the shadow tools. Telling the model "44 tools" while it can call
+     * 26 makes the briefing lie about the device it runs on. Frozen at task
+     * start; a shadow display created mid-task only widens what later rounds
+     * declare, never shrinks it.
+     */
+    private fun buildDeviceContext(declaredToolCount: Int): String {
         val app = ClawApplication.instance
         val sb = StringBuilder()
         sb.append("\n\n## Device Info\n")
@@ -320,7 +332,7 @@ class DefaultAgentService : AgentService {
             XLog.w(TAG, "Failed to get display metrics", e)
         }
 
-        sb.append("- Registered Tools: ").append(ToolRegistry.getAllTools().size).append("\n")
+        sb.append("- Registered Tools: ").append(declaredToolCount).append("\n")
 
         val appName = try {
             val appInfo = app.packageManager.getApplicationInfo(app.packageName, 0)
@@ -552,7 +564,7 @@ class DefaultAgentService : AgentService {
             append(inAppSearchGuard.buildPromptSection())
             append(emailComposeGuard.buildPromptSection())
             append(directDeviceDataGuard.buildPromptSection())
-            append(buildDeviceContext())
+            append(buildDeviceContext(requestToolSpecs().size))
         }
 
         val messages = mutableListOf<ChatMessage>()
