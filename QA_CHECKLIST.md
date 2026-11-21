@@ -2157,6 +2157,20 @@ adb logcat -d | grep "opened with the task ledger requested"
 
 Format: `[date] [status] [test-id] description`
 
+### 2026-11-21（晚二）— 小遗留清理轮：三实现轮遗留清单的可修项 7 件收编（代码落，模拟器未逐项复验）
+
+分支 `qa/small-leftovers` 单 commit cherry-pick 回主干 `9afa811`；合并门 `compileDebugKotlin testDebugUnitTest` **746/0**（736 基线 + 10 新例）EXIT=0，`.auto/leftovers_gate.log`。改动 16 文件 +326/-68。模拟器未逐项复验（均为低风险小额：计数/文案/委托/死代码），下次模拟器 QA 顺带看。
+
+- ✅ **Registered Tools 计数失真**：`buildDeviceContext()` 改收 `declaredToolCount`（与 `requestToolSpecs()` 同管线：本地=26 / 云端透传全量 / 有 shadow display 时扣 5），2026-11-21 段①遗留③收账；新例 LOCAL=26 / OPENAI 无显示=39 / 有显示=44。上下文按任务开始冻结，mid-task 建 shadow 只放宽后续轮（KDoc 注明）。
+- ✅ **KVUtils 死 API 删除**：`KEY_CHANNEL_WHITELIST_PREFIX` + `getChannelWhitelist()`/`addChannelWhitelist`/`removeChannelWhitelist` 全仓库 grep 零调用，四件一并删（2026-11-21 段③遗留①收账）。
+- ✅ **双 PIN 生成器收编**：`ChannelSecurityGuard` 定为 `KEY_CHANNEL_PAIR_PIN`/`KEY_CHANNEL_SECURITY_ENABLED` 单一写入方，`KVUtils` 四方法改委托（签名保持，`setChannelPairPin` Boolean 返回值零读者改 Unit）；guard 生成器升 `SecureRandom`（被删的 KVUtils 生成器是 CSPRNG，收编不静默降级）；同一 MMKV key、存量 PIN 不变（2026-11-21 段③遗留②收账）。+5 例。
+- ✅ **Compose 下拉空态**：`ModelMenuProjection.isEmptyMenu()`（对齐 cds.js `!models.length`——目录空才空态，存在但不可选的行仍列禁用态）+ 下拉空态行；新 key `chat_model_menu_empty`（en/zh/ja，zh 与卡片逐字对齐）（2026-11-21 段②遗留①收账）。+2 例。
+- ✅ **tab 无默认行给可见反馈**：`switchToTab` row==null 时 `Toast.LENGTH_SHORT`「当前没有可切换的模型」（新 key `chat_model_no_switchable` ×3 locale），不再纯静默（2026-11-21 段②遗留②收账）。
+- ✅ **白名单行尾计数偏小**：`ChannelsActivity.pairedSenderCount()` 先跑 `purgeLegacyEntries()` 再走 `ChannelPairingListModel.summaryCount()`（与白名单页同一行模型口径），两页数字恒等（2026-11-21 段③遗留④收账）。+2 例。
+- ✅ **`BuildConfig.VERSION_INFO` 零读者**：grep 确认真零读者（仅 build.gradle 注入行，无 Kotlin/XML/脚本读者、无注释引用），删注入行 + `getVersionGit()`；`BUILD_FINGERPRINT` 有真读者未动（2026-11-19 P3 轮遗留收账）。
+
+**本轮遗留（新发现，未动）**：KVUtils 里还有一批疑似零读者的 channel 常量/方法簇（`KEY_WECHAT_UPDATES_CURSOR`、Discord/Telegram/QQ/Douyin token 读写等）值得做同款零读者核查；`buildDeviceContext` 的工具数在 mid-task 建 shadow display 时有 1 轮内的滞后（只少报不多报，KDoc 已注明）。
+
 ### 2026-11-21 — 三并行实现轮：本地工具 allowlist/预算 · Compose 模型下拉齐平 · ChannelSecurityGuard 白名单 UI
 
 三件由本地 subagent 在独立 worktree 并行实现（分支 `qa/local-allowlist`/`qa/model-dropdown-parity`/`qa/channel-guard-ui`，cherry-pick 回主干 `6f8994c`/`a901819`/`ebc141e`，strings.xml 三 locale 零冲突）。合并后统一门 `compileDebugKotlin testDebugUnitTest` **736/0**（675 基线 + 18 + 28 + 15）EXIT=0，`.auto/merge_gate.log`；各自分支上的单测计数（693/703/690）为合并前各自跑的数字，736 为合并树权威值。**同日晚 h79 AVD 模拟器复验**（debug 构建 `NailongClaw_v0.9.0_20261121_190618.apk` 升级安装、数据/模型保留；`adb root` + 全限定名 a11y + appops 悬浮窗；logcat 存档 `.auto/qa1121_h79.log`，截图 `.auto/h_model_menu.png`/`.auto/h_pair_empty.png`）：①②✅ 全过，③ UI 面过、配对态待真渠道（与 SEC19–21 同款障碍）。
