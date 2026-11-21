@@ -13,14 +13,14 @@ The short version: NailongClaw is a generic Android mobile-agent harness, not a 
 | `README.md` | Public product direction, roadmap, changelog | When product direction, roadmap, release notes, or public claims change |
 | `AI_INDEX.md` | Repo map for coding agents | When files or directories move |
 | `CLAUDE.md` | Project rules | When workflow/rules change |
-| `QA_CHECKLIST.md` | E2E test cases + debug changelog | Every code change |
-| `RELEASING.md` | Stable signing and release workflow | When the release process changes |
-| `BACKLOG.md` | Features, bugs, ideas with priority | When new items come in or items get done |
-| `ARCHITECTURE_RECONSTRUCTION.md` | Historical architecture/refactor guardrails | When reconstruction phases change |
+| `work/QA_CHECKLIST.md` | E2E test cases + debug changelog | Every code change |
+| `docs/ops/RELEASING.md` | Stable signing and release workflow | When the release process changes |
+| `work/BACKLOG.md` | Features, bugs, ideas with priority | When new items come in or items get done |
+| `docs/design/ARCHITECTURE_RECONSTRUCTION.md` | Historical architecture/refactor guardrails | When reconstruction phases change |
 | `CLAUDE.local.md` | Current session state (local, gitignored) | Every session |
 | `CLAUDE.history.md` | Frozen session-history archive 2026-10-12 → 10-26 (local, gitignored) | Never — it is an archive; keep `CLAUDE.local.md` current instead |
 
-When Nicole mentions a feature idea, bug, or "之後要做" item → write it into `BACKLOG.md` immediately. Don't rely on session memory.
+When Nicole mentions a feature idea, bug, or "之後要做" item → write it into `work/BACKLOG.md` immediately. Don't rely on session memory.
 
 ## QA-First Development (MANDATORY)
 
@@ -31,7 +31,7 @@ QA must reflect the product direction in `README.md`: do not turn stochastic mod
 ### Per-Change QA (every commit)
 
 1. **Design QA tests FIRST** — before writing code, define what the E2E test looks like
-2. **Add tests to `QA_CHECKLIST.md`** — permanent, under the relevant section (A-K or new section)
+2. **Add tests to `work/QA_CHECKLIST.md`** — permanent, under the relevant section (A-K or new section)
 3. **Tests must be E2E via ADB** — simulate real user behavior: `adb shell input tap/text`, `adb shell am broadcast`, uiautomator dump, logcat verification. Control the phone like a user would.
 
    *Exception — pure logic only:* unit tests are allowed, and required, for pure functions with no Android dependencies (algorithms, parsers, state machines, retention/eviction math). No mocks. Anything touching Context, SharedPreferences, disk I/O, or lifecycle still requires E2E via ADB and must not be unit-tested with mocks. Adding such tests also means they run in CI — `.github/workflows/build.yml` runs `./gradlew testDebugUnitTest` on every push/PR to `main`. E2E/ADB coverage still has no CI gate, which is why device regressions reach main.

@@ -20,5 +20,5 @@ wsl -d kali-linux -- bash /home/nailoog/sec-lab/setup-kali.sh
 - **复用宿主 adb**：软链 `/mnt/c/.../platform-tools/adb` 到 PATH，WSL 与 Windows 共享同一台设备
 
 ## 说明
-- 本脚本只装工具、不发动任何攻击。真正打之前先读 `docs/SECURITY_AUDIT_R4_RED_RUNBOOK.md`。
+- 本脚本只装工具、不发动任何攻击。真正打之前先读 `docs/security/SECURITY_AUDIT_R4_RED_RUNBOOK.md`。
 - 动真机前务必先用当前 HEAD 重刷设备（现网设备是 §6.5 修复前的陈旧包，见 R4 报告）。

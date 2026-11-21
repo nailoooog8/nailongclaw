@@ -136,7 +136,7 @@ adb over network without extra setup.
 3. Click `Reserve` (30-min sessions, then re-queue)
 4. Web client opens — controllable via browser only (no SSH/adb over network out-of-the-box)
 5. Sideload PokeClaw APK via the web client's `Install APK` button (drag the latest signed release APK from `~/MyGithub/PokeClaw/app/build/outputs/apk/release/`)
-6. Drive UI in browser; capture findings in `QA_CHECKLIST.md` under K-section
+6. Drive UI in browser; capture findings in `work/QA_CHECKLIST.md` under K-section
 
 **Limitation vs Firebase Test Lab:** browser-only, manual, no scripted automation. Use it for human-driven repro of OEM-specific issues, not for CI.
 
@@ -186,11 +186,11 @@ plus `app_logs/`.
 weird vendor builds — custom ROMs (LineageOS, Magisk modules), regional
 variants, root-modified phones, super-recent OEM-update breakage.
 
-**Reporter contract** (codified in `docs/community-issue-replies.md`):
+**Reporter contract** (codified in `docs/ops/community-issue-replies.md`):
 - Reporter must run the latest signed release
 - Reporter must attach `debug-report.zip` from Settings → About → Share
   Debug Report
-- Author replies within 24 hr (D8 in `ARCHITECTURE_DECISIONS.md`)
+- Author replies within 24 hr (D8 in `docs/design/ARCHITECTURE_DECISIONS.md`)
 
 **Cost:** $0 + author's reply time. Round-trip per issue: 1-3 days.
 

@@ -8,10 +8,10 @@ This is the repo map for coding agents. Keep canonical information in existing f
 |------|------|
 | `README.md` | Public product direction, roadmap, platform constraints, benchmark claims, changelog |
 | `CLAUDE.md` | Agent/project working rules |
-| `QA_CHECKLIST.md` | QA methodology, release gate, test cases, debug changelog |
-| `RELEASING.md` | Release signing, tag workflow, stable APK publishing |
-| `BACKLOG.md` | Prioritized bugs, features, QA gaps, ideas |
-| `ARCHITECTURE_RECONSTRUCTION.md` | Historical architecture reconstruction plan and refactor guardrails |
+| `work/QA_CHECKLIST.md` | QA methodology, release gate, test cases, debug changelog |
+| `work/BACKLOG.md` | Prioritized bugs, features, QA gaps, ideas |
+| `docs/ops/RELEASING.md` | Release signing, tag workflow, stable APK publishing |
+| `docs/design/ARCHITECTURE_RECONSTRUCTION.md` | Historical architecture reconstruction plan and refactor guardrails |
 | `CLA.md` | Contributor license agreement |
 | `AI_INDEX.md` | This repo map |
 
@@ -22,11 +22,14 @@ This is the repo map for coding agents. Keep canonical information in existing f
 | `app/src/main/java/io/agents/nailongclaw/` | Android app source |
 | `app/src/main/assets/playbooks/` | Built-in playbooks used by the agent harness |
 | `app/src/test/` | JVM/unit regression tests |
+| `work/` | Working ledgers: `QA_CHECKLIST.md` (QA methodology, release gate, test cases, debug changelog) + `BACKLOG.md` (prioritized bugs, features, QA gaps, ideas) |
 | `scripts/` | QA and automation scripts |
 | `.github/workflows/` | Build + unit tests, CLA/DCO check, emulator-matrix QA, Firebase Test Lab, signed release |
 | `docs/` | GitHub Pages site and public site assets |
-| `docs/MEMORY_BANK.md` | How the memory bank works: retention curve, suppression fingerprints, contradiction detection, file format |
-| `docs/MEMORY_DESIGN.md` | Why the memory bank is built this way: community survey, rejected alternatives, known gaps |
+| `docs/design/` | Design docs: `MEMORY_BANK.md` (how the memory bank works: retention curve, suppression fingerprints, contradiction detection, file format), `MEMORY_DESIGN.md` (why the memory bank is built this way: community survey, rejected alternatives, known gaps), `ARCHITECTURE_DECISIONS.md`, `WEB_SEARCH_DESIGN.md`, `SKILL_FORMAT.md`, `MCP_INTEGRATION_PLAN.md`, `ARCHITECTURE_RECONSTRUCTION.md` |
+| `docs/security/` | Security audit reports R1–R4 with red-team runbook and blue-team review (`SECURITY_AUDIT*.md`) |
+| `docs/ops/` | Ops runbooks: `AI_AGENT_PLAYBOOK.md`, `RELEASING.md`, `SEC-LAB_KALI_SETUP.md`, `OEM_COVERAGE_TIERS.md`, `community-issue-replies.md`, `LOCALIZATION_STATUS.md` |
+| `docs/archive/` | Archived one-off docs: `AGENT_PERCEPTION_RESEARCH.md`, `RELEASE_NOTES_WEB_SEARCH.md` |
 | `docs/screenshots/` | Screenshot assets used by the landing page |
 | `demo/` | Legacy demo GIF assets |
 | `Screenshots/` | Legacy screenshot assets |

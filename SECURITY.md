@@ -55,10 +55,10 @@
 本 fork 对自身改动引入的安全边界做过多轮审计（R1–R4），覆盖 PIN 暴力破解、凭据明文泄漏、
 路径穿越、MCP 工具投毒、供应链与外部自动化入口等类别：
 
-- R1（v0.8.0，2026-10-11）→ [`docs/SECURITY_AUDIT.md`](docs/SECURITY_AUDIT.md)
-- R2（2026-10-16）→ [`docs/SECURITY_AUDIT_R2.md`](docs/SECURITY_AUDIT_R2.md)
-- R3（R3-01..R3-11）→ [`docs/SECURITY_AUDIT_R3.md`](docs/SECURITY_AUDIT_R3.md)
-- R4（最新，2026-10-27，含红队行动手册与蓝队复盘）→ [`docs/SECURITY_AUDIT_R4.md`](docs/SECURITY_AUDIT_R4.md)、[`docs/SECURITY_AUDIT_R4_RED_RUNBOOK.md`](docs/SECURITY_AUDIT_R4_RED_RUNBOOK.md)、[`docs/SECURITY_AUDIT_R4_BLUE.md`](docs/SECURITY_AUDIT_R4_BLUE.md)
+- R1（v0.8.0，2026-10-11）→ [`docs/security/SECURITY_AUDIT.md`](docs/security/SECURITY_AUDIT.md)
+- R2（2026-10-16）→ [`docs/security/SECURITY_AUDIT_R2.md`](docs/security/SECURITY_AUDIT_R2.md)
+- R3（R3-01..R3-11）→ [`docs/security/SECURITY_AUDIT_R3.md`](docs/security/SECURITY_AUDIT_R3.md)
+- R4（最新，2026-10-27，含红队行动手册与蓝队复盘）→ [`docs/security/SECURITY_AUDIT_R4.md`](docs/security/SECURITY_AUDIT_R4.md)、[`docs/security/SECURITY_AUDIT_R4_RED_RUNBOOK.md`](docs/security/SECURITY_AUDIT_R4_RED_RUNBOOK.md)、[`docs/security/SECURITY_AUDIT_R4_BLUE.md`](docs/security/SECURITY_AUDIT_R4_BLUE.md)
 
 各轮文档同时记录了**哪些验证已执行、哪些尚未覆盖**，欢迎针对其中的空白项提出补充。
 **报告漏洞前请先看最新一轮（R4）的结论**，早期轮次的开放项可能已被后续轮次关闭。

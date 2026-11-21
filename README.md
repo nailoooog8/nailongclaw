@@ -45,9 +45,9 @@ Google 的移动 agent 永远是 Pixel-first 的；Samsung 的 Galaxy AI 战略�
 
 同时**证伪了三条假设**：SnakeYAML 反序列化（实测 2.2 版已禁用全局标签）、Debug 接收器暴露（有 `BuildConfig.DEBUG` 闸门）、记忆库召回注入（已有围栏防护）。
 
-完整用例见 [`QA_CHECKLIST.md`](QA_CHECKLIST.md) 的 `SEC` 段（SEC1–SEC11）。
+完整用例见 [`QA_CHECKLIST.md`](work/QA_CHECKLIST.md) 的 `SEC` 段（SEC1–SEC11）。
 
-完整审计报告见 [`docs/SECURITY_AUDIT.md`](docs/SECURITY_AUDIT.md)。**该文档明确区分了「代码已修复」与「真机 E2E 已验证」**——SEC1–SEC11 目前全部尚未执行，请勿将代码修复等同于已通过安全测试。
+完整审计报告见 [`docs/security/SECURITY_AUDIT.md`](docs/security/SECURITY_AUDIT.md)。**该文档明确区分了「代码已修复」与「真机 E2E 已验证」**——SEC1–SEC11 目前全部尚未执行，请勿将代码修复等同于已通过安全测试。
 
 发现新漏洞请走[私有漏洞上报](https://github.com/nailoooog8/nailongclaw/security/advisories/new)，**不要开公开 issue**——修复落地前 issue 里的细节对所有人可见。报告范围、响应预期与转上游的边界见 [`SECURITY.md`](SECURITY.md)。
 
@@ -103,7 +103,7 @@ Google 的移动 agent 永远是 Pixel-first 的；Samsung 的 Galaxy AI 战略�
 | v0.8.0 | 首个包含安全加固与多渠道的正式版 |
 | v0.7.1 | 早前的 MCP 扩展试发版，**不含**安全修复 |
 
-> ⚠️ **v0.9.0 是一个全新的应用，不能覆盖升级**。applicationId 从 `io.agents.pokeclaw` 改为 `io.agents.nailongclaw`，Android 视其为另一个应用：直接安装会与旧版并存，需要**先卸载旧版**（本地模型缓存约 2.6 GB 需重新下载，记忆库与技能配置需重新配置）。旧仓库 [`nailoooog8/PokeClaw`](https://github.com/nailoooog8/PokeClaw) 保留至 2026 年底用于旧版用户过渡，之后仅在此仓库发版。流程与密钥约定见 [`RELEASING.md`](RELEASING.md)。
+> ⚠️ **v0.9.0 是一个全新的应用，不能覆盖升级**。applicationId 从 `io.agents.pokeclaw` 改为 `io.agents.nailongclaw`，Android 视其为另一个应用：直接安装会与旧版并存，需要**先卸载旧版**（本地模型缓存约 2.6 GB 需重新下载，记忆库与技能配置需重新配置）。旧仓库 [`nailoooog8/PokeClaw`](https://github.com/nailoooog8/PokeClaw) 保留至 2026 年底用于旧版用户过渡，之后仅在此仓库发版。流程与密钥约定见 [`docs/ops/RELEASING.md`](docs/ops/RELEASING.md)。
 
 ---
 
@@ -131,7 +131,7 @@ cd nailongclaw
 ./gradlew assembleDebug
 ```
 
-构建环境见 [`MCP_INTEGRATION_PLAN.md`](MCP_INTEGRATION_PLAN.md) 末尾的「构建环境备忘」。
+构建环境见 [`docs/design/MCP_INTEGRATION_PLAN.md`](docs/design/MCP_INTEGRATION_PLAN.md) 末尾的「构建环境备忘」。
 
 **首次使用**：安装 APK → 授予无障碍权限 → 需要后台监听时再授予通知使用权 → 本地模式首次启动会下载模型（约 2.6 GB）。
 
@@ -147,12 +147,12 @@ cd nailongclaw
 |---|---|
 | [`STRATEGY.md`](STRATEGY.md) | 项目定位、护城河论证、买家图谱（上游原文，仅存归属） |
 | [`EXECUTION_PLAN.md`](EXECUTION_PLAN.md) | 分阶段执行计划（上游原文，仅存归属） |
-| [`docs/ARCHITECTURE_DECISIONS.md`](docs/ARCHITECTURE_DECISIONS.md) | D1–D8 架构决策（技术尽调向） |
-| [`docs/MEMORY_BANK.md`](docs/MEMORY_BANK.md) | 记忆库设计 |
-| [`docs/SKILL_FORMAT.md`](docs/SKILL_FORMAT.md) | 技能配方格式 |
-| [`docs/OEM_COVERAGE_TIERS.md`](docs/OEM_COVERAGE_TIERS.md) | 各 OEM 测试覆盖层级 |
-| [`QA_CHECKLIST.md`](QA_CHECKLIST.md) | E2E 用例库（含安全红队段） |
-| [`BACKLOG.md`](BACKLOG.md) | 功能与缺陷优先级 |
+| [`docs/design/ARCHITECTURE_DECISIONS.md`](docs/design/ARCHITECTURE_DECISIONS.md) | D1–D8 架构决策（技术尽调向） |
+| [`docs/design/MEMORY_BANK.md`](docs/design/MEMORY_BANK.md) | 记忆库设计 |
+| [`docs/design/SKILL_FORMAT.md`](docs/design/SKILL_FORMAT.md) | 技能配方格式 |
+| [`docs/ops/OEM_COVERAGE_TIERS.md`](docs/ops/OEM_COVERAGE_TIERS.md) | 各 OEM 测试覆盖层级 |
+| [`work/QA_CHECKLIST.md`](work/QA_CHECKLIST.md) | E2E 用例库（含安全红队段） |
+| [`work/BACKLOG.md`](work/BACKLOG.md) | 功能与缺陷优先级 |
 
 ---
 
@@ -669,7 +669,7 @@ v0.9.0 之后 main 上 60 余条提交的累积发布。
 
 ### v0.8.2 (2026-10-16) — 第二轮红队审计：Telegram 身份粒度 + 高危工具闸门
 
-完整报告见 [`docs/SECURITY_AUDIT_R2.md`](docs/SECURITY_AUDIT_R2.md)。本轮共记录 10 条发现（F1–F10），**修复了 2 条**，其余 8 条仍然开放——下面如实列出。
+完整报告见 [`docs/security/SECURITY_AUDIT_R2.md`](docs/security/SECURITY_AUDIT_R2.md)。本轮共记录 10 条发现（F1–F10），**修复了 2 条**，其余 8 条仍然开放——下面如实列出。
 
 **F1（Critical）Telegram 白名单绑定到会话而非用户 ✅ 已修复**
 
@@ -733,7 +733,7 @@ v0.8.0 的设置页仍有大量英文。根因不是「没翻译」，而是 `Se
 
 本版本包含 5 笔改动，**是本 fork 第一个把安全修复、多渠道与中文界面一起交付的正式版本**。此前的 v0.7.1 只包含 MCP 扩展，不含以下任何一项。
 
-**安全（红队审计修复，完整报告见 [`docs/SECURITY_AUDIT.md`](docs/SECURITY_AUDIT.md)）**
+**安全（红队审计修复，完整报告见 [`docs/security/SECURITY_AUDIT.md`](docs/security/SECURITY_AUDIT.md)）**
 
 - **PIN 暴力破解（Critical）** — 渠道配对与局域网控制台的 6 位 PIN 此前零限速，10⁶ 组合可自动化穷举。现改为失败计数 + 递增锁定 + 常量时间比较（`BruteForceGuard`）。
 - **凭据明文泄漏（Critical）** — 局域网控制台的 `GET /api/channels`、`GET /api/llm` 此前明文返回全部 bot token 与 LLM API Key。现读路径一律返回掩码，页面回存掩码不会清空真实值。

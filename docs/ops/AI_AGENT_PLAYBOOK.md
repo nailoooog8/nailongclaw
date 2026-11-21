@@ -63,9 +63,9 @@ if (!isLocalModel || isTaskMode) {
 2. Use **Local LLM in Chat mode** — `onSendChat`, no permission gate. Local needs a downloaded `.litertlm` though (~2.6 GB).
 3. Use **debug-build APK** + `DebugTaskReceiver` broadcast.
 
-### 4. Pre-Tag QA is MANDATORY — see `QA_CHECKLIST.md` "Pre-Tag Release Smoke"
+### 4. Pre-Tag QA is MANDATORY — see `work/QA_CHECKLIST.md` "Pre-Tag Release Smoke"
 
-The v0.7.0 release went tag-first-QA-second and violated `CLAUDE.md`'s "full QA before any release/version bump" rule. The Release Gate Record for v0.7.0 explicitly notes this PROCESS violation. The `QA_CHECKLIST.md` now has an 8-step Pre-Tag Smoke section that MUST be followed. Do not push a `vX.Y.Z` tag before steps 1-6 pass.
+The v0.7.0 release went tag-first-QA-second and violated `CLAUDE.md`'s "full QA before any release/version bump" rule. The Release Gate Record for v0.7.0 explicitly notes this PROCESS violation. The `work/QA_CHECKLIST.md` now has an 8-step Pre-Tag Smoke section that MUST be followed. Do not push a `vX.Y.Z` tag before steps 1-6 pass.
 
 ### 5. APK upgrade story depends on signing keystore
 
@@ -160,7 +160,7 @@ grep -rn "AgentConfig\.\|AgentConfig(\|toAgentConfig" app/src/main/java
 
 ### 10. NailongClaw is a generic mobile-agent harness, NOT a missed-call product
 
-There is a SEPARATE revenue product called `~/MyGithub/missed-call-ai-chatbot-lab`. Missed-call follow-up is its scope, not this project's. NailongClaw stays generic — 52 tools × 14 rules — per `ARCHITECTURE_DECISIONS.md` D2. Do NOT add per-vertical workflows (missed call, plumber, dentist...) to NailongClaw core. If a generic primitive is needed (e.g. "phone call state read tool"), add it as a tool, not a workflow.
+There is a SEPARATE revenue product called `~/MyGithub/missed-call-ai-chatbot-lab`. Missed-call follow-up is its scope, not this project's. NailongClaw stays generic — 52 tools × 14 rules — per `docs/design/ARCHITECTURE_DECISIONS.md` D2. Do NOT add per-vertical workflows (missed call, plumber, dentist...) to NailongClaw core. If a generic primitive is needed (e.g. "phone call state read tool"), add it as a tool, not a workflow.
 
 ---
 
@@ -240,7 +240,7 @@ After release goes live, reply on every open OEM-specific issue:
 gh issue comment $NUM -R nailoooog8/nailongclaw -b "$(cat reply-draft.md)"
 ```
 
-Drafts for the current 6 open OEM threads live in `docs/community-issue-replies.md`. Each cites a specific version — don't post unless that version is actually published, or you'll send users hunting for an APK that doesn't exist yet.
+Drafts for the current 6 open OEM threads live in `docs/ops/community-issue-replies.md`. Each cites a specific version — don't post unless that version is actually published, or you'll send users hunting for an APK that doesn't exist yet.
 
 ---
 
@@ -250,6 +250,6 @@ For the long-term-decision context of **this fork**, read in this order:
 
 1. `CLAUDE.md` — project rules and direction principles (generic Android mobile-agent harness, deterministic problems before stochastic tuning)
 2. `AI_INDEX.md` — repo map and direction rules
-3. `BACKLOG.md` — live priorities; the file this fork actually executes against
+3. `work/BACKLOG.md` — live priorities; the file this fork actually executes against
 
 `STRATEGY.md` / `EXECUTION_PLAN.md` are the upstream author's exit-plan documents, preserved verbatim for Apache-2.0 §4 attribution only — **this fork does not inherit any of it** (see their header disclaimers and `README.md`「上游状态与归属」). Don't treat their phases, valuation framing or acquirer outreach as current priorities.

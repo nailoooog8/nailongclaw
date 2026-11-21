@@ -182,14 +182,14 @@ measurement.
 
 CLAUDE.md says: full QA triggers before any release/version bump. v0.7.0 violated this gate (QA was run after tag). To make the gate physically present in this checklist, do the following EVERY release, IN ORDER:
 
-1. **Local signed APK first.** Run `assembleRelease` locally with the keystore env sourced from your signing env file (see `RELEASING.md` — env vars or `local.properties`; the historical `~/.config/pokeclaw/release-signing.env` path predates the rebrand). The resulting `app/build/outputs/apk/release/NailongClaw_vX.Y.Z_*.apk` is the artifact under test. Do NOT use the debug APK for release-gate QA.
+1. **Local signed APK first.** Run `assembleRelease` locally with the keystore env sourced from your signing env file (see `docs/ops/RELEASING.md` — env vars or `local.properties`; the historical `~/.config/pokeclaw/release-signing.env` path predates the rebrand). The resulting `app/build/outputs/apk/release/NailongClaw_vX.Y.Z_*.apk` is the artifact under test. Do NOT use the debug APK for release-gate QA.
 2. **Install over the previous signed public APK** to verify in-place upgrade. If the upgrade fails (e.g., signing key changed), STOP — fix the upgrade story before tagging.
 3. **Run sections [RELEASE-OK]** of the new/changed feature areas (V/W/X/Y for v0.7.0-style batches). Record PASS/FAIL in the QA Debug Changelog under a draft `vX.Y.Z` heading.
 4. **Run Refactor Regression Bundles** matching the changed code areas.
 5. **Generate a debug-report.zip via Settings → About → Share Debug Report.** Unzip on the host machine and inspect `summary.txt`. Make sure: ABI / RAM / OpenCL probe / Backend health all populate; the new feature's `AppLogStore` entries appear under `app_logs/`.
 6. **Only after 1-5 PASS, push the tag.** The Actions workflow builds + signs + publishes the GitHub release. The local APK and the release APK should have matching SHA-256 IF the signing env matches (they may differ by tiny build-fingerprint metadata; the signing certificate must match).
 7. **Within 24 hours of release, write the Release Gate Record** (use the template above) under the changelog.
-8. **Within 24 hours of release, reply on every open OEM issue** with v0.7.0-style ack + debug-report.zip request (see `docs/community-issue-replies.md` for templates).
+8. **Within 24 hours of release, reply on every open OEM issue** with v0.7.0-style ack + debug-report.zip request (see `docs/ops/community-issue-replies.md` for templates).
 
 If steps 1-5 reveal a FAIL, do NOT tag. Hotfix on the release branch, retest, then tag.
 
@@ -1299,7 +1299,7 @@ When in doubt, rerun the smaller bundle first, then expand only if something dri
 
 ### 记忆库时效接替 —— 矛盾不再并存等裁决（2026-10-25，参照 getzep/graphiti）
 
-> 起因：`MEMORY_DESIGN.md` §4 预研时把「事实带有效期、被顶替时作废而非并存」标记为 Zep/Graphiti 领先的核心能力，结论是「若要做，只借『有效期』这一半」。本轮把那一半落地：矛盾判定命中后，**新事实顶替旧事实**（旧条目标 `invalidAt` 作废、保留可查，不删除），简报与默认召回只注入仍有效的事实。诚实失败的三道保险：工具返回值如实报告作废了什么；管理页可一键恢复（恢复=方向互换，接替者反而作废）；**置顶条目永不自动作废**（用户显式动作高于时间逻辑，与抑制豁免同一条原则）。旧数据里已有的 ⚠ 冲突对**不做静默迁移**，继续按老规则显示，直到用户处置或新事实接替其中一条。
+> 起因：`docs/design/MEMORY_DESIGN.md` §4 预研时把「事实带有效期、被顶替时作废而非并存」标记为 Zep/Graphiti 领先的核心能力，结论是「若要做，只借『有效期』这一半」。本轮把那一半落地：矛盾判定命中后，**新事实顶替旧事实**（旧条目标 `invalidAt` 作废、保留可查，不删除），简报与默认召回只注入仍有效的事实。诚实失败的三道保险：工具返回值如实报告作废了什么；管理页可一键恢复（恢复=方向互换，接替者反而作废）；**置顶条目永不自动作废**（用户显式动作高于时间逻辑，与抑制豁免同一条原则）。旧数据里已有的 ⚠ 冲突对**不做静默迁移**，继续按老规则显示，直到用户处置或新事实接替其中一条。
 >
 > 纯逻辑部分（接替写入、简报过滤、恢复互换、淘汰顺序、JSON 兼容）按 CLAUDE.md 纯逻辑例外走单测：`MemoryStoreTest` 36 例（新增 9、改写 3）、`MemoryEntryTest` 19 例（时间字段往返 + 旧文件回退）、`MemoryRecallFormatTest` 8 例（作废标注往返）；2026-10-25 实测全套 **363 / 363 绿**。下列两条为真机 E2E。
 
@@ -1309,7 +1309,7 @@ When in doubt, rerun the smaller bundle first, then expand only if something dri
   - ⚠️ **重装会重置无障碍服务**（系统设置被打回 null，重装后 `sendTask` 走 `DISABLED` 分支弹「Task mode needs Accessibility」）。`settings put secure enabled_accessibility_services` 在 V2502DA 上写了不生效——正确路径是 无障碍设置 → 已下载的服务 → PokeClaw → 允许（vivo 敏感权限弹窗）。技能触发词不自动豁免该门（`canRunWithoutAccessibility` 只放行 DirectIntent）。
 - [x] **H50. 默认检索只回仍有效的事实，历史按需可见 [PASS — 2026-10-25 真机]**: 接 H49 接替后状态 → ①发 `h50recall` → 工具步骤渲染成**单个 chip** `#408f934742b0 用户的手机是小米。`（Pixel 不出现）②发 `h50history`（技能带 `include_history: "true"`）→ 两个 chip 都在，Pixel 的内容区带「（已作废，被 #408f934742b0 接替）」③chips 渲染不退化（标注在内容区，`(命中 N 次)` 尾缀不动，`MemoryRecallFormatTest` 有往返回归）。
 
-### 感知回路降本 + 通知直回复 + 意图在场感（2026-10-25，`docs/AGENT_PERCEPTION_RESEARCH.md` 调研落地）
+### 感知回路降本 + 通知直回复 + 意图在场感（2026-10-25，`docs/archive/AGENT_PERCEPTION_RESEARCH.md` 调研落地）
 
 > 起因：用户原话「帮你回消息要截图再看，再滑动，才能回消息，而且你并不知道他在想什么，因为他已经跳转到另一个网页了」。调研（社区 mobile-mcp / DroidRun / android-use / Open-AutoGLM；海外 Apple App Intents、Android 16 AppFunctions、Assist 通道、ChatGPT Agent watch 模式；国产厂商；通知 RemoteInput 专项）落地五件事：
 > ① 提示词把 take_screenshot 收窄为「树拿不到的视觉内容」专用，Send Message 技能先试 reply_via_notification；
@@ -1918,7 +1918,7 @@ grep -i 'custom local model URL\|Custom URL set' /tmp/dump.xml
 adb shell run-as io.agents.nailongclaw strings /data/data/io.agents.nailongclaw/files/mmkv/mmkv.default | grep -E "KEY_CUSTOM_LOCAL_MODEL_URL|https://"
 ```
 
-## AA. Memory Bank Export Sharing (BACKLOG P1, `docs/MEMORY_DESIGN.md` §5.1)
+## AA. Memory Bank Export Sharing (BACKLOG P1, `docs/design/MEMORY_DESIGN.md` §5.1)
 
 Exporting the memory bank previously wrote `memories-export.md` into the
 `getExternalFilesDir(null)` **root**, which neither `FileProvider` root in
@@ -2060,7 +2060,7 @@ guessed at here.
 ## AB. 记忆关联（relatedIds） — 2026-10-17
 
 关联由模型在 `memory_save` 的 `related_ids` 里产出，单向挂在**后写**的那条上。
-设计取舍与「为什么不用相似度」见 `docs/MEMORY_DESIGN.md` §7；机制见 `docs/MEMORY_BANK.md`「关联」。
+设计取舍与「为什么不用相似度」见 `docs/design/MEMORY_DESIGN.md` §7；机制见 `docs/design/MEMORY_BANK.md`「关联」。
 
 **Build-type:** release（release 签名与线上包同密钥，故可覆盖安装，已绑定的微信 token 未丢）。
 **单测:** `MemoryLinkTest` 16 例，全量 **225 / 26 suites / 0 失败**。
@@ -2086,7 +2086,7 @@ guessed at here.
     - 矛盾对的两侧仍互相指向，未被误伤
   - ⚠️ **这是本轮修掉的现存缺陷**：`deleteByContent()` 与 `evictLocked()` 此前**不修** `conflictsWith`，只有 `delete()` 修——批量删除和容量淘汰会留下悬垂冲突。新增关联会把这个洞翻倍，故三条路径统一到 `pruneDanglingLocked`
 - [ ] **AB5. The agent links two related memories**: with a local/cloud model configured, ask something that yields a follow-up fact about an existing memory → **Expected**: the model passes `related_ids` using a `#id` seen in the briefing; the entry is stored with that link; `memory_save` reports which links took effect.
-  - ⏸ **SKIP（无模型环境）**：`memory_save` 的 `related_ids` 参数、简报里的 `#编号`、以及返回值里的「已关联 N 条 / 另有 N 个没生效」三条提示**均未在真实对话中观察过**。`MemoryLinkTest` 只能保证错误的连线不会被存下来，**保证不了模型连得准**——这正是路线 A 的已知代价（`MEMORY_DESIGN.md` §7.4）。需在有模型的环境补跑
+  - ⏸ **SKIP（无模型环境）**：`memory_save` 的 `related_ids` 参数、简报里的 `#编号`、以及返回值里的「已关联 N 条 / 另有 N 个没生效」三条提示**均未在真实对话中观察过**。`MemoryLinkTest` 只能保证错误的连线不会被存下来，**保证不了模型连得准**——这正是路线 A 的已知代价（`docs/design/MEMORY_DESIGN.md` §7.4）。需在有模型的环境补跑
 - [ ] **AB6. The agent links nothing when nothing is related**: ask about an unrelated topic → **Expected**: `related_ids` left empty, no links stored, and the model does not manufacture a link to satisfy the instruction.
   - ⏸ **SKIP（同 AB5）**：这条比 AB5 更重要——社区（mem0）专门为「不要因为主题沾边就连」写了提示词规则，说明**过度连线是实际会发生**的失败模式，而非理论风险
 
@@ -2105,7 +2105,7 @@ adb logcat -d | grep -i "Failed to find configured root"
 
 ## AC. 网络搜索（web_search 工具） — 2026-10-25
 
-内置 `web_search` 工具（博查 Bocha / DeepSeek / Tavily 三服务商，密钥加密存于 MMKV），系统提示词在纯聊天例外区增加了「实时/知识类问题 → web_search」路由。取舍记录见 `docs/WEB_SEARCH_DESIGN.md`；**用户公告文案见 `docs/RELEASE_NOTES_WEB_SEARCH.md`，其发布前置就是本组真机通过**。
+内置 `web_search` 工具（博查 Bocha / DeepSeek / Tavily 三服务商，密钥加密存于 MMKV），系统提示词在纯聊天例外区增加了「实时/知识类问题 → web_search」路由。取舍记录见 `docs/design/WEB_SEARCH_DESIGN.md`；**用户公告文案见 `docs/archive/RELEASE_NOTES_WEB_SEARCH.md`，其发布前置就是本组真机通过**。
 **单测:** `WebSearchClientTest` 13 例（解析/截断/错误提取，含 DeepSeek），`ToolRiskPolicyTest` 补 `web_search` 白名单两例。
 **注意:** 「在某 App 里搜索」仍走设备自动化（InAppSearchGuard 不变），W 组验证不覆盖也不改动该路径。
 

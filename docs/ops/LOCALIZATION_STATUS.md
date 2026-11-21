@@ -35,10 +35,10 @@
 - **捕获"保存为技能"**：`agent/skill/ToolCallRecorder.kt` 挂 `ToolRegistry.executeTool` 钩子，agent 循环（runAgentLoop 顶部 begin）记录工具调用，finish 成功/纯文本完成时 markSuccess 快照；生成 YAML 自动剔除 finish/get_screen_info/take_screenshot
 - **管理 UI**：`ui/settings/UserSkillsActivity`（设置 → Tools → 自定义技能）：配方列表（点击编辑 YAML、长按删除）、从上次任务创建（无捕获时置灰）、手动新建（内置模板）、保存即注册生效
 - **装机 e2e**（2026-10-07 实测）：`adb push scripts/sample_skill.yaml` → 重启 → logcat `User skills: 1 loaded, 0 error(s)`；管理页截图正常（配方"打开设置 · 2 步"）
-- 格式文档 `docs/SKILL_FORMAT.md`，示例 `scripts/sample_skill.yaml`
+- 格式文档 `docs/design/SKILL_FORMAT.md`，示例 `scripts/sample_skill.yaml`
 - 未做（可选增强）：配方自动触发仅 PipelineTier2 正则（继承内置逻辑）；技能面板 Workflows 卡片由 `getUserFacing()` 自动带出，未单独截图验证；MCP 管理 UI 的「测试连接」按钮仍未做（`WebSearchActivity` 有一个不同实现的同名按钮可参考）。**工具来源标记已交付**——`ToolsActivity` 按 builtin / MCP / 技能 / 影子屏分组展示。
 - 坑：Kotlin 块注释支持嵌套——KDoc 里写 `/skills/*.yaml` 的 `/*` 会开启嵌套注释吃掉整个文件（"Unclosed comment"），注释里写路径带 `*` 要注意
 
 ## 相关文件
 
-- `MCP_INTEGRATION_PLAN.md` — MCP/Skills 集成设计（已完成编码部分见此文档）
+- `docs/design/MCP_INTEGRATION_PLAN.md` — MCP/Skills 集成设计（已完成编码部分见此文档）

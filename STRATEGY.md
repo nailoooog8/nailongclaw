@@ -16,7 +16,7 @@
 > Treat it as a historical document, not as a roadmap for this repository.
 >
 > For this fork's actual scope and priorities, read [`README.md`](README.md) and
-> [`BACKLOG.md`](BACKLOG.md). For our own maintenance state, see `CLAUDE.local.md`
+> [`work/BACKLOG.md`](work/BACKLOG.md). For our own maintenance state, see `CLAUDE.local.md`
 > (not version-controlled).
 
 # PokeClaw — Moat, Window, Acquisition Thesis

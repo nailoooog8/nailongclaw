@@ -176,7 +176,7 @@ debug-report.zip.
 - Replies cite specific versions (v0.6.x → v0.7.0). Do **not** post until
   v0.7.0 is actually tagged + the GitHub release page is live, otherwise
   reporters will look for an APK that does not exist yet.
-- Same-day reply policy (per `ARCHITECTURE_DECISIONS.md` D8) — these
+- Same-day reply policy (per `docs/design/ARCHITECTURE_DECISIONS.md` D8) — these
   drafts are sized to be posted within 24 hours of v0.7.0 going live.
 - For follow-up rounds after the reporter attaches a debug-report.zip:
   - if OpenCL is missing → set `KEY_LOCAL_BACKEND_PREFERENCE=CPU` for

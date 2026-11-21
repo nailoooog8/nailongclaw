@@ -18,7 +18,7 @@
 > 中间目录正确不代表最终 APK 正确。
 >
 > 入口：设置 → 关于 →「Claude UI 聊天」。曾是「P1 发布前必删」的临时入口，
-> 现在是有产品功能的入口，故那条判据已作废（见 `BACKLOG.md`）。
+> 现在是有产品功能的入口，故那条判据已作废（见 `work/BACKLOG.md`）。
 >
 > **三类示例 turn 都已接真实数据**：**工具卡片**（2026-10-19，QA H23，2026-10-22
 > 修复历史恢复后丢失，QA H26 —— 「生产侧从未被赋值」是过时结论）；**MCP 确认卡**
@@ -166,7 +166,7 @@ Compose 侧入口在 `ActiveTaskBar` 行尾（`onOpenLedger` →
 
 已在浏览器（无桥预览）验证：四种状态卡 / 徽标 / 详情账本与失败行 /
 详情→列表→关闭的 BACK 层级 / 空账本与坏 JSON 均落空态 / 详情缺失态 /
-桥数据与推送刷新。真机 QA 条目见 `QA_CHECKLIST.md` AD 组（待设备；
+桥数据与推送刷新。真机 QA 条目见 `work/QA_CHECKLIST.md` AD 组（待设备；
 `DUMP_DOM` 广播已带 `tasksOpen/tasksLevel/taskCards` 三个探针，
 uiautomator 看不见 WebView 内部，这是任务页的真机取证口）。
 

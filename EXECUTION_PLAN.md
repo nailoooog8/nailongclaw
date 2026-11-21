@@ -14,7 +14,7 @@
 > items were delivered by other means in this fork (for example the emulator matrix CI).
 >
 > Everything below is preserved verbatim because Apache-2.0 §4 requires it. Treat it as a
-> historical document. For this fork's live priorities, read [`BACKLOG.md`](BACKLOG.md).
+> historical document. For this fork's live priorities, read [`work/BACKLOG.md`](work/BACKLOG.md).
 
 # PokeClaw — Execution Plan to Acquisition Target
 
@@ -198,7 +198,7 @@ Decision gate per STRATEGY.md §10:
 For each OEM bug we can't repro:
 1. Leave **visible reply within 24 hr**：「v0.X.Y diagnostics ship 緊，請 attach fresh debug-report.zip」
 2. **Issue template enforcement** — require OEM + Android version + Build number + debug-report.zip
-3. ~~**Vendor-specific code directories** — `vendor/xiaomi/`、`vendor/samsung/`~~ — 未采用：仓库无 `vendor/` 源根（`app/build.gradle.kts` 只认 `app/src`）；跨 OEM 差异按 `docs/OEM_COVERAGE_TIERS.md` 分层记录，不走 per-vendor 子目录
+3. ~~**Vendor-specific code directories** — `vendor/xiaomi/`、`vendor/samsung/`~~ — 未采用：仓库无 `vendor/` 源根（`app/build.gradle.kts` 只认 `app/src`）；跨 OEM 差异按 `docs/ops/OEM_COVERAGE_TIERS.md` 分层记录，不走 per-vendor 子目录
 4. **「PokeClaw OEM Verified」badge** in README — community-maintained matrix
 
 ### Active commit signal
@@ -248,4 +248,4 @@ ADRs are **the single highest signal** for acqui-hire candidates: shows you thin
 
 ## Right now → (upstream 的历史起点，已过时) #44 Voice Input 已于 2026-05-26 交付
 
-本 fork 的当前优先级见 `BACKLOG.md`。
+本 fork 的当前优先级见 `work/BACKLOG.md`。

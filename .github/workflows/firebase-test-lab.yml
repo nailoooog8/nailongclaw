@@ -18,7 +18,7 @@ name: Firebase Test Lab — real device smoke
 #                               with the role `roles/cloudtestservice.testAdmin`
 #                               and `roles/firebase.testLabAdmin`
 #
-# Setup playbook: docs/OEM_COVERAGE_TIERS.md → T2 section.
+# Setup playbook: docs/ops/OEM_COVERAGE_TIERS.md → T2 section.
 
 on:
   push:
@@ -79,7 +79,7 @@ jobs:
       - name: Refuse to run without GCP secrets
         run: |
           if [ -z "${{ secrets.GCP_PROJECT_ID }}" ] || [ -z "${{ secrets.GCP_SA_KEY_JSON }}" ]; then
-            echo "::error::Missing GCP_PROJECT_ID or GCP_SA_KEY_JSON repo secret. See docs/OEM_COVERAGE_TIERS.md T2 for setup."
+            echo "::error::Missing GCP_PROJECT_ID or GCP_SA_KEY_JSON repo secret. See docs/ops/OEM_COVERAGE_TIERS.md T2 for setup."
             exit 1
           fi
           echo "Secrets present, proceeding."

@@ -28,9 +28,9 @@ Modifications made in this distribution, summarised (full list in git history):
     credential masking in the LAN control server, path-traversal fix in file
     serving, MCP tool-description sanitisation, Telegram authorisation by user
     id rather than chat id, and a high-impact-tool gate for remote sources.
-    Audit reports: docs/SECURITY_AUDIT.md and docs/SECURITY_AUDIT_R2.md.
+    Audit reports: docs/security/SECURITY_AUDIT.md and docs/security/SECURITY_AUDIT_R2.md.
     Real-device end-to-end verification for these is NOT complete; see
-    QA_CHECKLIST.md sections SEC1-SEC11.
+    work/QA_CHECKLIST.md sections SEC1-SEC11.
   - Localisation: complete English / Simplified Chinese / Japanese interface.
   - Additional remote-control channels (WeChat, QQ, Douyin) and restored
     access to a channel settings group that was unreachable upstream.
