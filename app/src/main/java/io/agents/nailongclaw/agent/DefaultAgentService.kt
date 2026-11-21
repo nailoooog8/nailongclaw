@@ -10,6 +10,7 @@ import android.view.WindowManager
 import io.agents.nailongclaw.ClawApplication
 import io.agents.nailongclaw.R
 import io.agents.nailongclaw.agent.langchain.LangChain4jToolBridge
+import io.agents.nailongclaw.agent.llm.LocalToolAllowlist
 import io.agents.nailongclaw.agent.llm.LlmClient
 import io.agents.nailongclaw.agent.llm.LlmClientFactory
 import io.agents.nailongclaw.agent.llm.LlmResponse
@@ -143,10 +144,20 @@ class DefaultAgentService : AgentService {
      * round to describe a screen the model cannot touch yet, where every call
      * would error. The registry keeps them registered, so a display created
      * later is picked up by the next request — no restart, no stale pruning.
+     *
+     * On the LOCAL path a capability-domain allowlist is applied on top: the
+     * on-device window cannot afford all ~44 tool schemas, so only the tools
+     * the local prompt and the briefing teach are declared. A trimmed tool
+     * the model calls anyway is refused with an explanation (see
+     * LocalToolAllowlist.degradationNotice) instead of pretending it ran.
+     * Cloud requests are untouched.
      */
     private fun requestToolSpecs(): List<dev.langchain4j.agent.tool.ToolSpecification> {
-        if (ShadowDisplayManager.isCreated()) return toolSpecs
-        return toolSpecs.filterNot { it.name().startsWith("shadow_") }
+        return LocalToolAllowlist.specsForRequest(
+            toolSpecs,
+            config.provider,
+            ShadowDisplayManager.isCreated()
+        )
     }
 
     override fun updateConfig(config: AgentConfig) {
@@ -781,6 +792,21 @@ class DefaultAgentService : AgentService {
                     HashMap()
                 }
                 if (params == null) params = HashMap()
+
+                // Local allowlist degradation: a tool trimmed from the local
+                // toolset is refused honestly instead of pretending it ran.
+                // Same visible shape as the guard-blocked finish below — the
+                // model sees the refusal as a tool result and can end the
+                // task with an explanation instead of a fake success.
+                if (config.provider == LlmProvider.LOCAL && !LocalToolAllowlist.isDeclared(toolName)) {
+                    val degradedResult = ToolResult.error(LocalToolAllowlist.degradationNotice(toolName))
+                    XLog.i(TAG, "Local allowlist refused trimmed tool '$toolName' for '$userPrompt'")
+                    callback.onToolCall(iterations, toolName, displayName, toolArgs)
+                    val paramsString = if (params.isEmpty()) "" else params.toString()
+                    callback.onToolResult(iterations, toolName, displayName, paramsString, degradedResult)
+                    messages.add(ToolExecutionResultMessage.from(toolRequest, GSON.toJson(degradedResult)))
+                    continue
+                }
 
                 val blockedFinish = if (toolName == "finish") {
                     val screenInfo = try {
