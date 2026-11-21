@@ -2157,6 +2157,21 @@ adb logcat -d | grep "opened with the task ledger requested"
 
 Format: `[date] [status] [test-id] description`
 
+### 2026-11-21（夜）— v0.9.1 真机补验轮（vivo V2502DA，release 构建 vc65）：安装/升级、云端 E2E、EXTERNAL 令牌腿、影子屏真机判决；一修正一缺陷
+
+release 构建 `NAILongClaw_v0.9.1_20261121_222835.apk`（vc65）升级安装；证据 `.auto/qa1121_vivo_*.png` 六张。当日无第三方 logcat（vivo），证据以账本/截图/dumpsys 为准。
+
+- ✅ **安装/升级行为（含一修正）**：vc63 直装被拒——**设备实装是 vc64**（2026-11-08 僵尸态验证构建，板上「已装 vc62」记录过期），晚四段「63 压过 QA 机已装 vc62」据此失实；`NAILONGCLAW_VERSION_CODE=65` 重打 → `install -r` Success，dumpsys `versionCode=65` / lastUpdateTime=2026-11-21 22:36。**推论：发布的 v0.9.1 资产（vc63）在这台设备上同样装不上**——发布版本策略欠账（见 BACKLOG 2026-11-21 夜两条）。
+- ✅ **a11y（升级后）**：升级把 `enabled_accessibility_services` 清 null、`accessibility_enabled=0`，Bound services 空——权限自检页「无障碍服务 · Disabled」如实渲染（设置真没了，非僵尸态，不算自愈分支触发）；点该行**深链系统 `AccessibilitySettingsActivity` 复验 ✓**（b290988）。**新事实：vivo「永不重绑」砖是 force-stop 特供——install-update 后 `settings put secure` 直写即可重绑**（Bound services 立即恢复 NailongClaw），板上砖定案的范围要收窄。
+- ✅ **云端任务 E2E（DeepSeek 自定义端点）**：「check my battery…」→ 账本 `channel=LOCAL` **COMPLETED**，answer「Battery: 96%, charging, 27.2°C」；答案上方无散落工具行（H82 整轮折叠真机 ✓）；**通知栏仅 FGS 常驻条，无任务通知 → H80「前台态不通知」腿真机过**；完成反馈为应用内绿色横幅（非系统通知），与模拟器行为一致。
+- ✅ **EXTERNAL 令牌腿（R4-R1 正向 + fail-closed 反向 + H80 总通知）**：设置启用外部自动化（启用确认框）→ 配对令牌对话框 → 令牌经「复制令牌 → 长按 composer 粘贴 → dump」链路取得（32 位 Crockford base32）→ 带 `token` extra 广播 `RUN_TASK` → 账本 `channel=EXTERNAL` **COMPLETED** answer="4"，`NailongClaw_task_channel` 任务通知挂出 → **H80「EXTERNAL 总通知」腿真机过**；无 token 负向广播 → 账本零新增（fail-closed ✓）。外部自动化留在启用态（Tasker/MacroDroid E2E 欠账要用）。
+- ⚖️ **H78 b/f/g 真机判决：shadow_open_app 被 OriginOS/Android 17 系统级拦截**。云任务（26 秒 / 3 步 / 3 工具）自诊全文在 `.auto/qa1121_vivo_shadow_verdict.png`：虚拟显示器**能**创建，但「第三方应用往虚拟屏启动」报 `SecurityException: Permission Denial — starting <app> with launchDisplayId=NN`（uid=10405；学习通/抖音/系统设置三 app 报错一字不差 = 系统层限制，重试无意义）；此前一条「Failed: Opening clock」为同一拦截（该条 24ms COMPLETED 无 steps——「open…app」尾巴被确定性路由短截，未走影子工具，第二发换措辞才进真 agent loop）。板上「vivo 可用」平台差异笔记**作废**；继续走影子屏需调试层放行（START_ANY_ACTIVITY 类，需 root）或 OriginOS 多屏协作关卡。
+- ✅ **运行态可见性真机**：活动胶囊「获取应用列表 · 第2轮 · 0:07 · ✕」（秒表走动）+ 工具行（获取应用列表 → com.android.BBKClock）+ 受理横幅（「已收到：…」）全在 vivo 活。
+- ✅ **白名单 UI**：侧栏 → 设置 → 渠道接入，「已配对的发送者 — 0 个已配对」入口 ✓；`ChannelPairActivity` 空态四段（怎么配对 / 渠道隔离 / 仅本机存储 / 待重绑解释）中文完整渲染。
+- ⚠️ **新缺陷（真机，vivo 1260px / density 490）**：配对令牌对话框**正文溢出屏幕左缘被裁**——32 位不可折行令牌把 CdsDialog 正文撑出屏，令牌首字符不可读，「复制令牌」是唯一可用通路。修向：token TextView 水平滚动或等比缩放。截图 `.auto/qa1121_vivo_token_clip.png`。
+- ✅ **崩溃卫生**：`dumpsys activity exit-info` 无新增（最后一条 2026-11-08 force-stop），全程零崩。
+- ⏳ **未验（范围外）**：FGS 缝隙 vivo 复现（release 无 DebugTaskReceiver，广播驱动不可用；修复由 6 例单测 + 模拟器轮背书）；SEC19–21 完整配对链（需真渠道）；通知使用权/自动回复监听腿。
+
 ### 2026-11-21（晚四）— v0.9.1 发布：RELEASING.md 全链走完，发布门禁经用户决定豁免
 
 - [NOTE] — **发布动作**：版本默认键 34/0.9.0 → **63/0.9.1**（`app/build.gradle.kts`，local.properties 无覆盖键故默认值即生效；63 压过 QA 机已装 vc62 与公开线 vc34，两个已装面都能覆盖升级）；README Changelog 加 v0.9.1 条目（CI 的 release-notes 抽取按 `### v0.9.1\b` 锚定，抽取脚本已核读）。本地 `:app:assembleRelease` EXIT=0（5m06s，R8 + lintVital 全跑）；产物 `NailongClaw_v0.9.1_20261121_211645.apk`：aapt 实测 `versionCode='63' versionName='0.9.1'`，apksigner 验签通过（DN `CN=PokeClaw, O=nailoooog8`，证书 SHA-256 `7c2d6dd5…`），本地包 SHA-256 `9673fef7…`。main 推送 gh api 核对一致（`618e7a5` = 本地）；tag `v0.9.1` 推送触发 **Release APK** + **Firebase Test Lab real device smoke** 两个 run。
