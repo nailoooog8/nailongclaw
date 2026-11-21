@@ -2159,7 +2159,7 @@ Format: `[date] [status] [test-id] description`
 
 ### 2026-11-21（晚二）— 小遗留清理轮：三实现轮遗留清单的可修项 7 件收编（代码落，模拟器未逐项复验）
 
-分支 `qa/small-leftovers` 单 commit cherry-pick 回主干 `9afa811`；合并门 `compileDebugKotlin testDebugUnitTest` **746/0**（736 基线 + 10 新例）EXIT=0，`.auto/leftovers_gate.log`。改动 16 文件 +326/-68。模拟器未逐项复验（均为低风险小额：计数/文案/委托/死代码），下次模拟器 QA 顺带看。
+分支 `qa/small-leftovers` 单 commit cherry-pick 回主干 `9afa811`；合并门 `compileDebugKotlin testDebugUnitTest` **746/0**（736 基线 + 10 新例）EXIT=0，`.auto/leftovers_gate.log`。改动 16 文件 +326/-68。模拟器未逐项复验（均为低风险小额：计数/文案/委托/死代码）→ **同日晚三 h79 复验**（HEAD `e3f0a0c` debug 包 `_205232` 覆盖安装，可验面全过，见下方晚三复验段）。
 
 - ✅ **Registered Tools 计数失真**：`buildDeviceContext()` 改收 `declaredToolCount`（与 `requestToolSpecs()` 同管线：本地=26 / 云端透传全量 / 有 shadow display 时扣 5），2026-11-21 段①遗留③收账；新例 LOCAL=26 / OPENAI 无显示=39 / 有显示=44。上下文按任务开始冻结，mid-task 建 shadow 只放宽后续轮（KDoc 注明）。
 - ✅ **KVUtils 死 API 删除**：`KEY_CHANNEL_WHITELIST_PREFIX` + `getChannelWhitelist()`/`addChannelWhitelist`/`removeChannelWhitelist` 全仓库 grep 零调用，四件一并删（2026-11-21 段③遗留①收账）。
@@ -2170,6 +2170,14 @@ Format: `[date] [status] [test-id] description`
 - ✅ **`BuildConfig.VERSION_INFO` 零读者**：grep 确认真零读者（仅 build.gradle 注入行，无 Kotlin/XML/脚本读者、无注释引用），删注入行 + `getVersionGit()`；`BUILD_FINGERPRINT` 有真读者未动（2026-11-19 P3 轮遗留收账）。
 
 **本轮遗留（新发现，未动）**：KVUtils 里还有一批疑似零读者的 channel 常量/方法簇（`KEY_WECHAT_UPDATES_CURSOR`、Discord/Telegram/QQ/Douyin token 读写等）值得做同款零读者核查；`buildDeviceContext` 的工具数在 mid-task 建 shadow display 时有 1 轮内的滞后（只少报不多报，KDoc 已注明）。
+
+**晚三复验（同日，h79 AVD，HEAD `e3f0a0c` debug 构建 `NailongClaw_v0.9.0_20261121_205232.apk` 覆盖安装、数据/模型/a11y 设置幸存；证据 `.auto/qa1121b_build.log`、logcat 摘录、`.auto/qa_tab_toast2.png`）：**
+
+- ✅ **tab 无默认行 toast（本轮唯一新 UI 面）**：Compose 顶栏点 `Cloud` tab（871,147，dump bounds 实证）→ toast **「No model available to switch to」**截图入镜 `.auto/qa_tab_toast2.png`；tab 不切换（选择从激活模型派生，`Local` 保持高亮）；logcat 近 500 行 **0 条 `Agent config updated`**——no-op 不写 config 不发广播（与 BACKLOG 新 P3「同模型切换取消在跑任务」的守卫面一致）。
+- ✅ **Registered Tools 计数（新管线）+ ① allowlist 存活**：本地聊天任务广播驱动 → `createConversation: 26 native tools`（与 `buildDeviceContext(requestToolSpecs().size)` 同请求同源——上下文串本身无日志，机上证据为同管线 log + `LocalToolAllowlistTest` LOCAL=26 例）；任务 `rounds=1, answer=2 plus 2 equals 4.` 完整收尾，零 too-long 零 session 冲突。顺带：`open the settings app` 走 Tier 1 直连（`model=direct`）也过——管道两路都活着。
+- ✅ **② 下拉目录**：`Switch model`（457,261）→ 全量目录同上轮（On-device E2B「In use」/E4B「Not downloaded」灰化；Cloud OpenAI×5 + Anthropic×2 + Google×2 全列「No API key」灰化）。空态文案机上 N/A（目录非空），`ModelMenuProjectionTest` 钉住。
+- ✅ **③ 白名单 UI**：`ChannelsActivity` 入口行「Paired senders — 0 paired」+ `ChannelPairActivity`（ResumedActivity 实证）空态四段含 pending-re-bind 解释段在 HEAD 上复验。行尾计数口径修复机上无存量 legacy 条目可触发（单测钉住）。配对态/待重绑徽标/单条撤销仍需真渠道 `/bind`（与 SEC19–21 同障碍）。
+- ✅ **纯代码件无设备面**：KVUtils 死 API 删除 / 双 PIN 收编 / `VERSION_INFO` 注入删除——构建绿（EXIT=0，23s）+ 746/0 单测即覆盖，无机验项。
 
 ### 2026-11-21 — 三并行实现轮：本地工具 allowlist/预算 · Compose 模型下拉齐平 · ChannelSecurityGuard 白名单 UI
 
