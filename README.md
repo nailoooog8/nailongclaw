@@ -1,10 +1,10 @@
-# NailongClaw — 远程控制与安全加固版
+# NailongClaw — Android 端上 AI Agent（独立发行版）
 
-> 独立发行版，衍生自 [agents-io/PokeClaw](https://github.com/agents-io/PokeClaw)（Apache-2.0）。上游最后提交停在 2026-06-02；本版本在其代码基础上继续开发，完成了上游未覆盖的**多渠道远程控制**、**安全边界收敛**、**中文本地化**三个方向，并于 2026-10-27 完成独立化：**改名 NailongClaw、更换图标、启用新 applicationId**（`io.agents.nailongclaw`）。
+> 本地 Gemma / 云端双模：聊天、代你在手机上完成任务、监听并自动回复、定时执行、长期记忆。衍生自 [agents-io/PokeClaw](https://github.com/agents-io/PokeClaw)（Apache-2.0）。上游最后提交停在 2026-06-02；本版本在其代码基础上继续开发，并于 2026-10-27 完成独立发行：**改名 NailongClaw、更换图标、启用新 applicationId**（`io.agents.nailongclaw`）。
 >
 > 上游 README 的商标条款要求 fork 分发前改名，本次改名即依该条款执行；上游归属依 Apache-2.0 §4 完整保留（见 `NOTICE` 与下方逐字未动的上游原始 README）。
 >
-> 🟢 活跃维护中 · 最新 **v0.9.0** · 欢迎 [issue](https://github.com/nailoooog8/nailongclaw/issues) / [PR](https://github.com/nailoooog8/nailongclaw/pulls)
+> 🟢 活跃维护中 · 最新 **[v0.9.1](https://github.com/nailoooog8/nailongclaw/releases/tag/v0.9.1)** · 欢迎 [issue](https://github.com/nailoooog8/nailongclaw/issues) / [PR](https://github.com/nailoooog8/nailongclaw/pulls)
 
 [![license](https://img.shields.io/badge/license-Apache--2.0-3DDC84?style=flat-square)](https://github.com/nailoooog8/nailongclaw/blob/main/LICENSE)
 [![android](https://img.shields.io/badge/Android-9%2B-3DDC84?logo=android&logoColor=white)](https://developer.android.com)
@@ -32,22 +32,28 @@ Google 的移动 agent 永远是 Pixel-first 的；Samsung 的 Galaxy AI 战略�
 | **任务看门狗** | 120 秒无活动 / 600 秒总时长自动中止并释放任务锁，避免卡死 |
 | **后台保活** | 常驻前台服务开关 + 粘性服务 + 看门狗 |
 | **三语界面** | English / 简体中文 / 日本語 |
+| **本地模式可用性收口** | 8192 窗口曾被固定开销吃满（2026-10-27 诊断，任何带记忆的本地任务首轮必溢出）；v0.9.1 起工具声明按 allowlist 裁剪（44→26）+ 记忆简报总预算 2600 字符 + 被裁工具诚实降级——本地多轮 agent-loop 实测存活，详见[「本地模式的现实」](#本地模式的现实已知限制) |
+| **任务账本与定时任务** | 任务双写账本 + 定时队列（默认只读天花板，写操作白名单是开放决策）+ 侧栏任务/定时入口 |
+| **任务运行态可见性** | 忙时可见排队、composer 活动胶囊、执行过程整轮折叠、悬浮球秒表、完成通知、错误人话化（`ErrorHumanizer`） |
+| **影子屏自动化** | MediaProjection 虚拟屏驱动 + displayId 隔离防环 + 逃逸看门狗（真机部分腿待验） |
+| **无障碍僵尸态自愈** | 「已开启但系统未连接」自动判别并深链系统开关页（vivo force-stop 后 AMS 不重绑的实测场景） |
+| **语义记忆检索** | 端上 EmbeddingGemma 混合打分，记忆召回按相关度排序 |
 | **独立发行** | 自有名称、图标、签名密钥与 applicationId，issue / 更新检查均指向本仓库 |
 
-### 安全审计
+### 安全审计（R1–R4，四轮）
 
-本分支做过一次完整的红队审计（OWASP MASTG / Android IPC / 间接提示注入），修复了 2 个 Critical、1 个 High、1 个 Medium：
+| 轮次 | 日期 | 形态 | 结果 |
+|---|---|---|---|
+| R1 | 2026-10-11 | 红队（v0.8.0 基线，OWASP MASTG / Android IPC / 间接提示注入） | 2 Critical / 1 High / 1 Medium 当轮修复：`BruteForceGuard`（6 位 PIN 原本零限速可爆破）、控制台凭据掩码（`GET` 明文返回全部 token）、`McpDescriptionSanitizer`（MCP 工具描述投毒进 system prompt）、路径穿越校验 |
+| R2 | 2026-10-16 | 红队（v0.8.1 基线） | F1–F10；Telegram 按 user id 授权、远程来源禁用高危工具等随 v0.8.2 落地 |
+| R3 | 2026-10-25 | 攻防推演 | 外部自动化门控（R3-01 P0）→ `ExternalAutomationGuard` 配对令牌 + 加密落盘 + 爆破锁定落地 |
+| R4 | 2026-10-27 | 红蓝合报 | R4-B1 屏幕内容数据条款 + R4-R1 配对令牌门控，均已提交 |
 
-- **Critical — PIN 暴力破解**：渠道配对 PIN 与 LAN 控制台 PIN 均为 6 位，且两处比较都**没有任何限速**。新增 `BruteForceGuard`。
-- **Critical — 凭据泄漏**：`GET /api/channels` 与 `/api/llm` 明文返回全部 bot token 和 LLM API Key。读路径改为掩码返回。
-- **High — MCP 工具投毒**：`McpTool` 把远程服务器的 `description` 直接拼进 system prompt，恶意服务器可向一个能点击、输入、发消息的模型注入指令。新增 `McpDescriptionSanitizer`。
-- **Medium — 路径穿越**：`handleServeFile` 用 `absolutePath.startsWith(cacheDir)` 做校验，不折叠 `..`。
+同时证伪了三条假设：SnakeYAML 反序列化（实测 2.2 版已禁用全局标签）、Debug 接收器暴露（有 `BuildConfig.DEBUG` 闸门）、记忆库召回注入（已有围栏防护）。
 
-同时**证伪了三条假设**：SnakeYAML 反序列化（实测 2.2 版已禁用全局标签）、Debug 接收器暴露（有 `BuildConfig.DEBUG` 闸门）、记忆库召回注入（已有围栏防护）。
+四份报告在 [`docs/security/`](docs/security/)，逐条用例与方法论见各文。**边界声明不变：代码已修复 ≠ 真机 E2E 已验证**——SEC 系列与 R4 正向路径的真机执行仍在欠账（见 [`work/QA_CHECKLIST.md`](work/QA_CHECKLIST.md)），请勿将代码修复等同于已通过安全测试。当前仍开放的高优项：F3 逐调用方签名白名单、F5 LAN 控制台 cleartext（部分已修）。
 
-完整用例见 [`QA_CHECKLIST.md`](work/QA_CHECKLIST.md) 的 `SEC` 段（SEC1–SEC11）。
-
-完整审计报告见 [`docs/security/SECURITY_AUDIT.md`](docs/security/SECURITY_AUDIT.md)。**该文档明确区分了「代码已修复」与「真机 E2E 已验证」**——SEC1–SEC11 目前全部尚未执行，请勿将代码修复等同于已通过安全测试。
+单测基线 746/0（`./gradlew testDebugUnitTest`）。
 
 发现新漏洞请走[私有漏洞上报](https://github.com/nailoooog8/nailongclaw/security/advisories/new)，**不要开公开 issue**——修复落地前 issue 里的细节对所有人可见。报告范围、响应预期与转上游的边界见 [`SECURITY.md`](SECURITY.md)。
 
@@ -96,6 +102,7 @@ Google 的移动 agent 永远是 Pixel-first 的；Samsung 的 Galaxy AI 战略�
 
 | 版本 | 说明 |
 |---|---|
+| **v0.9.1** | **本地模式可用性收口**：工具 allowlist + 简报预算 + 诚实降级；一个月安全/稳定性累积 |
 | **v0.9.0** | **独立发行版**：改名 NailongClaw、新启动图标、新 applicationId `io.agents.nailongclaw` |
 | v0.8.3 | 设置页 About：移除指向上游作者的「开发者」，改为指向本项目的赞助入口 |
 | v0.8.2 | 第二轮红队审计：Telegram 按 user id 授权 + 远程来源禁用高危工具 |
@@ -151,6 +158,8 @@ cd nailongclaw
 | [`docs/design/MEMORY_BANK.md`](docs/design/MEMORY_BANK.md) | 记忆库设计 |
 | [`docs/design/SKILL_FORMAT.md`](docs/design/SKILL_FORMAT.md) | 技能配方格式 |
 | [`docs/ops/OEM_COVERAGE_TIERS.md`](docs/ops/OEM_COVERAGE_TIERS.md) | 各 OEM 测试覆盖层级 |
+| [`docs/security/`](docs/security/) | R1–R4 安全审计报告（红队 / 攻防推演 / 红蓝合报） |
+| [`docs/ops/AI_AGENT_PLAYBOOK.md`](docs/ops/AI_AGENT_PLAYBOOK.md) | 内部操作手册（构建 / 发布 / QA 驱动） |
 | [`work/QA_CHECKLIST.md`](work/QA_CHECKLIST.md) | E2E 用例库（含安全红队段） |
 | [`work/BACKLOG.md`](work/BACKLOG.md) | 功能与缺陷优先级 |
 
