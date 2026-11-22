@@ -22,8 +22,14 @@ import io.agents.nailongclaw.utils.XLog
 class PipelineRouter(private val context: Context) {
 
     sealed class Route {
-        /** Tier 1: Execute Android intent directly */
-        data class DirectIntent(val intent: Intent, val description: String) : Route()
+        /** Tier 1: Execute Android intent directly. [action] is TaskParser's
+         * user-facing verb ("call", "open_url"…) — the raw intent action
+         * (android.intent.action.DIAL) is diagnostics, not copy (U4). */
+        data class DirectIntent(
+            val intent: Intent,
+            val description: String,
+            val action: String,
+        ) : Route()
 
         /** Tier 1: Execute a tool directly (e.g., screenshot, back, home) */
         data class DirectTool(val toolName: String, val params: Map<String, Any>, val description: String) : Route()
@@ -73,7 +79,7 @@ class PipelineRouter(private val context: Context) {
 
             // Intent-based action (call, alarm, settings, URL)
             if (parseResult.intent != null) {
-                return Route.DirectIntent(parseResult.intent, parseResult.description)
+                return Route.DirectIntent(parseResult.intent, parseResult.description, parseResult.action)
             }
 
             // Tool-based action (screenshot, back, home, open app)

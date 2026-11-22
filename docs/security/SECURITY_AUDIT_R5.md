@@ -236,7 +236,7 @@ R4 之后落地的安全相关新面：
 | U1 | **Tier 1 正则劫持调度意图（存量）**：CALL_PATTERN `(?:call\|phone\|ring\|dial)\s+(.+)` 无锚定，「schedule a task … call 1234567」在 Tier 1 当场直接拨号，用户的「2 minutes from now」被静默丢弃——实测复现，拨号盘拉起、账本记 COMPLETED "Dialing 1234567" | **已修**：`route()` 在 parse 前对 schedule/定时 加 AgentLoop 守卫；alarm/timer 关键词不含这两词（快路不受影响）；纯 `call N` LOCAL 直连复测照常 |
 | U3 | **拒答被播报成成功（R5-06 引入的呈现缺陷）**：拒答发 `TaskEvent.Completed`，定时分发器播报「Scheduled task **done** Blocked: …」，锁屏上拒绝读成完成（通知栏截图实锤） | **已修**：改发 `TaskEvent.Failed(reason)`——账本 FAILED 行 + 「Scheduled task failed」标题 + 同一拒答文案；复测通过 |
 | U2 | **本地模型无法建定时任务，但定时页空态文案仍引导「在聊天里说…」**：`schedule_task/list_scheduled_tasks/cancel_scheduled_task` 在 LocalToolAllowlist.TRIMMED_EXAMPLES（8192 上下文预算的既有取舍），LOCAL 模型实测回答「I do not have a tool that allows me to schedule」 | **挂账**：文案应按 provider 区分，或空态注明仅云端可用 |
-| U4 | 拒答通知正文以原始 intent action 开头（`Tool 'android.intent.action.DIAL' is blocked…`）——诚实但略技术化；「Scheduled task started」通知在任务结束后仍留在通知栏（AUTO_CANCEL 只在点击时清） | 微瑕，记录不改 |
+| U4 | ~~拒答通知正文以原始 intent action 开头~~；~~「Scheduled task started」通知在任务结束后仍留在通知栏~~——前者根因是拒答把裸 `android.intent.action.DIAL` 当文案，后者根因是 started 通知用 recordId、outcome 用 task.id，同一生命周期发了两个 id | **已修**：DirectIntent 带上 TaskParser 的用户动词（"call"/"open_url"…）进拒答文案；started 通知改用 `fired.id` 键，outcome 同 id 替换而非堆叠。模拟器复测：单条通知读「Scheduled task failed — Tool 'call' is blocked…」 |
 
 **验证通过的腿**：
 - R5-01 负路径：SET_ACCENT 广播（合法 key）不再送达——无 setAccent 日志，页面无变化；注入门已关。

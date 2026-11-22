@@ -380,9 +380,12 @@ class TaskOrchestrator(
                 // while the same ask routed as a tool would have been refused.
                 // Every DirectIntent is an actuator (dialer, SMS composer,
                 // URL view), so it takes the same channel gate as the tools;
-                // no intent action is READ_ONLY, so unattended sources are
+                // no parse action is READ_ONLY, so unattended sources are
                 // always refused here.
-                val intentName = route.intent.action ?: "direct_intent"
+                // U4: the parse verb ("call") reads like copy in the refusal;
+                // the raw intent action (android.intent.action.DIAL) leaked
+                // onto the lockscreen notification verbatim.
+                val intentName = route.action
                 if (ToolRiskPolicy.isBlockedForChannel(intentName, channel)) {
                     XLog.i(TAG, "Pipeline Tier 1: DirectIntent refused for ${channel?.displayName}")
                     val reason = ToolRiskPolicy.blockReason(intentName, channel)

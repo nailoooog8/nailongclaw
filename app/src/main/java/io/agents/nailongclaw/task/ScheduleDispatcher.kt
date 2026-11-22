@@ -125,7 +125,11 @@ object ScheduleDispatcher {
 
         notify(
             context,
-            NOTIFY_OUTCOME_BASE + recordId.hashCode() % 1000,
+            // U4: key the started banner on the scheduled task's id — the
+            // same space notifyOutcome uses — so the outcome replaces it
+            // instead of stacking a second notification for one lifecycle.
+            // recordId (the ledger row id) is a different string per fire.
+            NOTIFY_OUTCOME_BASE + fired.id.hashCode() % 1000,
             context.getString(R.string.notification_scheduled_started_title),
             fired.taskText,
         )
