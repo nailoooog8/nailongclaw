@@ -223,3 +223,27 @@ R4 之后落地的安全相关新面：
 - **顺手②** 之后「自动允许操作」开关对 DESTRUCTIVE 级 MCP 工具不再生效——与确认门「破坏级永不整体放行」不变量对齐；当前 `mcp_*` 恒为 DESTRUCTIVE，即该开关现在对 MCP 面全量出卡。设置页警告文案建议同步更新（未在本轮改）。
 - **顺手⑤** 把三处任务/答案全文日志改为长度——QA 诊断损失原文可读性，换调试报告 ZIP 不再携带会话/任务内容。
 - 未修（挂账维持原判）：R5-09/F5 自签 TLS、F3 签名白名单、R3-06/08/09/10b；§5 其余 P3（PIN 明文 MMKV、截图 cache 残留、decideMcp nonce、sanitize 只识英文、看门狗 null fail-open 等）待排期。
+
+---
+
+## 10. 模拟器体验 QA（2026-11-22，修复落地后）
+
+平台：h79 AVD（API 36，1080×2400），HEAD debug 包（v0.9.1）覆盖安装，`adb root` + sqlite3 / 显式广播驱动。
+**观察到的体验/行为问题及处置**：
+
+| 编号 | 发现 | 处置 |
+|---|---|---|
+| U1 | **Tier 1 正则劫持调度意图（存量）**：CALL_PATTERN `(?:call\|phone\|ring\|dial)\s+(.+)` 无锚定，「schedule a task … call 1234567」在 Tier 1 当场直接拨号，用户的「2 minutes from now」被静默丢弃——实测复现，拨号盘拉起、账本记 COMPLETED "Dialing 1234567" | **已修**：`route()` 在 parse 前对 schedule/定时 加 AgentLoop 守卫；alarm/timer 关键词不含这两词（快路不受影响）；纯 `call N` LOCAL 直连复测照常 |
+| U3 | **拒答被播报成成功（R5-06 引入的呈现缺陷）**：拒答发 `TaskEvent.Completed`，定时分发器播报「Scheduled task **done** Blocked: …」，锁屏上拒绝读成完成（通知栏截图实锤） | **已修**：改发 `TaskEvent.Failed(reason)`——账本 FAILED 行 + 「Scheduled task failed」标题 + 同一拒答文案；复测通过 |
+| U2 | **本地模型无法建定时任务，但定时页空态文案仍引导「在聊天里说…」**：`schedule_task/list_scheduled_tasks/cancel_scheduled_task` 在 LocalToolAllowlist.TRIMMED_EXAMPLES（8192 上下文预算的既有取舍），LOCAL 模型实测回答「I do not have a tool that allows me to schedule」 | **挂账**：文案应按 provider 区分，或空态注明仅云端可用 |
+| U4 | 拒答通知正文以原始 intent action 开头（`Tool 'android.intent.action.DIAL' is blocked…`）——诚实但略技术化；「Scheduled task started」通知在任务结束后仍留在通知栏（AUTO_CANCEL 只在点击时清） | 微瑕，记录不改 |
+
+**验证通过的腿**：
+- R5-01 负路径：SET_ACCENT 广播（合法 key）不再送达——无 setAccent 日志，页面无变化；注入门已关。
+- R5-08：删除会话「second」→ SQLite conversations/messages 行、markdown 文件三者同删（sqlite3 前后对照）；确认弹窗有「找不回来」警示。
+- R5-06：种子任务（`{"tasks":[…]}` 直接写 scheduled_tasks.json + force-stop 重启装载 + root 显式广播驱动 `TaskAlarmReceiver` 走真实 fireNow）——`DirectIntent refused for Scheduled`，拨号盘未拉起，账本 FAILED，通知 failed 标题。
+- 启动健康、LOCAL 直连 parity（拨号/路由行为与修复前一致）。
+- 过修防线：U1 守卫未伤 LOCAL 直连（纯 call 实测拉起拨号盘）。
+
+**QA 驱动方法记录**：定时任务的火点腿可免 LLM——种子 JSON 写未来 fireAt（过去时间会被启动时 reconcile 判 MISSED），force-stop → push → 启动 → `am broadcast -n io.agents.nailongclaw/.task.TaskAlarmReceiver -a io.agents.nailongclaw.SCHEDULED_TASK_FIRE --es scheduled_task_id <id>`（需 adb root，接收器 exported=false）。
+
