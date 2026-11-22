@@ -1,0 +1,23 @@
+id: h87_pill_probe
+name: Pill probe
+description: wait-only steps to verify the floating pill on the first task after process start (P2 first-creation race)
+category: GENERAL
+user_facing: true
+triggers:
+  - "pillprobe"
+steps:
+  - tool: wait
+    description: step one waiting 8s
+    retries: 1
+    params:
+      duration_ms: "8000"
+  - tool: wait
+    description: step two waiting 8s
+    retries: 1
+    params:
+      duration_ms: "8000"
+  - tool: wait
+    description: step three waiting 8s
+    retries: 1
+    params:
+      duration_ms: "8000"

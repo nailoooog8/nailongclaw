@@ -1,0 +1,154 @@
+
+> Configure project :app
+WARNING: The option setting 'android.builtInKotlin=false' is deprecated.
+The current default is 'true'.
+It will be removed in version 10.0 of the Android Gradle plugin.
+WARNING: The option setting 'android.newDsl=false' is deprecated.
+The current default is 'true'.
+It will be removed in version 10.0 of the Android Gradle plugin.
+output file name: NailongClaw_v0.9.1_20261122_192432.apk
+output file name: NailongClaw_v0.9.1_20261122_192432.apk
+w: [33m[1mDeprecated 'org.jetbrains.kotlin.android' plugin usage[0m[0m
+The 'org.jetbrains.kotlin.android' plugin in project ':app' is no longer required for Kotlin support since AGP 9.0.
+[32m[1mSolution:[0m[0m
+[32m[3mRemove both `android.builtInKotlin=true` and `android.newDsl=false` from `gradle.properties`, then migrate to built-in Kotlin.[0m[0m
+[36mSee [0m[34mhttps://kotl.in/gradle/agp-built-in-kotlin[0m[36m for more details.[0m
+
+
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:syncClaudeUiMockup
+> Task :app:preBuild
+> Task :app:preDebugBuild
+> Task :app:generateDebugBuildConfig
+> Task :app:generateDebugResources
+> Task :app:packageDebugResources
+> Task :app:processDebugNavigationResources
+> Task :app:javaPreCompileDebug
+> Task :app:mapDebugSourceSetPaths
+> Task :app:compileDebugNavigationResources
+> Task :app:checkDebugAarMetadata
+> Task :app:parseDebugLocalResources
+> Task :app:createDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksDebug
+> Task :app:generateDebugRFile
+> Task :app:processDebugMainManifest
+> Task :app:mergeDebugResources
+> Task :app:processDebugManifest
+> Task :app:preDebugUnitTestBuild
+> Task :app:javaPreCompileDebugUnitTest
+> Task :app:processDebugManifestForPackage
+> Task :app:processDebugResources
+
+> Task :app:compileDebugKotlin
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/AppViewModel.kt:168:26 'static field SCREEN_DIM_WAKE_LOCK: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/AppViewModel.kt:168:63 'static field ACQUIRE_CAUSES_WAKEUP: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/TaskOrchestrator.kt:390:85 Unnecessary safe call on a non-null receiver of type 'Channel'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/agent/DefaultAgentService.kt:617:101 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/agent/DefaultAgentService.kt:723:160 Unnecessary safe call on a non-null receiver of type 'List<ToolExecutionRequest>'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/agent/DefaultAgentService.kt:895:62 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/agent/DefaultAgentService.kt:896:104 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/agent/DefaultAgentService.kt:898:64 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/agent/DefaultAgentService.kt:985:17 Unnecessary safe call on a non-null receiver of type 'List<ToolExecutionRequest>'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/agent/llm/LocalLlmClient.kt:117:42 The corresponding parameter in the supertype 'OpenApiTool' is named 'paramsJsonString'. This may cause problems when calling this function with named arguments.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/agent/llm/LocalLlmClient.kt:297:49 Unnecessary safe call on a non-null receiver of type 'Contents'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/agent/llm/LocalModelRuntime.kt:168:41 Unnecessary safe call on a non-null receiver of type 'Contents'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/base/AbstractBaseActivity.kt:28:5 Modifier 'open' is redundant in presence of 'abstract'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/channel/telegram/TelegramChannelHandler.kt:77:51 'fun create(contentType: MediaType?, content: String): RequestBody' is deprecated. Moved to extension function. Put the 'content' argument first to fix Java.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/channel/telegram/TelegramChannelHandler.kt:275:40 'fun create(contentType: MediaType?, content: String): RequestBody' is deprecated. Moved to extension function. Put the 'content' argument first to fix Java.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/channel/wechat/WeChatInbound.kt:223:41 Unnecessary non-null assertion (!!) on a non-null receiver of type 'WeChatTextItem'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/channel/wechat/WeChatInbound.kt:223:48 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/channel/wechat/WeChatInbound.kt:241:38 Unnecessary non-null assertion (!!) on a non-null receiver of type 'WeChatVoiceItem'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/channel/wechat/WeChatInbound.kt:241:45 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/debug/DebugTaskReceiver.kt:184:48 'fun get(p0: String!): Any?' is deprecated. Deprecated in Java.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/server/ConfigServer.kt:541:28 'val parms: (Mutable)Map<String!, String!>!' is deprecated. Deprecated in Java.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/server/ConfigServerManager.kt:130:41 'val connectionInfo: WifiInfo!' is deprecated. Deprecated in Java.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/server/ConfigServerManager.kt:131:35 'val ipAddress: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/service/ShadowDisplayManager.kt:355:21 'fun getRealMetrics(p0: DisplayMetrics!): Unit' is deprecated. Deprecated in Java.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/task/TaskRecordStore.kt:215:16 Unnecessary safe call on a non-null receiver of type 'TaskRecord'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/cds/CdsUi.kt:350:25 'var statusBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/chat/ChatScreen.kt:1446:51 'val Icons.Outlined.Chat: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Outlined.Chat.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/chat/ChatScreen.kt:1807:35 'val Icons.Filled.KeyboardArrowRight: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.KeyboardArrowRight.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/chat/ChatScreen.kt:2356:51 'val Icons.Outlined.Chat: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Outlined.Chat.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/chat/ChatScreen.kt:2408:39 'val Icons.Outlined.Send: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Outlined.Send.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/chat/ChatScreen.kt:2940:53 'val Icons.Filled.Assignment: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Assignment.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/chat/ChatScreen.kt:2956:13 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/chat/ChatSessionController.kt:404:48 Unnecessary safe call on a non-null receiver of type 'Message'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/chat/ChatSessionController.kt:677:48 Unnecessary safe call on a non-null receiver of type 'Message'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/chat/ComposeChatActivity.kt:171:16 'var statusBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/chat/ComposeChatActivity.kt:386:31 Unnecessary safe call on a non-null receiver of type 'Intent'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/chat/ConversationCompactor.kt:87:38 Unnecessary safe call on a non-null receiver of type 'Message'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/AboutActivity.kt:58:38 No cast needed.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelConfigActivity.kt:44:34 'fun getSerializableExtra(p0: String!): Serializable?' is deprecated. Deprecated in Java.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelConfigActivity.kt:55:38 No cast needed.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelPairActivity.kt:65:38 No cast needed.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:70:38 No cast needed.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/LlmConfigActivity.kt:60:38 No cast needed.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/McpServersActivity.kt:50:38 No cast needed.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ModelSettingsActivity.kt:56:38 No cast needed.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/MonitorActivity.kt:76:38 No cast needed.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/SettingsActivity.kt:74:38 No cast needed.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ThemeActivity.kt:118:38 No cast needed.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ToolsActivity.kt:74:38 No cast needed.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ToolsActivity.kt:174:21 'fun startActivityForResult(intent: Intent, requestCode: Int): Unit' is deprecated. This method has been deprecated in favor of using the Activity Result API
+      which brings increased type safety via an {@link ActivityResultContract} and the prebuilt
+      contracts for common intents available in
+      {@link androidx.activity.result.contract.ActivityResultContracts}, provides hooks for
+      testing, and allow receiving results in separate, testable classes independent from your
+      activity. Use
+      {@link #registerForActivityResult(ActivityResultContract, ActivityResultCallback)}
+      passing in a {@link StartActivityForResult} object for the {@link ActivityResultContract}.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/UserSkillsActivity.kt:44:38 No cast needed.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/WebSearchActivity.kt:49:38 No cast needed.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/web/ClaudeUiPreviewActivity.kt:1391:40 'static field SOFT_INPUT_ADJUST_RESIZE: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/web/ClaudeUiPreviewActivity.kt:1419:30 This declaration overrides a deprecated member but is not marked as deprecated itself. Add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/web/WebActivity.kt:108:30 This declaration overrides a deprecated member but is not marked as deprecated itself. Add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/web/WebActivity.kt:150:18 This declaration overrides a deprecated member but is not marked as deprecated itself. Add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/web/WebActivity.kt:154:19 'fun onBackPressed(): Unit' is deprecated. This method has been deprecated in favor of using the
+      {@link OnBackPressedDispatcher} via {@link #getOnBackPressedDispatcher()}.
+      The OnBackPressedDispatcher controls how back button events are dispatched
+      to one or more {@link OnBackPressedCallback} objects.
+
+> Task :app:compileDebugJavaWithJavac
+注: 某些输入文件使用或覆盖了已过时的 API。
+注: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+
+> Task :app:processDebugJavaRes
+> Task :app:bundleDebugClassesToCompileJar
+> Task :app:bundleDebugClassesToRuntimeJar
+
+> Task :app:compileDebugUnitTestKotlin
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/test/java/io/agents/nailongclaw/agent/TaskParserTest.kt:18:53 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Map<String, Any>'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/test/java/io/agents/nailongclaw/agent/TaskParserTest.kt:19:51 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Map<String, Any>'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/test/java/io/agents/nailongclaw/agent/TaskPromptEnvelopeTest.kt:27:38 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/test/java/io/agents/nailongclaw/agent/calendar/CalendarCreateToolTest.kt:179:32 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/test/java/io/agents/nailongclaw/agent/calendar/CalendarCreateToolTest.kt:216:32 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/test/java/io/agents/nailongclaw/agent/calendar/CalendarReadToolTest.kt:70:31 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/test/java/io/agents/nailongclaw/agent/calendar/CalendarReadToolTest.kt:71:31 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/test/java/io/agents/nailongclaw/agent/calendar/CalendarReadToolTest.kt:72:31 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/test/java/io/agents/nailongclaw/agent/calendar/CalendarReadToolTest.kt:95:32 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/test/java/io/agents/nailongclaw/tool/impl/SchedulingToolsTest.kt:68:31 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/test/java/io/agents/nailongclaw/tool/impl/SchedulingToolsTest.kt:69:31 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/test/java/io/agents/nailongclaw/tool/impl/SchedulingToolsTest.kt:144:31 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/test/java/io/agents/nailongclaw/tool/impl/SchedulingToolsTest.kt:145:31 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/test/java/io/agents/nailongclaw/tool/impl/SchedulingToolsTest.kt:146:31 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/test/java/io/agents/nailongclaw/ui/chat/ChatHistoryManagerLoadTest.kt:59:43 Unnecessary non-null assertion (!!) on a non-null receiver of type 'List<ToolStep>'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/test/java/io/agents/nailongclaw/ui/chat/ChatHistoryManagerLoadTest.kt:62:28 Unnecessary non-null assertion (!!) on a non-null receiver of type 'List<ToolStep>'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/test/java/io/agents/nailongclaw/ui/chat/ChatHistoryManagerLoadTest.kt:64:35 Unnecessary non-null assertion (!!) on a non-null receiver of type 'List<ToolStep>'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/test/java/io/agents/nailongclaw/ui/chat/ChatHistoryManagerLoadTest.kt:65:50 Unnecessary non-null assertion (!!) on a non-null receiver of type 'List<ToolStep>'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/test/java/io/agents/nailongclaw/ui/chat/ChatHistoryManagerLoadTest.kt:66:47 Unnecessary non-null assertion (!!) on a non-null receiver of type 'List<ToolStep>'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/test/java/io/agents/nailongclaw/ui/chat/ChatHistoryManagerLoadTest.kt:67:36 Unnecessary non-null assertion (!!) on a non-null receiver of type 'List<ToolStep>'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/test/java/io/agents/nailongclaw/ui/chat/ChatHistoryManagerLoadTest.kt:86:69 Unnecessary non-null assertion (!!) on a non-null receiver of type 'List<ToolStep>'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/test/java/io/agents/nailongclaw/ui/chat/ChatHistoryManagerLoadTest.kt:118:41 Unnecessary non-null assertion (!!) on a non-null receiver of type 'List<ToolStep>'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/test/java/io/agents/nailongclaw/ui/chat/ChatHistoryManagerToolGroupFormatTest.kt:95:46 Unnecessary non-null assertion (!!) on a non-null receiver of type 'List<ToolStep>'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/test/java/io/agents/nailongclaw/ui/chat/ChatHistoryManagerToolGroupFormatTest.kt:96:38 Unnecessary non-null assertion (!!) on a non-null receiver of type 'List<ToolStep>'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/test/java/io/agents/nailongclaw/ui/chat/ChatHistoryManagerToolGroupFormatTest.kt:97:55 Unnecessary non-null assertion (!!) on a non-null receiver of type 'List<ToolStep>'.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/test/java/io/agents/nailongclaw/ui/chat/ChatHistoryManagerToolGroupFormatTest.kt:98:61 Unnecessary non-null assertion (!!) on a non-null receiver of type 'List<ToolStep>'.
+
+> Task :app:compileDebugUnitTestJavaWithJavac
+> Task :app:processDebugUnitTestJavaRes
+> Task :app:testDebugUnitTest
+
+[Incubating] Problems report is available at: file:///C:/Users/chenweisheng2008/dev/pokeclaw/build/reports/problems/problems-report.html
+
+BUILD SUCCESSFUL in 37s
+28 actionable tasks: 28 executed

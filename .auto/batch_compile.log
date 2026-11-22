@@ -1,0 +1,189 @@
+
+> Configure project :app
+WARNING: The option setting 'android.builtInKotlin=false' is deprecated.
+The current default is 'true'.
+It will be removed in version 10.0 of the Android Gradle plugin.
+WARNING: The option setting 'android.newDsl=false' is deprecated.
+The current default is 'true'.
+It will be removed in version 10.0 of the Android Gradle plugin.
+output file name: NailongClaw_v0.9.1_20261122_210521.apk
+output file name: NailongClaw_v0.9.1_20261122_210521.apk
+w: [33m[1mDeprecated 'org.jetbrains.kotlin.android' plugin usage[0m[0m
+The 'org.jetbrains.kotlin.android' plugin in project ':app' is no longer required for Kotlin support since AGP 9.0.
+[32m[1mSolution:[0m[0m
+[32m[3mRemove both `android.builtInKotlin=true` and `android.newDsl=false` from `gradle.properties`, then migrate to built-in Kotlin.[0m[0m
+[36mSee [0m[34mhttps://kotl.in/gradle/agp-built-in-kotlin[0m[36m for more details.[0m
+
+
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:syncClaudeUiMockup UP-TO-DATE
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:generateDebugBuildConfig
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:processDebugNavigationResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:generateDebugRFile UP-TO-DATE
+
+> Task :app:compileDebugKotlin FAILED
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:416:68 Incorrect character literal.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:416:69 Syntax error: Expecting ','.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:417:1 Incorrect character literal.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:418:13 Unresolved reference 'setPadding'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:418:25 Syntax error: Expecting ')'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:418:27 Argument type mismatch: actual type is 'Int', but 'Char' was expected.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:418:63 Argument type mismatch: actual type is 'Int', but 'Char' was expected.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:418:66 Argument type mismatch: actual type is 'Int', but 'Char' was expected.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:418:101 Syntax error: Expecting ')'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:419:9 Missing return statement.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:420:9 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:420:12 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:420:13 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:420:20 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:420:21 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:420:25 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:420:26 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:420:31 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:420:32 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:420:41 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:420:42 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:420:43 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:420:45 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:420:45 Function declaration must have a name.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:420:51 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:420:52 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:421:49 Unresolved reference 'token'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:430:9 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:430:12 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:430:13 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:430:20 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:431:13 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:431:21 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:432:13 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:432:20 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:432:21 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:432:27 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:432:28 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:432:40 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:432:41 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:432:53 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:433:17 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:433:24 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:433:25 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:433:29 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:433:30 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:433:39 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:433:40 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:433:52 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:433:53 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:433:65 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:434:17 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:434:24 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:434:25 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:434:29 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:434:30 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:434:39 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:434:40 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:434:52 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:434:53 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:434:65 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:435:13 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:435:14 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:435:15 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:435:21 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:435:21 Function declaration must have a name.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:435:23 Unresolved reference 'setMargins'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:435:113 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:436:9 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:437:9 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:437:12 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:437:13 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:437:18 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:437:19 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:437:24 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:437:26 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:437:27 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:437:29 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:437:32 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:437:33 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:437:40 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:437:41 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:437:45 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:437:46 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:437:51 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:437:52 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:437:53 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:437:54 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:437:55 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:438:9 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:438:16 Syntax error: Expecting member declaration.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:443:28 'this' is not defined in this context.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:451:28 'this' is not defined in this context.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:456:23 'this' is not defined in this context.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:457:21 Unresolved reference 'getString'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:458:23 Unresolved reference 'tokenDialogContent'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:459:27 Unresolved reference 'getString'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:460:26 Unresolved reference 'getString'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:461:27 Unresolved reference 'getString'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:463:33 Unresolved reference 'getSystemService'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:466:25 Unresolved reference 'getString'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:470:32 'this' is not defined in this context.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:478:23 'this' is not defined in this context.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:479:21 Unresolved reference 'getString'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:480:41 'this' is not defined in this context.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:480:47 Unresolved reference 'getString'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:481:27 Unresolved reference 'getString'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:482:26 Unresolved reference 'getString'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:487:36 'this' is not defined in this context.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:490:32 'this' is not defined in this context.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:491:17 Unresolved reference 'renderAll'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:498:9 Unresolved reference 'soonGroup'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:499:9 Unresolved reference 'soonGroup'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:501:9 Unresolved reference 'soonGroup'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:505:32 'this' is not defined in this context.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:508:11 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:508:17 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:509:13 Unresolved reference 'setTitleColor'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:509:27 Unresolved reference 'cds'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:510:13 Unresolved reference 'setTrailingText'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:510:29 Unresolved reference 'getString'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:511:13 Unresolved reference 'setTrailingTextColor'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:511:34 Unresolved reference 'cds'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:512:13 Unresolved reference 'setLeadingIconColor'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:512:33 Unresolved reference 'cds'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:513:13 Unresolved reference 'setTrailingIconColor'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:513:34 Unresolved reference 'cds'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:516:9 Unresolved reference 'soonGroup'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:520:32 'this' is not defined in this context.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:523:11 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:523:17 Cannot infer type for type parameter 'T'. Specify it explicitly.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:524:13 Unresolved reference 'setTitleColor'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:524:27 Unresolved reference 'cds'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:525:13 Unresolved reference 'setTrailingText'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:525:29 Unresolved reference 'getString'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:526:13 Unresolved reference 'setTrailingTextColor'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:526:34 Unresolved reference 'cds'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:527:13 Unresolved reference 'setLeadingIconColor'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:527:33 Unresolved reference 'cds'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:528:13 Unresolved reference 'setTrailingIconColor'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:528:34 Unresolved reference 'cds'.
+e: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ChannelsActivity.kt:531:1 Syntax error: Expecting a top level declaration.
+
+[Incubating] Problems report is available at: file:///C:/Users/chenweisheng2008/dev/pokeclaw/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileDebugKotlin'.
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.btapi.BuildToolsApiCompilationWork
+   > Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 3s
+8 actionable tasks: 2 executed, 6 up-to-date
