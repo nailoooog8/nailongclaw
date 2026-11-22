@@ -2222,6 +2222,14 @@ Markdown 导出是人读分享件（只有正文/标签/置顶），损失留存
 - ✅ **设备实测**（h79，8 条账本）：UI 点「导出 JSON（无损）」→ ChooserActivity 弹起 → `memories-export.json` 落盘 3587B → pull 解析 **version=1 / entries=8 / 15 字段全在**（conflictsWith/content/createdAt/hits/id/invalidAt/kind/lastUsedAt/pinned/relatedIds/supersededBy/supersedes/tags/updatedAt/validAt）/ 零向量键。崩溃卫生 0。
 - [NOTE] **将来导入（P2）吃这个格式**，不变量三条已在 BACKLOG P2 写明：hits/lastUsedAt 必须**重置**（留存状态是设备本地的强化，继承它们会伪造熟悉度）、pinned **随行**（用户显式决定）、抑制指纹**随行**；content-hash id 在导入改写后不存活，relatedIds/conflictsWith/supersedes/supersededBy 必须**重映射**。
 
+### 2026-11-22（第七轮）— 记忆库导入（BACKLOG P2 收编）：exportJson 的往返另一半；三条不变量 + 防御性拒收 + 设备全链
+
+导入吃第六轮 exportJson 的 version=1 格式。`MemoryStore.importJson` 走自有写路径（不直写 memories.json），三条不变量逐条钉住：**hits/lastUsedAt 重置**（留存状态是设备本地的强化）、**pinned 随行**（用户显式决定）、**抑制指纹经 addSuppressionLocked 随行**（去重内建）。防御性：payload 超 MAX_ENTRIES / 非 version=1 / 坏 JSON → **整单拒**（导入是整库决定，部分应用 = 用户没选的状态）；悬空链接审计——relatedIds/conflictsWith/supersedes 指向 payload∪bank 之外的丢弃并计数，supersededBy 悬空清空。
+
+- ✅ **JVM 7 例**（MemoryImportJsonTest）：往返（链完整+pinned+hits 重置）/ 去重跳过 / 抑制随行且真的拒 re-learn / 坏 JSON 整单拒 / 错版本拒 / 超上限拒 / 悬空链接丢弃。三个语义坑都是先写错再学的：①gson 反射不吃 Kotlin 默认值，缺 kind 的条目经 fromJson 是 **null**——防御性解析必须走 `MemoryEntry.parseList`（逐字段兜底，库自己的文件就靠它）；②抑制门是 **agent 侧**的（fromAgent=true 才拒），用户显式写入不受限；③链的方向——**受害者**身上是 invalidAt+supersededBy=claim，**claim** 身上是 supersedes=[victim]，断言一开始就写反了。④顺带修了上一轮的**手种向量 daemon 竞态**测试（手种后必须 drain 再读）。
+- ✅ **设备全链**（h79，8 条账本）：UI 导出 → 清空（确认卡「将删除全部 8 条」）→「导入 JSON（从导出恢复）」→ SAF 选 Downloads 里的暂存文件 → 确认卡「**将导入 8 条记忆**。已存在的相同条目会跳过；召回计数从零开始」→ 导入 → **记忆（8）全部还原**（TPLINK/Chengdu/ThinkPad/Japanese/Sunday 全在列表），0 崩。
+- [DRIVE] SAF 驱动法：`registerForActivityResult(OpenDocument)` 的选择器落在 Recent（空）——点 ≡（60,105）→ Downloads → 文件行；导出文件先 `adb pull` 再 `adb push` 到 `/sdcard/Download/` 暂存（app 私有目录 SAF 浏览不到）。
+
 ### 2026-11-22 — R5 安全修复落地 + 模拟器体验 QA（h79 AVD，API 36，HEAD debug 覆装 vc63 调试包）：R5 四腿全过；抓出并即修两体验缺陷（U1/U3）+ 一通知细节（U4）
 
 R5 报告 `docs/security/SECURITY_AUDIT_R5.md`（§9 修复落地 / §10 本轮 QA）。基线 `45c9e5f` 的五笔修复提交（`215a1c0`→`4df279e`）后 HEAD debug 包 `adb install -r` 覆装（vc34 → vc63，数据保留）。证据 `.auto/r5_shade*.png`、`.auto/r5_test.log`（749/0）。

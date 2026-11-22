@@ -1053,6 +1053,166 @@ object MemoryStore {
         }
     }
 
+    /**
+     * What [importJson] did. [refusedReason] non-null means nothing was written
+     * — import is a whole-bank decision, and a partial application of a refused
+     * file is exactly the state the user did not choose.
+     */
+    data class ImportReport(
+        val imported: Int,
+        val skippedDuplicates: Int,
+        val suppressions: Int,
+        val droppedDanglingLinks: Int,
+        val refusedReason: String? = null,
+    )
+
+    /**
+     * Restores a bank from [exportJson]'s payload — the import half of the
+     * round trip. Goes through the store's own write machinery (never writes
+     * `memories.json` directly), and keeps the three invariants BACKLOG P2
+     * documents:
+     *
+     *  1. **hits/lastUsedAt reset** — they are device-local reinforcement;
+     *     inheriting them fakes familiarity and hollows out the retention
+     *     curve, turning "what got recalled" into "what got imported".
+     *  2. **pinned travels** — it is the user's explicit decision.
+     *  3. **suppression fingerprints travel** — otherwise a fact the user
+     *     deleted on device A gets re-learned on device B.
+     *
+     * Content passes through verbatim, and ids are content hashes, so ids
+     * survive the import — but links are still audited defensively: any
+     * relatedIds/conflictsWith/supersedes/supersededBy pointing at an id that
+     * exists in neither the bank nor the payload is dropped (a partial export
+     * would otherwise plant dangling ids), counted in the report. `fromAgent`
+     * semantics match [remember]'s false: an import is user data, not agent
+     * claims.
+     *
+     * Defensive caps: a payload beyond [MAX_ENTRIES] is refused outright (the
+     * bank's own cap would silently evict half of it — a whole-bank import
+     * must not turn into a silent partial one), as is anything that is not a
+     * version-1 export.
+     */
+    @JvmStatic
+    fun importJson(text: String): ImportReport = synchronized(lock) {
+        fun refused(reason: String) = ImportReport(0, 0, 0, 0, refusedReason = reason)
+
+        val root = try {
+            gson.fromJson(text, com.google.gson.JsonObject::class.java)
+        } catch (e: Exception) {
+            return refused("not valid JSON: ${e.message?.take(120)}")
+        }
+        if (root == null || root.get("version")?.takeIf { it.isJsonPrimitive }?.asInt != 1) {
+            return refused("unsupported export version (need version=1)")
+        }
+        val entriesEl = root.getAsJsonArray("entries")
+        val suppressionsEl = root.getAsJsonArray("suppressions") ?: com.google.gson.JsonArray()
+        if (entriesEl == null) return refused("missing entries array")
+        // Parse through MemoryEntry.parseList — the same defensive reader the
+        // bank file itself uses. Gson alone would leave absent fields null
+        // (Kotlin defaults only apply to constructors, not reflection), and a
+        // hand-edited export missing "kind" would then NPE the whole import.
+        val incoming = MemoryEntry.parseList(entriesEl.toString())
+        if (incoming.size > MAX_ENTRIES) {
+            return refused("payload has ${incoming.size} entries, over the bank cap of $MAX_ENTRIES")
+        }
+
+        val bank = loadLocked().toMutableList()
+        val knownIds = bank.mapTo(HashSet()) { it.id }
+        var duplicates = 0
+        var importedCount = 0
+
+        // Pass 1: write entries with ids intact (content passes verbatim).
+        for (raw in incoming) {
+            val entry = raw.copy(
+                // Invariant 1: device-local reinforcement does not travel.
+                hits = 0,
+                lastUsedAt = 0L,
+                // Invariant 2 + the temporal chain: verbatim.
+            )
+            if (entry.id in knownIds) {
+                duplicates++
+                continue
+            }
+            bank.add(entry)
+            knownIds.add(entry.id)
+            importedCount++
+        }
+
+        // Pass 2: audit every imported entry's links against bank ∪ payload —
+        // anything pointing outside is a dangling id (partial export, hand edit)
+        // and gets dropped rather than confusing the model with a dead id.
+        val payloadIds = incoming.map { it.id }.toSet()
+        var droppedLinks = 0
+        fun repair(ids: List<String>): List<String> {
+            val kept = ids.filter { it in knownIds || it in payloadIds }
+            droppedLinks += ids.size - kept.size
+            return kept
+        }
+        val repaired = bank.map { e ->
+            if (e.id !in payloadIds) return@map e  // pre-existing bank entries untouched
+            e.copy(
+                relatedIds = repair(e.relatedIds),
+                conflictsWith = repair(e.conflictsWith),
+                supersedes = repair(e.supersedes),
+                supersededBy = e.supersededBy.takeIf { it.isEmpty() || it in knownIds || it in payloadIds } ?: "",
+            )
+        }
+
+        cache = repaired.toMutableList()
+        persistLocked()
+
+        // Invariant 3: suppressions travel, through the store's own add path
+        // (deduped by fingerprint similarity).
+        var suppressionCount = 0
+        for (el in suppressionsEl) {
+            val obj = el as? com.google.gson.JsonObject ?: continue
+            val text = obj.get("text")?.takeIf { it.isJsonPrimitive }?.asString ?: continue
+            val kind = obj.get("kind")?.takeIf { it.isJsonPrimitive }?.asString ?: MemoryKind.FACT
+            val before = loadSuppressionsLocked().size
+            addSuppressionLocked(text, kind)
+            if (loadSuppressionsLocked().size > before) suppressionCount++
+        }
+
+        ImportReport(
+            imported = importedCount,
+            skippedDuplicates = duplicates,
+            suppressions = suppressionCount,
+            droppedDanglingLinks = droppedLinks,
+        )
+    }
+
+    /**
+     * Non-mutating look at what [importJson] would do with [text] — the confirm
+     * card names real numbers instead of "something will happen". Same
+     * validation as the import, without touching the bank.
+     */
+    @JvmStatic
+    fun previewImport(text: String): ImportReport {
+        fun refused(reason: String) = ImportReport(0, 0, 0, 0, refusedReason = reason)
+        val root = try {
+            gson.fromJson(text, com.google.gson.JsonObject::class.java)
+        } catch (e: Exception) {
+            return refused("not valid JSON: ${e.message?.take(120)}")
+        }
+        if (root == null || root.get("version")?.takeIf { it.isJsonPrimitive }?.asInt != 1) {
+            return refused("unsupported export version (need version=1)")
+        }
+        val entriesEl = root.getAsJsonArray("entries")
+        val suppressionsEl = root.getAsJsonArray("suppressions") ?: com.google.gson.JsonArray()
+        if (entriesEl == null) return refused("missing entries array")
+        val incoming = MemoryEntry.parseList(entriesEl.toString())
+        if (incoming.size > MAX_ENTRIES) {
+            return refused("payload has ${incoming.size} entries, over the bank cap of $MAX_ENTRIES")
+        }
+        val valid = incoming.count { it.content.trim().isNotEmpty() }
+        return ImportReport(
+            imported = valid,
+            skippedDuplicates = incoming.size - valid,
+            suppressions = suppressionsEl.count { it.isJsonObject && it.asJsonObject.get("text")?.isJsonPrimitive == true },
+            droppedDanglingLinks = 0,
+        )
+    }
+
     // ── Prompt integration ────────────────────────────────────────────────────
 
     /**

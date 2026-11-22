@@ -15,6 +15,7 @@ import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.FileProvider
 import java.io.File
 import io.agents.nailongclaw.R
@@ -386,6 +387,20 @@ class MemoryActivity : BaseActivity() {
         }
 
         actionsGroup.addMenuItem(
+            leadingIcon = android.R.drawable.ic_menu_upload,
+            // 导入吃 exportJson 的 version=1 格式（BACKLOG P2）。三条不变量
+            // 在 MemoryStore.importJson 的 KDoc：hits/lastUsedAt 重置（设备
+            // 本地的强化不随行）、pinned 随行、抑制指纹随行。
+            title = "导入 JSON（从导出恢复）",
+            onClick = { launchImportPicker() },
+            showDivider = true
+        ).apply {
+            setTitleColor(cds.textPrimary)
+            setLeadingIconColor(cds.textPrimary)
+            setTrailingIconColor(cds.textMuted)
+        }
+
+        actionsGroup.addMenuItem(
             leadingIcon = android.R.drawable.ic_menu_delete,
             title = "清空记忆库",
             onClick = { showClearDialog() },
@@ -493,6 +508,66 @@ class MemoryActivity : BaseActivity() {
     private fun exportJsonAndShare() {
         val file = MemoryStore.exportJson()
         shareExported(file, "application/json", "NailongClaw 记忆库导出（无损，全字段 + 抑制指纹）")
+    }
+
+    private val importPicker =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri != null) readAndConfirmImport(uri)
+        }
+
+    private fun launchImportPicker() {
+        try {
+            importPicker.launch(arrayOf("application/json", "text/json", "text/plain"))
+        } catch (e: Exception) {
+            Toast.makeText(this, "无法打开文件选择器", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun readAndConfirmImport(uri: android.net.Uri) {
+        val text = try {
+            contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+        } catch (e: Exception) {
+            Toast.makeText(this, "读不了这个文件：${e.message}", Toast.LENGTH_LONG).show()
+            return
+        }
+        if (text.isNullOrEmpty()) {
+            Toast.makeText(this, "文件是空的", Toast.LENGTH_LONG).show()
+            return
+        }
+        // Preview the payload before asking: the confirm card should name real
+        // numbers, not "something will happen".
+        val preview = MemoryStore.previewImport(text)
+        if (preview.refusedReason != null) {
+            Toast.makeText(this, "无法导入：${preview.refusedReason}", Toast.LENGTH_LONG).show()
+            return
+        }
+        val summary = buildString {
+            append("将导入 ").append(preview.imported).append(" 条记忆")
+            if (preview.suppressions > 0) append(" 和 ").append(preview.suppressions).append(" 条遗忘抑制")
+            append("。已存在的相同条目会跳过；召回计数从零开始（不继承来源设备的熟悉度）。")
+        }
+        io.agents.nailongclaw.widget.CdsDialog.show(
+            context = this,
+            title = "导入记忆库",
+            content = io.agents.nailongclaw.widget.CdsDialog.message(this, summary),
+            confirmText = "导入",
+            cancelText = "取消",
+            onConfirm = {
+                val report = MemoryStore.importJson(text)
+                val msg = if (report.refusedReason != null) {
+                    "无法导入：${report.refusedReason}"
+                } else {
+                    buildString {
+                        append("已导入 ").append(report.imported).append(" 条")
+                        if (report.skippedDuplicates > 0) append("，跳过重复 ").append(report.skippedDuplicates).append(" 条")
+                        if (report.suppressions > 0) append("，恢复抑制 ").append(report.suppressions).append(" 条")
+                        if (report.droppedDanglingLinks > 0) append("，丢弃悬空关联 ").append(report.droppedDanglingLinks).append(" 条")
+                    }
+                }
+                Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
+                renderAll()
+            },
+        )
     }
 
     private fun shareExported(file: File?, mime: String, subject: String) {
