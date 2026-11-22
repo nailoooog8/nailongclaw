@@ -1,0 +1,243 @@
+--------- beginning of main
+11-15 15:03:35.742   690   931 I ActivityManager: Broadcasting: Intent { act=io.agents.nailongclaw.DEBUG_TASK flg=0x400000 pkg=probe cmp=io.agents.nailongclaw/.debug.DebugTaskReceiver (has extras) }
+--------- beginning of system
+11-15 15:03:35.743   690   931 I ActivityManager: Enqueued broadcast Intent { act=io.agents.nailongclaw.DEBUG_TASK flg=0x400000 pkg=probe cmp=io.agents.nailongclaw/.debug.DebugTaskReceiver (has extras) }: 0
+11-15 15:03:35.745   690   730 D OomAdjuster: Not killing cached processes
+11-15 15:03:35.745   690   904 D BackgroundInstallControlService: Package event received: 0
+11-15 15:03:35.747  2247  2247 I DebugTaskReceiver: Received debug task: overflow
+11-15 15:03:35.758  2247  2247 D PromptUtils: applyGlobalPrompt: no global prompt set, returning base (13287 chars)
+11-15 15:03:35.758  2247  2247 I LocalLlmClient: close() — closing conversation only (engine stays in EngineHolder)
+11-15 15:03:35.759  2247  2247 I LocalLlmClient: close() — done
+11-15 15:03:35.759  2247  2247 I AgentService: Old LlmClient closed before config update
+11-15 15:03:35.762  2247  2247 I AgentService: Agent initialized: provider=LOCAL, model=gemma4-e2b, streaming=false
+11-15 15:03:35.762  2247  2247 I AgentService: Agent config updated, new model: gemma4-e2b
+11-15 15:03:35.762  2247  2247 D TaskOrchestrator: Agent config updated: model=gemma4-e2b, temp=0.1
+11-15 15:03:35.764   690  1508 I ActivityManager: Background started FGS: Allowed [callingPackage: io.agents.nailongclaw; callingUid: 10152; uidState: TOP ; uidBFSL: [BFSL]; intent: Intent { xflg=0x4 cmp=io.agents.nailongclaw/.service.ForegroundService (has extras) }; code:PROC_STATE_TOP; tempAllowListReason:<null>; allowWiu:12; targetSdkVersion:36; callerTargetSdkVersion:36; startForegroundCount:0; bindFromPackage:null: isBindService:false]
+11-15 15:03:35.768  2247  2247 I PipelineRouter: No deterministic match, falling through to agent loop: overflow
+11-15 15:03:35.771  2247  2247 I DebugTaskReceiver: Task started: overflow
+11-15 15:03:35.771  2247  2407 D ToolCallRecorder: Recording started for task: overflow
+11-15 15:03:35.772   690   721 I ActivityManager: Broadcast completed: result=0
+11-15 15:03:35.773  2247  2407 I LocalLlmClient: close() — closing conversation only (engine stays in EngineHolder)
+11-15 15:03:35.775  2247  2407 I LocalLlmClient: close() — done
+11-15 15:03:35.776  2247  2407 I AgentService: LlmClient closed after task completion
+11-15 15:03:35.778  2247  2407 E TaskOrchestrator: onError: Accessibility service is not enabled, totalTokens=0
+11-15 15:03:35.778  2247  2407 E TaskOrchestrator: java.lang.RuntimeException: Accessibility service is not enabled
+11-15 15:03:35.778  2247  2407 E TaskOrchestrator: 	at io.agents.nailongclaw.agent.DefaultAgentService.runAgentLoopInternal(DefaultAgentService.kt:510)
+11-15 15:03:35.778  2247  2407 E TaskOrchestrator: 	at io.agents.nailongclaw.agent.DefaultAgentService.runAgentLoop(DefaultAgentService.kt:501)
+11-15 15:03:35.778  2247  2407 E TaskOrchestrator: 	at io.agents.nailongclaw.agent.DefaultAgentService.executeTask$lambda$3(DefaultAgentService.kt:211)
+11-15 15:03:35.778  2247  2407 E TaskOrchestrator: 	at io.agents.nailongclaw.agent.DefaultAgentService$$ExternalSyntheticLambda3.run(D8$$SyntheticClass:0)
+11-15 15:03:35.778  2247  2407 E TaskOrchestrator: 	at java.util.concurrent.Executors$RunnableAdapter.call(Executors.java:524)
+11-15 15:03:35.778  2247  2407 E TaskOrchestrator: 	at java.util.concurrent.FutureTask.run(FutureTask.java:317)
+11-15 15:03:35.778  2247  2407 E TaskOrchestrator: 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1156)
+11-15 15:03:35.778  2247  2407 E TaskOrchestrator: 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:651)
+11-15 15:03:35.778  2247  2407 E TaskOrchestrator: 	at java.lang.Thread.run(Thread.java:1119)
+11-15 15:03:35.778   690   931 W ForegroundServiceTypeLoggerModule: Foreground service start for UID: 10152 does not have any types
+11-15 15:03:35.779   690   904 D BackgroundInstallControlService: Package event received: 0
+11-15 15:03:35.794   690  1508 W ForegroundServiceTypeLoggerModule: FGS stop call for: 10152 has no types!
+11-15 15:03:35.796   690   904 D BackgroundInstallControlService: Package event received: 0
+11-15 15:03:35.796  2247  2407 D ChannelManager: sendMessage [Local]: Error: Accessibility service is not enabled
+11-15 15:03:35.798  2247  2247 I FloatingCircle: setState: ERROR, view=true, isShowing=false
+11-15 15:03:35.986   690   690 I NotificationService: Cannot find enqueued record for key: 0|io.agents.nailongclaw|1001|null|10152
+11-15 15:03:35.988   690   690 I NotificationService: Cannot find enqueued record for key: 0|io.agents.nailongclaw|1001|null|10152
+11-15 15:03:36.001  1102  1298 D SatelliteController: iisInCarrierRoamingNbIotNtn: satellite is disabled
+11-15 15:03:39.369   690   740 I WifiService: isFeatureSupported uid=1000 returns [WIFI_FEATURE_INFRA, WIFI_FEATURE_P2P, WIFI_FEATURE_MOBILE_HOTSPOT, WIFI_FEATURE_WPA3_SAE, WIFI_FEATURE_WPA3_SUITE_B, WIFI_FEATURE_OWE, WIFI_FEATURE_DPP, WIFI_FEATURE_AP_RAND_MAC, WIFI_FEATURE_MBO, WIFI_FEATURE_FILS_SHA256, WIFI_FEATURE_FILS_SHA384, WIFI_FEATURE_SAE_PK, WIFI_FEATURE_DPP_ENROLLEE_RESPONDER, WIFI_FEATURE_PASSPOINT_TERMS_AND_CONDITIONS, WIFI_FEATURE_WFD_R2, WIFI_FEATURE_DECORATED_IDENTITY, WIFI_FEATURE_TRUST_ON_FIRST_USE, WIFI_FEATURE_SET_TLS_MINIMUM_VERSION, WIFI_FEATURE_TLS_V1_3, WIFI_FEATURE_WEP, WIFI_FEATURE_WPA_PERSONAL]
+11-15 15:03:39.423  1729  1870 I Dialer  : OmtpVvmCarrierCfgHlpr - OmtpEvent:CONFIG_STATUS_SMS_TIME_OUT
+11-15 15:03:39.424  1729  1729 I Dialer  : RetryPolicy - discarding deferred status: configuration_state=4
+11-15 15:03:39.426  1729  1729 I Dialer  : VvmTaskExecutor - no more tasks, stopping service if no task are added in 5000 millis
+11-15 15:03:39.428  1729  1729 I Dialer  : VvmTaskReceiver - task received
+11-15 15:03:39.428  1729  1729 I Dialer  : VvmTaskReceiver - TaskExecutor already running
+11-15 15:03:39.429  1729  1729 I Dialer  : Task.createTask - create task:com.android.voicemail.impl.ActivationTask
+11-15 15:03:39.429  1729  1729 I Dialer  : RetryPolicy - retry #4 for com.android.voicemail.impl.ActivationTask@4e2059f queued, executing in 5000
+11-15 15:03:39.430  1729  1729 I Dialer  : VvmTaskExecutor - com.android.voicemail.impl.ActivationTask@4e2059f added
+11-15 15:03:39.430  1729  1729 I Dialer  : VvmTaskExecutor - minimal wait time:5000
+11-15 15:03:39.431  1729  1729 I Dialer  : VvmTaskExecutor - sleep for 5000 millis
+11-15 15:03:40.804  2247  2247 I FloatingCircle: setState: IDLE, view=true, isShowing=false
+11-15 15:03:44.432  1729  1870 I Dialer  : VvmTaskExecutor - executing task com.android.voicemail.impl.ActivationTask@4e2059f
+11-15 15:03:44.433  1729  1870 I Dialer  : PreOMigrationHandler - ComponentInfo{com.android.phone/com.android.services.telephony.TelephonyConnectionService}, 1, UserHandle{0} already migrated
+11-15 15:03:44.443   690   715 D OomAdjuster: Not killing cached processes
+11-15 15:03:44.444   690   715 D ActivityManager: sync unfroze 1565 android.process.acore for 7
+11-15 15:03:44.458  1565  1744 I VoicemailNotifier: receivers for android.intent.action.PROVIDER_CHANGED :[]
+11-15 15:03:44.462  1729  1870 I Dialer  : VvmActivationTask - VVM content provider configured - vvm_type_cvvm
+11-15 15:03:44.463  1729  1870 I Dialer  : OmtpVvmCarrierCfgHlpr - OmtpEvent:CONFIG_ACTIVATING
+11-15 15:03:44.470  1565  1744 I VoicemailNotifier: receivers for android.intent.action.PROVIDER_CHANGED :[]
+11-15 15:03:44.478   470   513 I netd    : tetherGetStats() -> {[]} <0.70ms>
+11-15 15:03:44.480  1102  1427 I RemoteVvmTaskManager: getRemotePackage: found package null
+11-15 15:03:44.487  1102  1427 I RemoteVvmTaskManager: getRemotePackage: found package null
+11-15 15:03:44.490  1102  1427 D SmsNumberUtils: enter filterDestAddr. destAddr="[BajqU4K5_YhSYbs-7QUn0dOwcmI]"
+11-15 15:03:44.490  1102  1427 D SmsNumberUtils: destAddr is not formatted.
+11-15 15:03:44.490  1102  1427 D SmsNumberUtils: leave filterDestAddr, new destAddr="[BajqU4K5_YhSYbs-7QUn0dOwcmI]"
+11-15 15:03:44.504  1102  1102 D SatelliteController: iisInCarrierRoamingNbIotNtn: satellite is disabled
+11-15 15:03:44.508  1102  1102 D SatelliteController: iisInCarrierRoamingNbIotNtn: satellite is disabled
+11-15 15:03:46.003  1102  1298 D SatelliteController: iisInCarrierRoamingNbIotNtn: satellite is disabled
+11-15 15:03:50.501   690   729 D OomAdjuster: Not killing cached processes
+11-15 15:03:50.517   470   513 I netd    : tetherGetStats() -> {[]} <0.69ms>
+11-15 15:03:56.003  1102  1298 D SatelliteController: iisInCarrierRoamingNbIotNtn: satellite is disabled
+11-15 15:04:06.005  1102  1298 D SatelliteController: iisInCarrierRoamingNbIotNtn: satellite is disabled
+11-15 15:04:10.513   690   730 D OomAdjuster: Not killing cached processes
+11-15 15:04:10.538   470   513 I netd    : tetherGetStats() -> {[]} <1.92ms>
+11-15 15:04:10.949   690   690 I ResourceTimer: GetResourceValue count=1828 pvalues=11000,30000,54000,230000
+11-15 15:04:10.950   690   690 I ResourceTimer: RetrieveAttributes count=3089 pvalues=9000,16000,30000,97000
+11-15 15:04:12.402   470  2412 I resolv  : ResNSendHandler::run: 0 / {100 983140 100 983140 1073 1}
+11-15 15:04:12.402   470  2413 I resolv  : ResNSendHandler::run: 0 / {100 983140 100 983140 1073 1}
+11-15 15:04:12.403   470  2413 I resolv  : resolv_cache_lookup: FOUND IN CACHE entry=0x7d9e06e18850
+11-15 15:04:12.406   470  2414 I resolv  : ResNSendHandler::run: 0 / {100 983140 100 983140 1073 1}
+11-15 15:04:12.406   470  2415 I resolv  : ResNSendHandler::run: 0 / {100 983140 100 983140 1073 1}
+11-15 15:04:12.407   470  2415 I resolv  : resolv_cache_lookup: FOUND IN CACHE entry=0x7d9ea6e1bbd0
+11-15 15:04:12.407   470  2414 I resolv  : resolv_cache_lookup: FOUND IN CACHE entry=0x7d9db6e0c270
+11-15 15:04:12.412  1042  2410 D NetworkMonitor/100: PROBE_DNS www.google.com 17ms OK 69.171.235.22,2001::1
+11-15 15:04:12.415   470  2416 I resolv  : GetAddrInfoHandler::run: {100 983140 100 983140 1073 1}
+11-15 15:04:12.415   470  2417 I resolv  : res_nmkquery: (QUERY, IN, AAAA)
+11-15 15:04:12.416   470  2418 I resolv  : res_nmkquery: (QUERY, IN, A)
+11-15 15:04:12.416   470  2417 I resolv  : resolv_cache_lookup: FOUND IN CACHE entry=0x7d9e06e18850
+11-15 15:04:12.416   470  2417 I resolv  : doQuery: rcode=0, ancount=1, return value=60
+11-15 15:04:12.416   470  2418 I resolv  : resolv_cache_lookup: FOUND IN CACHE entry=0x7d9db6e0c270
+11-15 15:04:12.417   470  2418 I resolv  : doQuery: rcode=0, ancount=1, return value=48
+11-15 15:04:12.441   470  2412 I resolv  : res_nsend: used send_dg 104 terrno: 0
+11-15 15:04:12.444  1042  2411 D NetworkMonitor/100: PROBE_DNS connectivitycheck.gstatic.com 49ms OK 120.232.234.98
+11-15 15:04:12.447   470  2419 I resolv  : GetAddrInfoHandler::run: {100 983140 100 983140 1073 1}
+11-15 15:04:12.448   470  2420 I resolv  : res_nmkquery: (QUERY, IN, AAAA)
+11-15 15:04:12.448   470  2421 I resolv  : res_nmkquery: (QUERY, IN, A)
+11-15 15:04:12.448   470  2420 I resolv  : resolv_cache_lookup: FOUND IN CACHE entry=0x7d9f16e1b530
+11-15 15:04:12.449   470  2420 I resolv  : doQuery: rcode=0, ancount=0, return value=104
+11-15 15:04:12.449   470  2421 I resolv  : resolv_cache_lookup: FOUND IN CACHE entry=0x7d9ea6e1bbd0
+11-15 15:04:12.449   470  2421 I resolv  : doQuery: rcode=0, ancount=1, return value=63
+11-15 15:04:12.530  1042  2411 D NetworkMonitor/100: PROBE_HTTP http://connectivitycheck.gstatic.com/generate_204 time=83ms ret=204 request={Connection=[close], User-Agent=[Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.32 Safari/537.36]} headers={null=[HTTP/1.1 204 No Content], Connection=[close], Content-Length=[0], Cross-Origin-Resource-Policy=[cross-origin], Date=[Sun, 15 Nov 2026 15:04:11 GMT], X-Android-Received-Millis=[1794755052529], X-Android-Response-Source=[NETWORK 204], X-Android-Selected-Protocol=[http/1.1], X-Android-Sent-Millis=[1794755052486]}
+11-15 15:04:14.152   690   789 W CpuMonitorService: Current CPU frequency (1644342) is greater than maximum CPU frequency (2) for policy ID (2). Skipping CPU frequency policy
+11-15 15:04:15.397   470  2423 I resolv  : GetAddrInfoHandler::run: {100 983140 100 983140 1073 1}
+11-15 15:04:15.397   470  2424 I resolv  : res_nmkquery: (QUERY, IN, AAAA)
+11-15 15:04:15.398   470  2424 I resolv  : resolv_cache_lookup: FOUND IN CACHE entry=0x7d9e06e18850
+11-15 15:04:15.398   470  2425 I resolv  : res_nmkquery: (QUERY, IN, A)
+11-15 15:04:15.398   470  2424 I resolv  : doQuery: rcode=0, ancount=1, return value=60
+11-15 15:04:15.398   470  2425 I resolv  : resolv_cache_lookup: FOUND IN CACHE entry=0x7d9db6e0c270
+11-15 15:04:15.398   470  2425 I resolv  : doQuery: rcode=0, ancount=1, return value=48
+11-15 15:04:16.003  1102  1298 D SatelliteController: iisInCarrierRoamingNbIotNtn: satellite is disabled
+11-15 15:04:19.260   690   849 E WifiScoringParams: Invalid frequency(-1), using 5G as default rssi array
+11-15 15:04:19.262   690   849 V WifiConnectivityManager: schedulePeriodicScanTimer intervalMs 160000
+11-15 15:04:19.262   690   853 I WifiScanningService: Registering listener= com.android.server.wifi.scanner.WifiScannerInternal$ScanListener@141c6ff uid=1000 packageName=null workSource=WorkSource{1000}
+11-15 15:04:19.262   690   853 I WifiScanningService: start scan: ClientInfo[uid=1000, package=null, attributionTag=null, com.android.server.wifi.scanner.WifiScannerInternal$ScanListener@141c6ff] package null AttributionTag null
+11-15 15:04:19.263   690   853 I WifiScanningService: addSingleScanRequest: ClientInfo[uid=1000, package=null, attributionTag=null, com.android.server.wifi.scanner.WifiScannerInternal$ScanListener@141c6ff],WorkSource{1010}, ScanSettings {  type:HIGH ACCURACY band:24Ghz & 5Ghz (DFS incl) & 6Ghz ignoreLocationSettings:false period:0 reportEvents:3 numBssidsPerScan:0 maxScansToCache:0 rnrSetting:1 6GhzPscOnlyEnabled:true channels:[  ]  } 
+11-15 15:04:19.264   690   853 D WifiScanningService: replySucceeded onSuccess
+11-15 15:04:19.277   934   934 D wpa_supplicant: nl80211: Drv Event 33 (NL80211_CMD_TRIGGER_SCAN) received for wlan0
+11-15 15:04:19.277   934   934 D wpa_supplicant: wlan0: nl80211: Scan trigger
+11-15 15:04:19.277   934   934 D wpa_supplicant: wlan0: Event SCAN_STARTED (47) received
+11-15 15:04:19.277   934   934 D wpa_supplicant: wlan0: External program started a scan
+11-15 15:04:20.565   690   795 D ActivityManager: freezing 1565 android.process.acore
+11-15 15:04:20.570   690   855 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+11-15 15:04:20.572   690   855 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+11-15 15:04:20.573   690   855 D InetDiagMessage: Destroyed live tcp sockets for uids={10062} in 4ms
+11-15 15:04:23.045   934   934 D wpa_supplicant: nl80211: Drv Event 34 (NL80211_CMD_NEW_SCAN_RESULTS) received for wlan0
+11-15 15:04:23.045   934   934 D wpa_supplicant: wlan0: nl80211: New scan results available
+11-15 15:04:23.046   690   715 D WifiNl80211Manager: Scan result ready event
+11-15 15:04:23.046   934   934 D wpa_supplicant: nl80211: Scan probed for SSID ''
+11-15 15:04:23.046   934   934 D wpa_supplicant: nl80211: Scan included frequencies: 2412 2417 2422 2427 2432 2437 2442 2447 2452 2457 2462 2467 2472 2484 5180 5200 5220 5240 5260 5280 5300 5320 5500 5520 5540 5560 5580 5600 5620 5640 5660 5680 5700 5745 5765 5785 5805 5825
+11-15 15:04:23.046   934   934 D wpa_supplicant: wlan0: Event SCAN_RESULTS (3) received
+11-15 15:04:23.047   690   715 D WifiNative: Scan result ready event
+11-15 15:04:23.047   934   934 D wpa_supplicant: nl80211: Received scan results (1 BSSes)
+11-15 15:04:23.047   934   934 D wpa_supplicant: wlan0: BSS: Start scan result update 6
+11-15 15:04:23.048   934   934 D wpa_supplicant: BSS: last_scan_res_used=1/32
+11-15 15:04:23.049   934   934 D wpa_supplicant: wlan0: New scan results available (own=0 ext=1)
+11-15 15:04:23.049   934   934 D wpa_supplicant: wlan0: Do not use results from externally requested scan operation for network selection
+11-15 15:04:23.049   934   934 D wpa_supplicant: p2p-dev-wlan0: Updating scan results from sibling
+11-15 15:04:23.049   934   934 D wpa_supplicant: nl80211: Received scan results (1 BSSes)
+11-15 15:04:23.049   934   934 D wpa_supplicant: p2p-dev-wlan0: BSS: Start scan result update 6
+11-15 15:04:23.050   934   934 D wpa_supplicant: BSS: last_scan_res_used=1/32
+11-15 15:04:23.050   934   934 D wpa_supplicant: p2p-dev-wlan0: New scan results available (own=0 ext=1)
+11-15 15:04:23.050   934   934 D wpa_supplicant: p2p-dev-wlan0: Do not use results from externally requested scan operation for network selection
+11-15 15:04:23.050   690   853 D WifiNl80211Manager: get 1 scan results from wificond
+11-15 15:04:23.051   690   853 D WifiNative: get 1 scan results from wificond
+11-15 15:04:23.053   690   853 I WifiScanningService: singleScanResults: ClientInfo[uid=1000, package=null, attributionTag=null, com.android.server.wifi.scanner.WifiScannerInternal$ScanListener@141c6ff],results=1
+11-15 15:04:23.054   690   853 I WifiScanningService: singleScanResults listener: ClientInfo[uid=1000, package=android, attributionTag=null, com.android.server.wifi.scanner.WifiScannerInternal$ScanListener@9567876],results=1
+11-15 15:04:23.054   690   853 I WifiScanningService: singleScanResults listener: ClientInfo[uid=1000, package=android, attributionTag=null, com.android.server.wifi.scanner.WifiScannerInternal$ScanListener@709b56f],results=1
+11-15 15:04:23.054   690   849 D WifiScanRequestProxy: Scan results received
+11-15 15:04:23.054   690   853 I WifiScanningService: singleScanResults listener: ClientInfo[uid=1000, package=android, attributionTag=null, com.android.server.wifi.scanner.WifiScannerInternal$ScanListener@7dd614a],results=1
+11-15 15:04:23.055   690   853 I WifiScanningService: Unregistering listener= com.android.server.wifi.scanner.WifiScannerInternal$ScanListener@141c6ff uid=1000 packageName=null workSource=WorkSource{1000}
+11-15 15:04:23.055   690   849 D WifiScanRequestProxy: Received 1 scan results
+11-15 15:04:23.056   690   849 D WifiHealthMonitor:  2G scanResult count: 1, Above2g scanResult count: 0
+11-15 15:04:23.058   690   715 I WifiService: getScanResults uid=10124
+11-15 15:04:23.058   690  2190 I WifiService: getScanResults uid=10124
+11-15 15:04:23.059   690   849 V WifiConfigManager: getSavedNetworkFromScanResult Found "AndroidWifi"NONE for AndroidWifi[[ESS]]
+11-15 15:04:23.061   690   849 I HalDevMgr: bestIfaceCreationProposal is null, requestIface=STA, existingIface=[name=wlan0 type=STA]
+11-15 15:04:23.061   690   849 V WifiConnectivityManager: Clearing blocklist for REASON_FRAMEWORK_DISCONNECT_FAST_RECONNECT
+11-15 15:04:23.062   690   849 V WifiConnectivityManager: AllSingleScanListener onResults: start network selection
+11-15 15:04:23.062   690   849 V WifiConfigManager: getSavedNetworkFromScanResult Found "AndroidWifi"NONE for AndroidWifi[[ESS]]
+11-15 15:04:23.062   690   849 V WifiConfigManager: Clear network candidate scan result for 0
+11-15 15:04:23.062   690   849 D WifiNetworkSelector: Disabled configured networks:
+11-15 15:04:23.062   690   849 D WifiNetworkSelector:   "AndroidWifi":0 reason=NETWORK_SELECTION_DISABLED_NO_INTERNET_PERMANENT, count=1; 
+11-15 15:04:23.062   690   849 D WifiNetworkSelector: 
+11-15 15:04:23.063   690   849 D WifiNetworkSelector: About to run SavedNetworkNominator :
+11-15 15:04:23.063   690   849 V WifiConfigManager: getSavedNetworkFromScanResult Found "AndroidWifi"NONE for AndroidWifi[[ESS]]
+11-15 15:04:23.063   690   849 D WifiNetworkSelector: About to run NetworkSuggestionNominator :
+11-15 15:04:23.063   690   849 V WifiLastResortWatchdog: updateAvailableNetworks: size = 0
+11-15 15:04:23.063   690   849 V WifiLastResortWatchdog: mWatchdogFeatureEnabled: true
+11-15 15:04:23.063   690   849 V WifiLastResortWatchdog: mWatchdogAllowedToTrigger: true
+11-15 15:04:23.063   690   849 V WifiLastResortWatchdog: mRecentAvailableNetworks: 0
+11-15 15:04:23.063   690   849 V WifiLastResortWatchdog: mSsidFailureCount:
+11-15 15:04:23.064   690   849 V WifiConnectivityManager: AllSingleScanListener:  No candidates
+11-15 15:04:23.064   690   849 V WifiConfigManager: getSavedNetworkFromScanResult Found "AndroidWifi"NONE for AndroidWifi[[ESS]]
+11-15 15:04:26.003  1102  1298 D SatelliteController: iisInCarrierRoamingNbIotNtn: satellite is disabled
+11-15 15:04:32.445  1042  2410 D NetworkMonitor/100: PROBE_HTTPS https://www.google.com/generate_204 Probe failed with exception java.net.SocketTimeoutException: failed to connect to www.google.com/2001::1 (port 443) from /fec0::5054:ff:fe12:3456 (port 41590) after 10000ms
+11-15 15:04:35.426  1042  2409 D NetworkMonitor/100: PROBE_FALLBACK http://www.google.com/gen_204 Probe failed with exception java.net.SocketTimeoutException: failed to connect to www.google.com/2001::1 (port 80) from /fec0::5054:ff:fe12:3456 (port 55890) after 10000ms
+11-15 15:04:35.428  1042  2409 D NetworkMonitor/100: isCaptivePortal: isSuccessful()=false isPortal()=false RedirectUrl=null isPartialConnectivity()=true Time=23036ms
+11-15 15:04:35.430   690   855 D ConnectivityService: [100 CELLULAR] validation failed
+11-15 15:04:36.005  1102  1298 D SatelliteController: iisInCarrierRoamingNbIotNtn: satellite is disabled
+11-15 15:04:42.601   690  2190 D TelephonyManager: requestModemActivityInfo: Sending result to app: ModemActivityInfo{ mTimestamp=341994 mSleepTimeMs=42 mIdleTimeMs=14 mActivityStatsTechSpecificInfo=[{mRat=UNKNOWN,mFrequencyRange=UNKNOWN,mTxTimeMs[]=[1, 3, 6, 8, 9],mRxTimeMs=9}]}
+11-15 15:04:42.631   470   513 I netd    : tetherGetStats() -> {[]} <1.23ms>
+11-15 15:04:44.449   690   740 I WifiService: isFeatureSupported uid=1000 returns [WIFI_FEATURE_INFRA, WIFI_FEATURE_P2P, WIFI_FEATURE_MOBILE_HOTSPOT, WIFI_FEATURE_WPA3_SAE, WIFI_FEATURE_WPA3_SUITE_B, WIFI_FEATURE_OWE, WIFI_FEATURE_DPP, WIFI_FEATURE_AP_RAND_MAC, WIFI_FEATURE_MBO, WIFI_FEATURE_FILS_SHA256, WIFI_FEATURE_FILS_SHA384, WIFI_FEATURE_SAE_PK, WIFI_FEATURE_DPP_ENROLLEE_RESPONDER, WIFI_FEATURE_PASSPOINT_TERMS_AND_CONDITIONS, WIFI_FEATURE_WFD_R2, WIFI_FEATURE_DECORATED_IDENTITY, WIFI_FEATURE_TRUST_ON_FIRST_USE, WIFI_FEATURE_SET_TLS_MINIMUM_VERSION, WIFI_FEATURE_TLS_V1_3, WIFI_FEATURE_WEP, WIFI_FEATURE_WPA_PERSONAL]
+11-15 15:04:44.455   690   740 E BluetoothPowerStatsCollector: Cannot acquire BluetoothActivityEnergyInfo
+11-15 15:04:44.455   690   740 E BluetoothPowerStatsCollector: java.util.concurrent.ExecutionException: java.lang.RuntimeException: error: 11
+11-15 15:04:44.455   690   740 E BluetoothPowerStatsCollector: 	at java.util.concurrent.CompletableFuture.reportGet(CompletableFuture.java:372)
+11-15 15:04:44.455   690   740 E BluetoothPowerStatsCollector: 	at java.util.concurrent.CompletableFuture.get(CompletableFuture.java:2072)
+11-15 15:04:44.455   690   740 E BluetoothPowerStatsCollector: 	at com.android.server.power.stats.BluetoothPowerStatsCollector.collectBluetoothActivityInfo(BluetoothPowerStatsCollector.java:192)
+11-15 15:04:44.455   690   740 E BluetoothPowerStatsCollector: 	at com.android.server.power.stats.BluetoothPowerStatsCollector.collectStats(BluetoothPowerStatsCollector.java:155)
+11-15 15:04:44.455   690   740 E BluetoothPowerStatsCollector: 	at com.android.server.power.stats.PowerStatsCollector.collectAndDeliverStats(PowerStatsCollector.java:176)
+11-15 15:04:44.455   690   740 E BluetoothPowerStatsCollector: 	at com.android.server.power.stats.PowerStatsCollector$$ExternalSyntheticLambda0.run(R8$$SyntheticClass:0)
+11-15 15:04:44.455   690   740 E BluetoothPowerStatsCollector: 	at android.os.Handler.handleCallback(Handler.java:995)
+11-15 15:04:44.455   690   740 E BluetoothPowerStatsCollector: 	at android.os.Handler.dispatchMessage(Handler.java:103)
+11-15 15:04:44.455   690   740 E BluetoothPowerStatsCollector: 	at android.os.Looper.loopOnce(Looper.java:248)
+11-15 15:04:44.455   690   740 E BluetoothPowerStatsCollector: 	at android.os.Looper.loop(Looper.java:338)
+11-15 15:04:44.455   690   740 E BluetoothPowerStatsCollector: 	at android.os.HandlerThread.run(HandlerThread.java:85)
+11-15 15:04:44.455   690   740 E BluetoothPowerStatsCollector: Caused by: java.lang.RuntimeException: error: 11
+11-15 15:04:44.455   690   740 E BluetoothPowerStatsCollector: 	at com.android.server.power.stats.BluetoothPowerStatsCollector$1.onBluetoothActivityEnergyInfoError(BluetoothPowerStatsCollector.java:181)
+11-15 15:04:44.455   690   740 E BluetoothPowerStatsCollector: 	at android.bluetooth.BluetoothAdapter$OnBluetoothActivityEnergyInfoProxy.lambda$onBluetoothActivityEnergyInfoAvailable$0(BluetoothAdapter.java:1037)
+11-15 15:04:44.455   690   740 E BluetoothPowerStatsCollector: 	at android.bluetooth.BluetoothAdapter$OnBluetoothActivityEnergyInfoProxy$$ExternalSyntheticLambda1.run(D8$$SyntheticClass:0)
+11-15 15:04:44.455   690   740 E BluetoothPowerStatsCollector: 	at android.bluetooth.BluetoothUtils.lambda$executeFromBinder$0(BluetoothUtils.java:343)
+11-15 15:04:44.455   690   740 E BluetoothPowerStatsCollector: 	at android.bluetooth.BluetoothUtils$$ExternalSyntheticLambda1.run(D8$$SyntheticClass:0)
+11-15 15:04:44.455   690   740 E BluetoothPowerStatsCollector: 	at com.android.server.SystemServerInitThreadPool$$ExternalSyntheticLambda0.execute(R8$$SyntheticClass:0)
+11-15 15:04:44.455   690   740 E BluetoothPowerStatsCollector: 	at android.bluetooth.BluetoothUtils.executeFromBinder(BluetoothUtils.java:343)
+11-15 15:04:44.455   690   740 E BluetoothPowerStatsCollector: 	at android.bluetooth.BluetoothAdapter$OnBluetoothActivityEnergyInfoProxy.onBluetoothActivityEnergyInfoAvailable(BluetoothAdapter.java:1035)
+11-15 15:04:44.455   690   740 E BluetoothPowerStatsCollector: 	at android.bluetooth.IBluetoothActivityEnergyInfoListener$Stub.onTransact(IBluetoothActivityEnergyInfoListener.java:98)
+11-15 15:04:44.455   690   740 E BluetoothPowerStatsCollector: 	at android.os.Binder.execTransactInternal(Binder.java:1426)
+11-15 15:04:44.455   690   740 E BluetoothPowerStatsCollector: 	at android.os.Binder.execTransact(Binder.java:1365)
+11-15 15:04:44.506  1729  1870 I Dialer  : OmtpVvmCarrierCfgHlpr - OmtpEvent:CONFIG_STATUS_SMS_TIME_OUT
+11-15 15:04:44.506  1729  1729 I Dialer  : RetryPolicy - Retry limit for com.android.voicemail.impl.ActivationTask@4e2059f reached
+11-15 15:04:44.506  1729  1729 I Dialer  : RetryPolicy - committing deferred status: configuration_state=4
+11-15 15:04:44.507   690   715 D OomAdjuster: Not killing cached processes
+11-15 15:04:44.508   690   715 D ActivityManager: sync unfroze 1565 android.process.acore for 7
+11-15 15:04:44.528  1565  2370 I VoicemailNotifier: receivers for android.intent.action.PROVIDER_CHANGED :[]
+11-15 15:04:44.531  1729  1729 I Dialer  : VvmTaskExecutor - no more tasks, stopping service if no task are added in 5000 millis
+11-15 15:04:44.546   470   513 I netd    : tetherGetStats() -> {[]} <0.36ms>
+11-15 15:04:46.004  1102  1298 D SatelliteController: iisInCarrierRoamingNbIotNtn: satellite is disabled
+11-15 15:04:49.536  1729  1729 I Dialer  : VvmTaskExecutor - Stopping service
+11-15 15:04:49.537  1729  1729 I Dialer  : VvmTaskExecutor - finishing Job
+11-15 15:04:49.537  1729  1729 I Dialer  : TaskSchedulerJobService - finishing job
+11-15 15:04:49.543   690  1231 D OomAdjuster: Not killing cached processes
+11-15 15:04:49.549  1729  1729 I Dialer  : JobFinishedPoller.run - Job finished
+11-15 15:04:49.549  1729  1729 I Dialer  : VvmTaskExecutor - terminated
+11-15 15:04:49.567   470   513 I netd    : tetherGetStats() -> {[]} <0.81ms>
+11-15 15:04:54.569   690   855 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+11-15 15:04:54.570   690   855 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+11-15 15:04:54.570   690   855 D InetDiagMessage: Destroyed live tcp sockets for uids={10101} in 2ms
+11-15 15:04:54.571   690   855 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+11-15 15:04:54.572   690   855 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+11-15 15:04:54.572   690   855 D InetDiagMessage: Destroyed live tcp sockets for uids={20101} in 2ms
+11-15 15:04:56.004  1102  1298 D SatelliteController: iisInCarrierRoamingNbIotNtn: satellite is disabled
+11-15 15:04:59.567   690   795 D ActivityManager: freezing 1729 com.android.dialer
+11-15 15:04:59.574   690   795 D ActivityManager: freezing 1565 android.process.acore
+11-15 15:04:59.583   690   855 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+11-15 15:04:59.584   690   855 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+11-15 15:04:59.584   690   855 D InetDiagMessage: Destroyed live tcp sockets for uids={10101} in 9ms
+11-15 15:04:59.616   690   855 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+11-15 15:04:59.617   690   855 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+11-15 15:04:59.617   690   855 D InetDiagMessage: Destroyed live tcp sockets for uids={10062} in 1ms
+11-15 15:05:06.005  1102  1298 D SatelliteController: iisInCarrierRoamingNbIotNtn: satellite is disabled
+11-15 15:05:14.175   690   789 W CpuMonitorService: Current CPU frequency (2266605) is greater than maximum CPU frequency (2) for policy ID (3). Skipping CPU frequency policy

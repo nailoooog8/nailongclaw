@@ -1,0 +1,56 @@
+
+> Configure project :app
+output file name: NailongClaw_v0.9.0_20261121_195654.apk
+output file name: NailongClaw_v0.9.0_20261121_195654.apk
+
+> Task :app:syncClaudeUiMockup UP-TO-DATE
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:generateDebugBuildConfig
+> Task :app:generateDebugResources
+> Task :app:packageDebugResources
+> Task :app:processDebugNavigationResources
+> Task :app:javaPreCompileDebug UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths
+> Task :app:compileDebugNavigationResources UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:processDebugManifest
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :app:preDebugUnitTestBuild UP-TO-DATE
+> Task :app:javaPreCompileDebugUnitTest UP-TO-DATE
+> Task :app:parseDebugLocalResources
+> Task :app:mergeDebugResources
+> Task :app:generateDebugRFile
+> Task :app:processDebugResources
+
+> Task :app:compileDebugKotlin
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/debug/DebugTaskReceiver.kt:183:48 'fun get(p0: String!): Any?' is deprecated. Deprecated in Java.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/server/ConfigServer.kt:537:28 'val parms: (Mutable)Map<String!, String!>!' is deprecated. Deprecated in Java.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/chat/ChatScreen.kt:1446:51 'val Icons.Outlined.Chat: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Outlined.Chat.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/chat/ChatScreen.kt:1807:35 'val Icons.Filled.KeyboardArrowRight: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.KeyboardArrowRight.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/chat/ChatScreen.kt:2356:51 'val Icons.Outlined.Chat: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Outlined.Chat.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/chat/ChatScreen.kt:2408:39 'val Icons.Outlined.Send: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Outlined.Send.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/chat/ChatScreen.kt:2940:53 'val Icons.Filled.Assignment: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Assignment.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/chat/ChatScreen.kt:2956:13 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/chat/ComposeChatActivity.kt:171:16 'var statusBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/web/ClaudeUiPreviewActivity.kt:1391:40 'static field SOFT_INPUT_ADJUST_RESIZE: Int' is deprecated. Deprecated in Java.
+
+> Task :app:compileDebugJavaWithJavac
+注: 某些输入文件使用或覆盖了已过时的 API。
+注: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+
+> Task :app:processDebugJavaRes UP-TO-DATE
+> Task :app:bundleDebugClassesToCompileJar
+> Task :app:bundleDebugClassesToRuntimeJar
+> Task :app:compileDebugUnitTestKotlin
+> Task :app:compileDebugUnitTestJavaWithJavac UP-TO-DATE
+> Task :app:processDebugUnitTestJavaRes UP-TO-DATE
+> Task :app:testDebugUnitTest
+
+[Incubating] Problems report is available at: file:///C:/Users/chenweisheng2008/dev/pokeclaw/build/reports/problems/problems-report.html
+
+BUILD SUCCESSFUL in 57s
+28 actionable tasks: 17 executed, 11 up-to-date

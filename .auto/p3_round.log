@@ -1,0 +1,22 @@
+# P3 round 2026-11-19 晚 — emulator-5554 (h79 AVD, API 35), debug APK vc34/0.9.0 @ 9f5c6d8
+
+## 1. WebActivity scheme allowlist (BACKLOG P3 · F10)
+No device path: WebActivity has zero callers. Evidence = 5 JVM tests in
+app/src/test/java/io/agents/nailongclaw/ui/web/WebUrlPolicyTest.kt (675/0 total).
+
+## 2. Build fingerprint (BACKLOG P3 · 构建)
+injectBuildFingerprint task + app/src/main/assets/.pcfp deleted (AAPT never
+packaged dot-files; nothing read it). BuildConfig.BUILD_FINGERPRINT now has
+readers: AboutActivity '构建指纹' row + DebugReportManager summary.txt +
+GitHub issue body. On-device About page (uiautomator dump):
+text="9f5c6d8|20261119_223758|chenweisheng2008"
+text="构建指纹"
+row bounds: title [178,453][310,553], trailing [310,481][954,524] (1080w, no clip)
+
+## 3. Drawer BACK (BACKLOG P3 · 导航抽屉)
+ClaudeUiPreviewActivity, main WebView surface:
+  22:45:01.564 E ClaudeUiPreview: [chat] notifyNavOpen(true)   <- tap hamburger (60,180)
+  22:45:14.289 E ClaudeUiPreview: [chat] notifyNavOpen(false)  <- BACK, Kotlin called closeNav()
+  ResumedActivity before BACK: ClaudeUiPreviewActivity t62
+  ResumedActivity after  BACK: ClaudeUiPreviewActivity t62  (app did NOT exit)
+  Control: with no overlay open, BACK still exits to launcher3 (t43) — branch skipped.

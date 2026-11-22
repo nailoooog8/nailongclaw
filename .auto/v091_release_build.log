@@ -1,0 +1,129 @@
+
+> Configure project :app
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/build.gradle.kts:206:20: 'fun srcDir(srcDir: Any): Any' is deprecated. Use `directories` mutable set instead.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/build.gradle.kts:320:38: 'fun exec(p0: String!): Process!' is deprecated. Deprecated in Java.
+output file name: NailongClaw_v0.9.1_20261121_211645.apk
+output file name: NailongClaw_v0.9.1_20261121_211645.apk
+
+> Task :app:syncClaudeUiMockup UP-TO-DATE
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preReleaseBuild UP-TO-DATE
+> Task :app:mergeReleaseJniLibFolders UP-TO-DATE
+> Task :app:mergeReleaseNativeLibs UP-TO-DATE
+> Task :app:stripReleaseDebugSymbols UP-TO-DATE
+> Task :app:extractReleaseNativeSymbolTables UP-TO-DATE
+> Task :app:mergeReleaseNativeDebugMetadata NO-SOURCE
+> Task :app:checkReleaseDuplicateClasses UP-TO-DATE
+> Task :app:generateReleaseBuildConfig
+> Task :app:generateReleaseResources
+> Task :app:packageReleaseResources
+> Task :app:processReleaseNavigationResources
+> Task :app:javaPreCompileRelease UP-TO-DATE
+> Task :app:mergeReleaseArtProfile UP-TO-DATE
+> Task :app:checkReleaseAarMetadata UP-TO-DATE
+> Task :app:mapReleaseSourceSetPaths
+> Task :app:compileReleaseNavigationResources UP-TO-DATE
+> Task :app:createReleaseCompatibleScreenManifests
+> Task :app:extractDeepLinksRelease UP-TO-DATE
+> Task :app:parseReleaseLocalResources
+> Task :app:mergeReleaseResources
+> Task :app:processReleaseMainManifest
+> Task :app:processReleaseManifest
+> Task :app:extractProguardFiles UP-TO-DATE
+> Task :app:mergeReleaseStartupProfile UP-TO-DATE
+> Task :app:generateReleaseAssets UP-TO-DATE
+> Task :app:generateReleaseRFile
+> Task :app:mergeReleaseAssets
+> Task :app:compressReleaseAssets
+> Task :app:extractReleaseVersionControlInfo
+> Task :app:collectReleaseDependencies UP-TO-DATE
+> Task :app:sdkReleaseDependencyData UP-TO-DATE
+> Task :app:validateSigningRelease UP-TO-DATE
+> Task :app:writeReleaseAppMetadata UP-TO-DATE
+> Task :app:writeReleaseSigningConfigVersions UP-TO-DATE
+> Task :app:processReleaseManifestForPackage
+> Task :app:processReleaseResources
+
+> Task :app:compileReleaseKotlin
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/AppViewModel.kt:168:26 'static field SCREEN_DIM_WAKE_LOCK: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/AppViewModel.kt:168:63 'static field ACQUIRE_CAUSES_WAKEUP: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/agent/llm/LocalLlmClient.kt:117:42 The corresponding parameter in the supertype 'OpenApiTool' is named 'paramsJsonString'. This may cause problems when calling this function with named arguments.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/debug/DebugTaskReceiver.kt:183:48 'fun get(p0: String!): Any?' is deprecated. Deprecated in Java.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/server/ConfigServer.kt:537:28 'val parms: (Mutable)Map<String!, String!>!' is deprecated. Deprecated in Java.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/service/ShadowDisplayManager.kt:355:21 'fun getRealMetrics(p0: DisplayMetrics!): Unit' is deprecated. Deprecated in Java.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/chat/ChatScreen.kt:1446:51 'val Icons.Outlined.Chat: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Outlined.Chat.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/chat/ChatScreen.kt:1807:35 'val Icons.Filled.KeyboardArrowRight: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.KeyboardArrowRight.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/chat/ChatScreen.kt:2356:51 'val Icons.Outlined.Chat: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Outlined.Chat.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/chat/ChatScreen.kt:2408:39 'val Icons.Outlined.Send: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Outlined.Send.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/chat/ChatScreen.kt:2940:53 'val Icons.Filled.Assignment: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Assignment.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/chat/ChatScreen.kt:2956:13 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/chat/ComposeChatActivity.kt:171:16 'var statusBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ToolsActivity.kt:174:21 'fun startActivityForResult(intent: Intent, requestCode: Int): Unit' is deprecated. This method has been deprecated in favor of using the Activity Result API
+      which brings increased type safety via an {@link ActivityResultContract} and the prebuilt
+      contracts for common intents available in
+      {@link androidx.activity.result.contract.ActivityResultContracts}, provides hooks for
+      testing, and allow receiving results in separate, testable classes independent from your
+      activity. Use
+      {@link #registerForActivityResult(ActivityResultContract, ActivityResultCallback)}
+      passing in a {@link StartActivityForResult} object for the {@link ActivityResultContract}.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/web/ClaudeUiPreviewActivity.kt:1391:40 'static field SOFT_INPUT_ADJUST_RESIZE: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/web/WebActivity.kt:150:18 This declaration overrides a deprecated member but is not marked as deprecated itself. Add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/web/WebActivity.kt:154:19 'fun onBackPressed(): Unit' is deprecated. This method has been deprecated in favor of using the
+      {@link OnBackPressedDispatcher} via {@link #getOnBackPressedDispatcher()}.
+      The OnBackPressedDispatcher controls how back button events are dispatched
+      to one or more {@link OnBackPressedCallback} objects.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/AppViewModel.kt:168:26 'static field SCREEN_DIM_WAKE_LOCK: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/AppViewModel.kt:168:63 'static field ACQUIRE_CAUSES_WAKEUP: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/agent/llm/LocalLlmClient.kt:117:42 The corresponding parameter in the supertype 'OpenApiTool' is named 'paramsJsonString'. This may cause problems when calling this function with named arguments.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/debug/DebugTaskReceiver.kt:183:48 'fun get(p0: String!): Any?' is deprecated. Deprecated in Java.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/server/ConfigServer.kt:537:28 'val parms: (Mutable)Map<String!, String!>!' is deprecated. Deprecated in Java.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/service/ShadowDisplayManager.kt:355:21 'fun getRealMetrics(p0: DisplayMetrics!): Unit' is deprecated. Deprecated in Java.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/chat/ChatScreen.kt:1446:51 'val Icons.Outlined.Chat: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Outlined.Chat.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/chat/ChatScreen.kt:1807:35 'val Icons.Filled.KeyboardArrowRight: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.KeyboardArrowRight.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/chat/ChatScreen.kt:2356:51 'val Icons.Outlined.Chat: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Outlined.Chat.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/chat/ChatScreen.kt:2408:39 'val Icons.Outlined.Send: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Outlined.Send.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/chat/ChatScreen.kt:2940:53 'val Icons.Filled.Assignment: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Assignment.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/chat/ChatScreen.kt:2956:13 'fun Divider(modifier: Modifier = ..., thickness: Dp = ..., color: Color = ...): Unit' is deprecated. Renamed to HorizontalDivider.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/chat/ComposeChatActivity.kt:171:16 'var statusBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/settings/ToolsActivity.kt:174:21 'fun startActivityForResult(intent: Intent, requestCode: Int): Unit' is deprecated. This method has been deprecated in favor of using the Activity Result API
+      which brings increased type safety via an {@link ActivityResultContract} and the prebuilt
+      contracts for common intents available in
+      {@link androidx.activity.result.contract.ActivityResultContracts}, provides hooks for
+      testing, and allow receiving results in separate, testable classes independent from your
+      activity. Use
+      {@link #registerForActivityResult(ActivityResultContract, ActivityResultCallback)}
+      passing in a {@link StartActivityForResult} object for the {@link ActivityResultContract}.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/web/ClaudeUiPreviewActivity.kt:1391:40 'static field SOFT_INPUT_ADJUST_RESIZE: Int' is deprecated. Deprecated in Java.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/web/WebActivity.kt:150:18 This declaration overrides a deprecated member but is not marked as deprecated itself. Add the '@Deprecated' annotation or suppress the diagnostic.
+w: file:///C:/Users/chenweisheng2008/dev/pokeclaw/app/src/main/java/io/agents/nailongclaw/ui/web/WebActivity.kt:154:19 'fun onBackPressed(): Unit' is deprecated. This method has been deprecated in favor of using the
+      {@link OnBackPressedDispatcher} via {@link #getOnBackPressedDispatcher()}.
+      The OnBackPressedDispatcher controls how back button events are dispatched
+      to one or more {@link OnBackPressedCallback} objects.
+
+> Task :app:compileReleaseJavaWithJavac
+注: 某些输入文件使用或覆盖了已过时的 API。
+注: 有关详细信息, 请使用 -Xlint:deprecation 重新编译。
+
+> Task :app:mergeReleaseGeneratedProguardFiles UP-TO-DATE
+> Task :app:processReleaseJavaRes
+> Task :app:generateReleaseLintVitalReportModel
+> Task :app:mergeReleaseJavaResource
+> Task :app:expandReleaseArtProfileWildcards
+
+> Task :app:minifyReleaseWithR8
+WARNING: C:\Users\chenweisheng2008\dev\pokeclaw\app\build\intermediates\merged_java_res\release\mergeReleaseJavaResource\base.jar: R8: Unexpected reference to missing service class: META-INF/services/reactor.blockhound.integration.BlockHoundIntegration.
+
+> Task :app:lintVitalAnalyzeRelease
+> Task :app:lintVitalReportRelease
+> Task :app:lintVitalRelease
+> Task :app:convertShrunkResourcesToBinaryRelease
+> Task :app:optimizeReleaseResources
+> Task :app:compileReleaseArtProfile
+> Task :app:packageRelease
+> Task :app:createReleaseApkListingFileRedirect
+> Task :app:assembleRelease
+
+[Incubating] Problems report is available at: file:///C:/Users/chenweisheng2008/dev/pokeclaw/build/reports/problems/problems-report.html
+
+BUILD SUCCESSFUL in 5m 6s
+50 actionable tasks: 31 executed, 19 up-to-date

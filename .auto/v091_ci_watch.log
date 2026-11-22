@@ -1,0 +1,63 @@
+Refreshing run status every 30 seconds. Press Ctrl+C to quit.
+
+* v0.9.1 Release APK · 44908607065
+Triggered via push less than a minute ago
+
+JOBS
+* release (ID 136859387550)
+  ✓ Set up job
+  ✓ Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+  ✓ Set up JDK 17
+  ✓ Setup Android SDK
+  * Cache Gradle packages
+  * Prepare release signing
+  * Build signed release APK
+  * Generate release checksums
+  * Extract release notes from README
+  * Create GitHub Release
+  * Post Cache Gradle packages
+  * Post Set up JDK 17
+  * Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+X v0.9.1 Release APK · 44908607065
+Triggered via push about 1 minute ago
+
+JOBS
+X release in 38s (ID 136859387550)
+  ✓ Set up job
+  ✓ Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+  ✓ Set up JDK 17
+  ✓ Setup Android SDK
+  ✓ Cache Gradle packages
+  X Prepare release signing
+  - Build signed release APK
+  - Generate release checksums
+  - Extract release notes from README
+  - Create GitHub Release
+  - Post Cache Gradle packages
+  ✓ Post Set up JDK 17
+  ✓ Post Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+  ✓ Complete job
+
+ANNOTATIONS
+! Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830, actions/checkout@11d5960a326750d5838078e36cf38b85af677262, actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+release: .github#2
+
+X Process completed with exit code 1.
+release: .github#38
+
+X Refusing to publish a public APK without a stable signing key.
+release: .github#37
+
+X Missing required Actions secret: ANDROID_KEY_PASSWORD
+release: .github#36
+
+X Missing required Actions secret: ANDROID_KEYSTORE_PASSWORD
+release: .github#35
+
+X Missing required Actions secret: ANDROID_KEYSTORE_B64
+release: .github#34
+
+! setup-java v4 is deprecated and will no longer receive updates. Please migrate to actions/setup-java@v5.
+release: .github#14
+
+EXIT=1

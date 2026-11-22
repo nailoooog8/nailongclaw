@@ -1,0 +1,158 @@
+--------- beginning of main
+11-15 15:02:32.439   690   931 I ActivityManager: Broadcasting: Intent { act=io.agents.nailongclaw.DEBUG_TASK flg=0x400000 cmp=io.agents.nailongclaw/.debug.DebugTaskReceiver (has extras) }
+--------- beginning of system
+11-15 15:02:32.441   690   931 I ActivityManager: Enqueued broadcast Intent { act=io.agents.nailongclaw.DEBUG_TASK flg=0x400000 cmp=io.agents.nailongclaw/.debug.DebugTaskReceiver (has extras) }: 0
+11-15 15:02:32.441   690   730 D OomAdjuster: Not killing cached processes
+11-15 15:02:32.441   690   904 D BackgroundInstallControlService: Package event received: 0
+11-15 15:02:32.447  2247  2247 I DebugTaskReceiver: Received debug task: cancelprobe
+11-15 15:02:32.464  2247  2247 D PromptUtils: applyGlobalPrompt: no global prompt set, returning base (13287 chars)
+11-15 15:02:32.465  2247  2247 I LocalLlmClient: close() — closing conversation only (engine stays in EngineHolder)
+11-15 15:02:32.466  2247  2247 I LocalLlmClient: close() — done
+11-15 15:02:32.466  2247  2247 I AgentService: Old LlmClient closed before config update
+11-15 15:02:32.468  2247  2247 I AgentService: Agent initialized: provider=LOCAL, model=gemma4-e2b, streaming=false
+11-15 15:02:32.469  2247  2247 I AgentService: Agent config updated, new model: gemma4-e2b
+11-15 15:02:32.470  2247  2247 D TaskOrchestrator: Agent config updated: model=gemma4-e2b, temp=0.1
+11-15 15:02:32.471   690  1508 I ActivityManager: Background started FGS: Allowed [callingPackage: io.agents.nailongclaw; callingUid: 10152; uidState: TOP ; uidBFSL: [BFSL]; intent: Intent { xflg=0x4 cmp=io.agents.nailongclaw/.service.ForegroundService (has extras) }; code:PROC_STATE_TOP; tempAllowListReason:<null>; allowWiu:12; targetSdkVersion:36; callerTargetSdkVersion:36; startForegroundCount:0; bindFromPackage:null: isBindService:false]
+11-15 15:02:32.478  2247  2247 I PipelineRouter: Tier 1.5 skill match: h86_cancel_probe params={}
+11-15 15:02:32.479  2247  2247 I TaskOrchestrator: Pipeline Tier 2: Skill — h86_cancel_probe
+11-15 15:02:32.482  2247  2247 I FloatingCircle: setState: TASK_NOTIFY, view=false, isShowing=false
+11-15 15:02:32.485  2247  2247 I DebugTaskReceiver: Task started: cancelprobe
+11-15 15:02:32.486  2247  2364 I SkillExecutor: Executing skill: h86_cancel_probe with params: {}
+11-15 15:02:32.489   690   721 I ActivityManager: Broadcast completed: result=0
+11-15 15:02:32.502   690  1508 W ForegroundServiceTypeLoggerModule: Foreground service start for UID: 10152 does not have any types
+11-15 15:02:32.503   690   904 D BackgroundInstallControlService: Package event received: 0
+11-15 15:02:32.506  2247  2364 D SkillExecutor: Step 1/3: wait — step one waiting 8s
+11-15 15:02:32.509  2247  2247 I FloatingCircle: ensureShowing: showing float
+11-15 15:02:32.509  2247  2247 I FloatingCircle: show() called, isShowing=false
+11-15 15:02:32.537  2247  2247 W HWUI    : Image decoding logging dropped!
+11-15 15:02:32.540  2247  2247 W HWUI    : Image decoding logging dropped!
+11-15 15:02:32.580  2247  2247 I FloatingCircle: createdResult: isCreated=true, msg=null, view=true
+11-15 15:02:32.582  2247  2247 W View    : requestLayout() improperly called by androidx.cardview.widget.CardView{fd858b5 V.E...... ......I. 0,0-0,0 #7f09007d app:id/cardTaskNotify} during layout: running second layout pass
+11-15 15:02:32.582  2247  2247 W View    : requestLayout() improperly called by android.widget.FrameLayout{b231b4a V.E...... ......ID 0,0-147,147 #7f0900ec app:id/floatRoot} during layout: running second layout pass
+11-15 15:02:32.685   690   724 W HWUI    : Image decoding logging dropped!
+11-15 15:02:32.711   690   690 W NotificationHistory: Attempted to add notif for locked/gone/disabled user 0
+11-15 15:02:32.712   690   904 D BackgroundInstallControlService: Package event received: 0
+11-15 15:02:32.719  1387  1387 I id.ext.services: AssetManager2(0x74fcf8f64ad8) locale list changing from [] to [en-US]
+11-15 15:02:32.739   950   950 W HWUI    : Image decoding logging dropped!
+11-15 15:02:32.760   950  1288 W HWUI    : Image decoding logging dropped!
+11-15 15:02:32.777   950  1288 W HWUI    : Image decoding logging dropped!
+11-15 15:02:32.891   690   690 W NotificationHistory: Attempted to add notif for locked/gone/disabled user 0
+11-15 15:02:32.891   690   904 D BackgroundInstallControlService: Package event received: 0
+11-15 15:02:32.895  1387  1387 I id.ext.services: AssetManager2(0x74fcf8f6bb58) locale list changing from [] to [en-US]
+11-15 15:02:32.913   950  1288 D LocalImageResolver: Couldn't use ImageDecoder for drawable, falling back to non-resized load.
+11-15 15:02:32.921   950  1288 D LocalImageResolver: Couldn't use ImageDecoder for drawable, falling back to non-resized load.
+11-15 15:02:33.596  2247  2369 D ProfileInstaller: Installing profile for io.agents.nailongclaw
+11-15 15:02:34.289   690   740 I WifiService: isFeatureSupported uid=1000 returns [WIFI_FEATURE_INFRA, WIFI_FEATURE_P2P, WIFI_FEATURE_MOBILE_HOTSPOT, WIFI_FEATURE_WPA3_SAE, WIFI_FEATURE_WPA3_SUITE_B, WIFI_FEATURE_OWE, WIFI_FEATURE_DPP, WIFI_FEATURE_AP_RAND_MAC, WIFI_FEATURE_MBO, WIFI_FEATURE_FILS_SHA256, WIFI_FEATURE_FILS_SHA384, WIFI_FEATURE_SAE_PK, WIFI_FEATURE_DPP_ENROLLEE_RESPONDER, WIFI_FEATURE_PASSPOINT_TERMS_AND_CONDITIONS, WIFI_FEATURE_WFD_R2, WIFI_FEATURE_DECORATED_IDENTITY, WIFI_FEATURE_TRUST_ON_FIRST_USE, WIFI_FEATURE_SET_TLS_MINIMUM_VERSION, WIFI_FEATURE_TLS_V1_3, WIFI_FEATURE_WEP, WIFI_FEATURE_WPA_PERSONAL]
+11-15 15:02:34.348  1729  1870 I Dialer  : OmtpVvmCarrierCfgHlpr - OmtpEvent:CONFIG_STATUS_SMS_TIME_OUT
+11-15 15:02:34.348  1729  1729 I Dialer  : RetryPolicy - discarding deferred status: configuration_state=4
+11-15 15:02:34.350  1729  1729 I Dialer  : VvmTaskExecutor - no more tasks, stopping service if no task are added in 5000 millis
+11-15 15:02:34.350  1729  1729 I Dialer  : VvmTaskReceiver - task received
+11-15 15:02:34.351  1729  1729 I Dialer  : VvmTaskReceiver - TaskExecutor already running
+11-15 15:02:34.351  1729  1729 I Dialer  : Task.createTask - create task:com.android.voicemail.impl.ActivationTask
+11-15 15:02:34.351  1729  1729 I Dialer  : RetryPolicy - retry #3 for com.android.voicemail.impl.ActivationTask@fb1e19a queued, executing in 5000
+11-15 15:02:34.352  1729  1729 I Dialer  : VvmTaskExecutor - com.android.voicemail.impl.ActivationTask@fb1e19a added
+11-15 15:02:34.352  1729  1729 I Dialer  : VvmTaskExecutor - minimal wait time:5000
+11-15 15:02:34.352  1729  1729 I Dialer  : VvmTaskExecutor - sleep for 5000 millis
+11-15 15:02:34.526   690   855 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+11-15 15:02:34.527   690   855 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+11-15 15:02:34.527   690   855 D InetDiagMessage: Destroyed live tcp sockets for uids={10104} in 2ms
+11-15 15:02:34.528   690   855 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+11-15 15:02:34.528   690   855 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+11-15 15:02:34.528   690   855 D InetDiagMessage: Destroyed live tcp sockets for uids={20104} in 1ms
+11-15 15:02:35.506  2247  2247 I FloatingCircle: setState: RUNNING, view=true, isShowing=false
+11-15 15:02:36.000  1102  1298 D SatelliteController: iisInCarrierRoamingNbIotNtn: satellite is disabled
+11-15 15:02:37.404  2247  2253 W nts.nailongclaw: Cleared Reference was only reachable from finalizer (only reported once)
+11-15 15:02:39.356  1729  1870 I Dialer  : VvmTaskExecutor - executing task com.android.voicemail.impl.ActivationTask@fb1e19a
+11-15 15:02:39.356  1729  1870 I Dialer  : PreOMigrationHandler - ComponentInfo{com.android.phone/com.android.services.telephony.TelephonyConnectionService}, 1, UserHandle{0} already migrated
+11-15 15:02:39.365   690  1508 D OomAdjuster: Not killing cached processes
+11-15 15:02:39.366   690  1508 D ActivityManager: sync unfroze 1565 android.process.acore for 7
+11-15 15:02:39.383  1565  2370 I VoicemailNotifier: receivers for android.intent.action.PROVIDER_CHANGED :[]
+11-15 15:02:39.385   470   513 I netd    : tetherGetStats() -> {[]} <0.46ms>
+11-15 15:02:39.388  1729  1870 I Dialer  : VvmActivationTask - VVM content provider configured - vvm_type_cvvm
+11-15 15:02:39.388  1729  1870 I Dialer  : OmtpVvmCarrierCfgHlpr - OmtpEvent:CONFIG_ACTIVATING
+11-15 15:02:39.392  1565  2370 I VoicemailNotifier: receivers for android.intent.action.PROVIDER_CHANGED :[]
+11-15 15:02:39.402  1102  1296 I RemoteVvmTaskManager: getRemotePackage: found package null
+11-15 15:02:39.406  1102  1296 I RemoteVvmTaskManager: getRemotePackage: found package null
+11-15 15:02:39.408  1102  1296 D SmsNumberUtils: enter filterDestAddr. destAddr="[BajqU4K5_YhSYbs-7QUn0dOwcmI]"
+11-15 15:02:39.408  1102  1296 D SmsNumberUtils: destAddr is not formatted.
+11-15 15:02:39.408  1102  1296 D SmsNumberUtils: leave filterDestAddr, new destAddr="[BajqU4K5_YhSYbs-7QUn0dOwcmI]"
+11-15 15:02:39.419  1102  1102 D SatelliteController: iisInCarrierRoamingNbIotNtn: satellite is disabled
+11-15 15:02:39.423  1102  1102 D SatelliteController: iisInCarrierRoamingNbIotNtn: satellite is disabled
+11-15 15:02:39.515   690   795 D ActivityManager: freezing 2276 com.android.webview:webview_service
+11-15 15:02:39.517   690   855 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+11-15 15:02:39.519   690   855 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+11-15 15:02:39.519   690   855 D InetDiagMessage: Destroyed live tcp sockets for uids={10104} in 2ms
+11-15 15:02:40.102   950  1054 E FrameTracker: force finish cuj, time out: J<SPLASHSCREEN_EXIT_ANIM>
+11-15 15:02:40.102   950  1054 W FrameTracker: Missed SF frame:JANK_COMPOSER, 10893, 11215786, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+11-15 15:02:40.102   950  1054 W FrameTracker: Missed App frame:UNKNOWN: 3, 10908, 28316720, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+11-15 15:02:40.102   950  1054 W FrameTracker: Missed SF frame:UNKNOWN: 3, 10908, 28316720, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+11-15 15:02:40.102   950  1054 W FrameTracker: Missed SF frame:JANK_COMPOSER, 10915, 24602754, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+11-15 15:02:40.102   950  1054 W FrameTracker: Missed SF frame:JANK_COMPOSER, 10923, 21737788, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+11-15 15:02:40.103   950  1054 W FrameTracker: Missed SF frame:JANK_COMPOSER, 10938, 22605322, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+11-15 15:02:40.103   950  1054 W FrameTracker: Missed SF frame:JANK_COMPOSER, 10960, 5951156, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+11-15 15:02:40.103   950  1054 W FrameTracker: Missed SF frame:JANK_COMPOSER, 10982, 25731990, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+11-15 15:02:40.103   950  1054 W FrameTracker: Missed SF frame:JANK_COMPOSER, 11004, 23499424, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+11-15 15:02:40.103   950  1054 W FrameTracker: Missed SF frame:JANK_COMPOSER, 11019, 22444758, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+11-15 15:02:40.103   950  1054 W FrameTracker: Missed SF frame:JANK_COMPOSER, 11034, 22337392, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+11-15 15:02:40.103   950  1054 W FrameTracker: Missed SF frame:JANK_COMPOSER, 11049, 22337526, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+11-15 15:02:40.103   950  1054 W FrameTracker: Missed SF frame:JANK_COMPOSER, 11064, 23634460, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+11-15 15:02:40.103   950  1054 W FrameTracker: Missed SF frame:JANK_COMPOSER, 11079, 23778594, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+11-15 15:02:40.103   950  1054 W FrameTracker: Missed SF frame:JANK_COMPOSER, 11094, 23486428, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+11-15 15:02:40.103   950  1054 W FrameTracker: Missed SF frame:JANK_COMPOSER, 11109, 21774162, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+11-15 15:02:40.103   950  1054 W FrameTracker: Missed SF frame:JANK_COMPOSER, 11124, 34455296, CUJ=J<SPLASHSCREEN_EXIT_ANIM>
+11-15 15:02:40.106   950  1038 V PerfettoTrigger: Not triggering com.android.telemetry.interaction-jank-monitor-39 - not enough time since last trigger
+11-15 15:02:40.523  2247  2364 D SkillExecutor: Step 1 OK: Waited for 8000ms
+11-15 15:02:40.532  2247  2364 D SkillExecutor: Step 2/3: wait — step two waiting 8s
+11-15 15:02:40.774   950  1288 W HWUI    : Image decoding logging dropped!
+11-15 15:02:40.780   950  1288 W HWUI    : Image decoding logging dropped!
+11-15 15:02:41.481   690   795 D ActivityManager: freezing 1583 com.android.keychain
+11-15 15:02:41.482   690   795 D ActivityManager: freezing 1112 com.android.settings
+11-15 15:02:41.483   690   795 D ActivityManager: freezing 1891 com.android.dynsystem:dynsystem
+11-15 15:02:41.486   690   795 D ActivityManager: freezing 1859 com.android.dynsystem
+11-15 15:02:41.487   690   795 D ActivityManager: freezing 1779 com.android.localtransport
+11-15 15:02:41.619   690  1508 I ActivityManager: Broadcasting: Intent { act=io.agents.nailongclaw.DEBUG_TASK flg=0x400000 cmp=io.agents.nailongclaw/.debug.DebugTaskReceiver (has extras) }
+11-15 15:02:41.620   690  1508 I ActivityManager: Enqueued broadcast Intent { act=io.agents.nailongclaw.DEBUG_TASK flg=0x400000 cmp=io.agents.nailongclaw/.debug.DebugTaskReceiver (has extras) }: 0
+11-15 15:02:41.621   690   904 D BackgroundInstallControlService: Package event received: 0
+11-15 15:02:41.644  2247  2247 I DebugTaskReceiver: Received debug task: cancel:
+11-15 15:02:41.645  2247  2247 I AgentService: cancel: LOCAL task marked cancelled; waiting for current LiteRT round to finish safely
+11-15 15:02:41.648  2247  2247 D TaskOrchestrator: Current task cancellation requested
+11-15 15:02:41.649  2247  2247 I DebugTaskReceiver: Debug task cancellation requested
+11-15 15:02:41.649   690   721 I ActivityManager: Broadcast completed: result=0
+11-15 15:02:41.892   950  1288 W HWUI    : Image decoding logging dropped!
+11-15 15:02:41.897   950  1288 W HWUI    : Image decoding logging dropped!
+11-15 15:02:44.523   690   904 D BackgroundInstallControlService: Package event received: 0
+11-15 15:02:44.524   690  1508 D OomAdjuster: Not killing cached processes
+11-15 15:02:44.524   690   985 V Configuration: Updating configuration, locales updated from [] to [en_US]
+11-15 15:02:44.525   690   985 V Configuration: Updating configuration, locales updated from [] to [en_US]
+11-15 15:02:44.525   690   985 V Configuration: Updating configuration, locales updated from [] to [en_US]
+11-15 15:02:44.525   690   985 V Configuration: Updating configuration, locales updated from [] to [en_US]
+11-15 15:02:44.525   690   985 V Configuration: Updating configuration, locales updated from [] to [en_US]
+11-15 15:02:44.525   690   985 V Configuration: Updating configuration, locales updated from [] to [en_US]
+11-15 15:02:44.525   690   985 D IntervalStats: Unable to parse usage stats packages: [29, 40]
+11-15 15:02:45.356   470  2380 I resolv  : ResNSendHandler::run: 0 / {100 983140 100 983140 1073 1}
+11-15 15:02:45.356   470  2380 I resolv  : resolv_cache_lookup: FOUND IN CACHE entry=0x7d9e06e18850
+11-15 15:02:45.358   470  2381 I resolv  : ResNSendHandler::run: 0 / {100 983140 100 983140 1073 1}
+11-15 15:02:45.358   470  2381 I resolv  : resolv_cache_lookup: FOUND IN CACHE entry=0x7d9db6e0c270
+11-15 15:02:45.360   470  2382 I resolv  : ResNSendHandler::run: 0 / {100 983140 100 983140 1073 1}
+11-15 15:02:45.362  1042  2378 D NetworkMonitor/100: PROBE_DNS www.google.com 7ms OK 69.171.235.22,2001::1
+11-15 15:02:45.363   470  2383 I resolv  : GetAddrInfoHandler::run: {100 983140 100 983140 1073 1}
+11-15 15:02:45.363   470  2384 I resolv  : ResNSendHandler::run: 0 / {100 983140 100 983140 1073 1}
+11-15 15:02:45.363   470  2384 I resolv  : resolv_cache_lookup: FOUND IN CACHE entry=0x7d9ea6e1bbd0
+11-15 15:02:45.364   470  2385 I resolv  : res_nmkquery: (QUERY, IN, AAAA)
+11-15 15:02:45.364   470  2382 I resolv  : res_nsend: used send_dg 104 terrno: 0
+11-15 15:02:45.364   470  2385 I resolv  : resolv_cache_lookup: FOUND IN CACHE entry=0x7d9e06e18850
+11-15 15:02:45.364   470  2386 I resolv  : res_nmkquery: (QUERY, IN, A)
+11-15 15:02:45.365   470  2385 I resolv  : doQuery: rcode=0, ancount=1, return value=60
+11-15 15:02:45.365   470  2386 I resolv  : resolv_cache_lookup: FOUND IN CACHE entry=0x7d9db6e0c270
+11-15 15:02:45.366   470  2386 I resolv  : doQuery: rcode=0, ancount=1, return value=48
+11-15 15:02:45.369  1042  2379 D NetworkMonitor/100: PROBE_DNS connectivitycheck.gstatic.com 11ms OK 120.232.234.98
+11-15 15:02:45.371   470  2387 I resolv  : GetAddrInfoHandler::run: {100 983140 100 983140 1073 1}
+11-15 15:02:45.371   470  2388 I resolv  : res_nmkquery: (QUERY, IN, AAAA)
+11-15 15:02:45.371   470  2389 I resolv  : res_nmkquery: (QUERY, IN, A)
+11-15 15:02:45.371   470  2388 I resolv  : resolv_cache_lookup: FOUND IN CACHE entry=0x7d9f16e1bad0
+11-15 15:02:45.372   470  2388 I resolv  : doQuery: rcode=0, ancount=0, return value=104
+11-15 15:02:45.372   470  2389 I resolv  : resolv_cache_lookup: FOUND IN CACHE entry=0x7d9ea6e1bbd0
+11-15 15:02:45.372   470  2389 I resolv  : doQuery: rcode=0, ancount=1, return value=63
+11-15 15:02:45.452  1042  2379 D NetworkMonitor/100: PROBE_HTTP http://connectivitycheck.gstatic.com/generate_204 time=82ms ret=204 request={Connection=[close], User-Agent=[Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/60.0.3112.32 Safari/537.36]} headers={null=[HTTP/1.1 204 No Content], Connection=[close], Content-Length=[0], Cross-Origin-Resource-Policy=[cross-origin], Date=[Sun, 15 Nov 2026 15:02:44 GMT], X-Android-Received-Millis=[1794754965452], X-Android-Response-Source=[NETWORK 204], X-Android-Selected-Protocol=[http/1.1], X-Android-Sent-Millis=[1794754965409]}
+11-15 15:02:45.453   470   513 I netd    : tetherGetStats() -> {[]} <0.53ms>
+11-15 15:02:46.002  1102  1298 D SatelliteController: iisInCarrierRoamingNbIotNtn: satellite is disabled

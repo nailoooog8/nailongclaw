@@ -1,0 +1,23 @@
+id: h86_cancel_probe
+name: Cancel probe
+description: wait-only steps to verify skill cancellation (H86/P1 skill stop)
+category: GENERAL
+user_facing: true
+triggers:
+  - "cancelprobe"
+steps:
+  - tool: wait
+    description: step one waiting 8s
+    retries: 1
+    params:
+      duration_ms: "8000"
+  - tool: wait
+    description: step two waiting 8s
+    retries: 1
+    params:
+      duration_ms: "8000"
+  - tool: wait
+    description: step three waiting 8s
+    retries: 1
+    params:
+      duration_ms: "8000"
