@@ -290,7 +290,7 @@ adb shell am force-stop io.agents.nailongclaw   # 重启后重新读取
 ## 管理界面
 
 设置 → 功能 → 记忆库（`ui/settings/MemoryActivity`）：搜索、按类排序、点击编辑、长按删除、
-手动添加、导出 Markdown、总开关。列表**活条目在前、已作废在后**；带 ⚠ 的条目是与置顶/事件
+手动添加、导出 Markdown（人读分享件）、**导出 JSON（无损）**、**导入 JSON（从导出恢复，见下）**、总开关。列表**活条目在前、已作废在后**；带 ⚠ 的条目是与置顶/事件
 记忆矛盾的一对（需用户裁决），带「已作废」的是被时间顶替的（muted 色显示，保留度标签不再跑），
 带「渐淡 / 几乎遗忘」的条目是保留度已经掉下去的（见上节）。
 
@@ -307,12 +307,18 @@ adb shell am force-stop io.agents.nailongclaw   # 重启后重新读取
 「需 4GB+ 内存」且不给下载。页脚在开关打开时追加「语义检索已开启（N/M 条已索引）」
 或「已开启但未下载模型，当前按词法检索」。
 
+**导入 JSON**（2026-11-22 起）：吃导出的 version=1 载荷（`{version, exportedAt, entries[全字段], suppressions[]}`）。
+三条不变量：`hits`/`lastUsedAt` **重置**（留存状态是设备本地的强化，继承会伪造熟悉度）、`pinned` **随行**
+（用户显式决定）、抑制指纹**随行**（A 机删过的事实在 B 机不会被重新学回）。防御性：非 version=1 / 超
+200 条上限 / 坏 JSON 一律**整单拒**；悬空链接（指向 payload∪bank 之外的 id）丢弃并计数。UI 从系统文件
+选择器选文件，确认卡报真数字，结果 toast 如实报跳过/悬空数。
+
 **总开关关掉后**：不再向模型注入任何记忆，`memory_save` 也会明确回复"没有保存"，但库里已有的
 条目保留，随时可以再打开。
 
 ## 代码位置
 
-- `agent/memory/MemoryStore.kt` — 存储、合并、排序（词法/混合）、简报生成、抑制指纹、淘汰、**时效接替与恢复**
+- `agent/memory/MemoryStore.kt` — 存储、合并、排序（词法/混合，召回双道准入）、简报生成、抑制指纹、淘汰、**时效接替与恢复**、**无损导入/导出**
 - `agent/memory/MemoryRetention.kt` — 保留度曲线（半衰期、闲置天数、分档标签）
 - `agent/memory/MemorySimilarity.kt` — 二元组 Dice、矛盾判定、指纹解析
 - `agent/memory/MemoryEmbedder.kt` — 语义排序接口 + cosine（全仓唯一的向量数学）
@@ -324,6 +330,7 @@ adb shell am force-stop io.agents.nailongclaw   # 重启后重新读取
 - `ui/settings/MemoryActivity.kt` — 管理界面（含已作废徽标、恢复入口、语义检索三行）
 - `app/src/test/.../MemorySimilarityTest.kt` — 矛盾判定与相似度的回归测试（31 例）
 - `app/src/test/.../MemoryRetentionTest.kt` — 保留度曲线的回归测试（22 例）
-- `app/src/test/.../MemoryStoreTest.kt` — 接替/豁免/恢复/淘汰/简报过滤的顺序敏感不变量（36 例）
+- `app/src/test/.../MemoryStoreTest.kt` — 接替/豁免/恢复/淘汰/简报过滤的顺序敏感不变量（37 例）
 - `app/src/test/.../MemoryVectorCacheTest.kt` — sidecar 的往返/fingerprint/维度/损坏/空存（6 例）
-- `app/src/test/.../MemorySemanticRankingTest.kt` — 混合排序：换述召回、下限、逐条降级、合并失效、后台补算（7 例）
+- `app/src/test/.../MemorySemanticRankingTest.kt` — 混合排序：换述召回、双道准入（地板+相对边际）、逐条降级、合并失效、后台补算（9 例）
+- `app/src/test/.../MemoryExportJsonTest.kt` / `MemoryImportJsonTest.kt` — 无损导出/导入的往返与不变量（4+7 例）

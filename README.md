@@ -24,10 +24,10 @@ Google 的移动 agent 永远是 Pixel-first 的；Samsung 的 Galaxy AI 战略�
 | **微信渠道** | Base URL 与 Token 可配置（适配第三方网关） |
 | **渠道安全网关** | 所有外部消息必须通过 PIN 配对 + 白名单，未授权发送者**无法**触达 TaskOrchestrator |
 | **凭据限速锁定** | 6 位 PIN 原本零限速（10⁶ 组合可爆破），现改为失败计数 + 递增锁定 + 常量时间比较 |
-| **控制台密钥脱敏** | LAN 控制台的 `GET` 接口原本明文返回全部 bot token 与 API Key，现返回掩码 |
+| **LAN 控制台 TLS** | 控制台按设备自签证书走 HTTPS-only（明文凭据面收编入 TLS），证书指纹在手机屏展示供浏览器警告页比对；`GET` 掩码 + `POST` 体/PIN 头只跑在 TLS 内 |
 | **MCP 客户端** | Streamable HTTP，含管理 UI、Bearer/Basic/Custom 鉴权、Keystore 落盘加密 |
 | **MCP 工具投毒防护** | 第三方 MCP 服务器的描述不再原样进入 system prompt |
-| **长期记忆库** | 跨会话记忆、矛盾检测、遗忘抑制指纹、访问加权保留、可选端上语义检索（EmbeddingGemma，默认关） |
+| **长期记忆库** | 跨会话记忆、矛盾检测（时效接替）、遗忘抑制指纹、访问加权保留、可选端上语义检索（EmbeddingGemma，默认关，召回双道准入）、无损 JSON 导入/导出（全字段 + 抑制指纹往返） |
 | **技能层** | YAML 配方、任务捕获、技能管理 UI |
 | **任务看门狗** | 120 秒无活动 / 600 秒总时长自动中止并释放任务锁，避免卡死 |
 | **后台保活** | 常驻前台服务开关 + 粘性服务 + 看门狗 |
@@ -52,7 +52,7 @@ Google 的移动 agent 永远是 Pixel-first 的；Samsung 的 Galaxy AI 战略�
 
 同时证伪了三条假设：SnakeYAML 反序列化（实测 2.2 版已禁用全局标签）、Debug 接收器暴露（有 `BuildConfig.DEBUG` 闸门）、记忆库召回注入（已有围栏防护）。
 
-五份报告在 [`docs/security/`](docs/security/)，逐条用例与方法论见各文。**边界声明不变：代码已修复 ≠ 真机 E2E 已验证**——SEC 系列与 R4 正向路径的真机执行仍在欠账（见 [`work/QA_CHECKLIST.md`](work/QA_CHECKLIST.md)），请勿将代码修复等同于已通过安全测试。当前仍开放的高优项：F3 逐调用方签名白名单、F5 LAN 控制台 cleartext（部分已修）；R5 挂账（R3-06/08/09/10b、本地无 schedule_task 的空态文案错位等）见 R5 报告 §7/§10。
+五份报告在 [`docs/security/`](docs/security/)，逐条用例与方法论见各文。**边界声明不变：代码已修复 ≠ 真机 E2E 已验证**——SEC 系列与 R4 正向路径的真机执行仍在欠账（见 [`work/QA_CHECKLIST.md`](work/QA_CHECKLIST.md)），请勿将代码修复等同于已通过安全测试。当前仍开放的高优项：F3 逐调用方签名白名单；R3-06/08/09/10b、看门狗 null fail-open（有兜底链）等维持原判项见 R5 报告 §7/§10。F5（LAN 控制台 cleartext）与 U2（本地无 schedule_task 的空态文案）已于 2026-11-22 收编。
 
 单测基线 749/0（`./gradlew testDebugUnitTest`）。
 
@@ -62,7 +62,7 @@ Google 的移动 agent 永远是 Pixel-first 的；Samsung 的 Galaxy AI 战略�
 
 ## 本地模式的现实（已知限制）
 
-本地模式跑 Gemma 4 E2B，上下文窗口 **8192 token**。2026-10-27 诊断时，固定开销吃掉几乎整个窗口，任何带记忆的本地任务首轮即溢出（`Input token ids are too long (8202 >= 8192)`）；**2026-11-21 起开销已收敛**——工具声明按 allowlist 裁剪、记忆简报设总预算，h79 模拟器复验本地多轮 agent-loop 实测存活、全程零 too-long。
+本地模式跑 Gemma 4 E2B，上下文窗口 **8192 token**。2026-10-27 诊断时，固定开销吃掉几乎整个窗口，任何带记忆的本地任务首轮即溢出（`Input token ids are too long (8202 >= 8192)`）；**2026-11-21 起开销已收敛**——工具声明按 allowlist 裁剪、记忆简报设总预算，h79 模拟器复验本地多轮 agent-loop 实测存活、全程零 too-long。（2026-11-22 语义检索并入随带 litertlm 0.10→0.18 九版本跳升，toolResult 回喂跳一度解析必坏、本地多轮不可用——当日修复并复验，见 `work/QA_CHECKLIST.md` 2026-11-22 第二轮段。）
 
 开销三块，现状如下：
 
