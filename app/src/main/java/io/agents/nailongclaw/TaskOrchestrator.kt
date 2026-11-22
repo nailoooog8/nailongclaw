@@ -386,7 +386,12 @@ class TaskOrchestrator(
                 if (ToolRiskPolicy.isBlockedForChannel(intentName, channel)) {
                     XLog.i(TAG, "Pipeline Tier 1: DirectIntent refused for ${channel?.displayName}")
                     val reason = ToolRiskPolicy.blockReason(intentName, channel)
-                    emit(TaskEvent.Completed("Blocked: ${route.description}"))
+                    // U3 (R5 模拟器 QA): the refusal first rode TaskEvent.Completed,
+                    // which the scheduled dispatcher announces as "Scheduled task
+                    // done" — a refused dial reading as success on the lockscreen.
+                    // A refusal is the honest "did not happen": Failed gives the
+                    // ledger a FAILED row and the notification a failed title.
+                    emit(TaskEvent.Failed(reason))
                     ChannelManager.sendMessage(channel, "✗ ${route.description}: $reason", messageID)
                     val session = releaseTask()
                     if (session.isRunning) {

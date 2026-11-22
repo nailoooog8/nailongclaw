@@ -55,6 +55,17 @@ class PipelineRouter(private val context: Context) {
             return Route.AgentLoop(task)
         }
 
+        // U1 (R5 模拟器 QA): a scheduling request must reach the agent loop —
+        // CALL_PATTERN is unanchored, so "schedule a task … call 1234567" dialed
+        // immediately and the user's "2 minutes from now" was silently dropped.
+        // 定时/schedule are not alarm/timer keywords (those fast paths keep
+        // working); on LOCAL the loop will honestly say scheduling is not
+        // available rather than performing an unrequested action now.
+        if (lower.contains("schedule") || lower.contains("定时")) {
+            XLog.i(TAG, "Scheduling intent detected, skipping Tier 1 (len=${task.length})")
+            return Route.AgentLoop(task)
+        }
+
         // Tier 1: Deterministic regex matching
         val parseResult = TaskParser.parse(task)
         if (parseResult != null) {
