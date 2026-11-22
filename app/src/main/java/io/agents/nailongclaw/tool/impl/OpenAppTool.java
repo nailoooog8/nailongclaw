@@ -196,6 +196,22 @@ public class OpenAppTool extends BaseTool {
                     if (!node.isVisibleToUser() || !node.isEnabled()) {
                         continue;
                     }
+                    // R5-04: the id alone used to be enough, but button1 is
+                    // the positive button of nearly every AlertDialog — so a
+                    // dangerous confirm (uninstall, clear data, grant) that
+                    // happened to be foreground at the settle moment got
+                    // clicked sight unseen. The id narrows candidates; the
+                    // label must still say allow before the tap lands. A
+                    // dialog whose positive button reads something else just
+                    // stays up — that is a lost convenience, not a lost
+                    // confirm.
+                    CharSequence label = node.getText();
+                    if (label == null || !matchesAllowButton(label.toString())) {
+                        CharSequence desc = node.getContentDescription();
+                        if (desc == null || !matchesAllowButton(desc.toString())) {
+                            continue;
+                        }
+                    }
                     boolean clicked = service.clickNode(node);
                     XLog.i(TAG, "Chain launch dialog: tapped positive button id " + viewId + " " + (clicked ? "success" : "failed"));
                     if (clicked) {

@@ -161,7 +161,11 @@ class ConfigServer(
      */
     private fun authenticate(session: IHTTPSession): Boolean {
         val expectedPin = ChannelSecurityGuard.getPairPin().trim()
-        if (expectedPin.isEmpty()) return true
+        // Fail closed (R5 顺手批): getPairPin() mints a non-empty PIN on first
+        // read, so an empty value here means that write silently failed —
+        // exactly the moment authentication must refuse, not wave every
+        // request on the LAN through.
+        if (expectedPin.isEmpty()) return false
 
         // The console PIN is the same 6-digit channel pairing PIN, so 10^6
         // guesses is enough for anything on the same Wi-Fi. Rate-limit per

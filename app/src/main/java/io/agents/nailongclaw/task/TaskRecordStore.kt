@@ -195,7 +195,10 @@ object TaskRecordStore {
                     updatedAt = clock(),
                     answer = (event as? TaskEvent.Completed)?.answer ?: next.answer,
                     error = when (event) {
-                        is TaskEvent.Failed -> event.error
+                        // R5 顺手批: the ledger is the longest-lived copy of a
+                        // failure — scrub credential shapes before they persist.
+                        is TaskEvent.Failed -> io.agents.nailongclaw.agent.langchain.http.HeaderMask
+                            .scrubText(event.error)
                         TaskEvent.Blocked -> BLOCKED_ERROR
                         else -> next.error
                     },

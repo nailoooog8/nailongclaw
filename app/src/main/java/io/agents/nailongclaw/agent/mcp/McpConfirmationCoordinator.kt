@@ -143,9 +143,15 @@ object McpConfirmationCoordinator {
     ): McpConfirmationGate.Verdict {
         // 自动允许：用户显式关掉了逐次确认。在任何状态判断之前生效 ——
         // 后台、无界面、忙碌都不该让一个「不再询问」的策略突然变成拒绝。
+        // R5 顺手批:但 DESTRUCTIVE 不吃这一套 —— 确认门的不变量是「破坏级
+        // 永不拿到整体放行」(McpConfirmationGate 连 remembered yes 都不给
+        // 这个档),开关不能变成比门本身更慷慨的发放者。破坏级照样出卡。
         if (autoAllowProvider()) {
-            XLog.e(TAG, "[mcpConfirm] auto-allow on: '${request.toolName}' runs without asking")
-            return verdictFor(McpConfirmationGate.Outcome.AUTO_ALLOWED, request, timeoutMs)
+            if (request.risk != io.agents.nailongclaw.tool.ToolRiskPolicy.Risk.DESTRUCTIVE) {
+                XLog.e(TAG, "[mcpConfirm] auto-allow on: '${request.toolName}' runs without asking")
+                return verdictFor(McpConfirmationGate.Outcome.AUTO_ALLOWED, request, timeoutMs)
+            }
+            XLog.e(TAG, "[mcpConfirm] auto-allow on but '${request.toolName}' is DESTRUCTIVE — asking anyway")
         }
 
         val current = surface

@@ -436,10 +436,13 @@ class ChatSessionController(
                 }
                 XLog.e(TAG, "Chat error", e)
                 postToMain {
-                    val raw = e.message ?: "Chat failed"
+                    // R5 顺手批: scrub before publish — same reasoning as the
+                    // task path. The unscrubbed original stays in the log line
+                    // above for diagnosis.
+                    val raw = io.agents.nailongclaw.agent.langchain.http.HeaderMask
+                        .scrubText(e.message ?: "Chat failed")
                     // Same deal as the task path: a human line when the failure
-                    // shape is known, the raw rendering when it is not. The raw
-                    // string stays in the log.
+                    // shape is known, the raw rendering when it is not.
                     replaceTypingIndicator(
                         ErrorHumanizer.humanize(raw) ?: "Error: $raw"
                     )

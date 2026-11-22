@@ -212,9 +212,9 @@ object ScheduleDispatcher {
     private fun notifyOutcome(context: Context, task: ScheduledTask, event: TaskEvent) {
         val (titleRes, text) = when (event) {
             is TaskEvent.Completed ->
-                R.string.notification_scheduled_done_title to event.answer.take(200)
+                R.string.notification_scheduled_done_title to event.answer
             is TaskEvent.Failed ->
-                R.string.notification_scheduled_failed_title to event.error.take(200)
+                R.string.notification_scheduled_failed_title to event.error
             TaskEvent.Cancelled ->
                 R.string.notification_scheduled_cancelled_title to task.taskText
             TaskEvent.Blocked ->
@@ -222,11 +222,18 @@ object ScheduleDispatcher {
                     context.getString(R.string.notification_scheduled_blocked_text)
             else -> return
         }
+        // R5 顺手批: the answer/error/task text rides onto the lockscreen —
+        // scrub credential-shaped strings first, then cut (same treatment as
+        // TaskOutcomeNotifier). take(200) moves after the scrub so a long URL
+        // the scrub collapses still trims cleanly.
+        val scrubbed = io.agents.nailongclaw.agent.langchain.http.HeaderMask
+            .scrubText(text.trim())
+            .take(200)
         notify(
             context,
             NOTIFY_OUTCOME_BASE + task.id.hashCode() % 1000,
             context.getString(titleRes),
-            text,
+            scrubbed,
         )
     }
 
@@ -242,6 +249,12 @@ object ScheduleDispatcher {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 nm.createNotificationChannel(
                     NotificationChannel(CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_DEFAULT)
+                        .apply {
+                            // R5 顺手批: pinned explicitly, same as the task
+                            // outcome channel — lockscreen content respects
+                            // the user's sensitive-notification setting.
+                            setLockscreenVisibility(android.app.Notification.VISIBILITY_PRIVATE)
+                        }
                 )
             }
             nm.notify(

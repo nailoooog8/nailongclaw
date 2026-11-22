@@ -610,12 +610,17 @@ class TaskFlowController(
      * — several paths can report the same failure.
      */
     private fun publishFailure(raw: String) {
-        val friendly = ErrorHumanizer.humanize(raw)
+        // R5 顺手批: the raw text goes to the UI and then into the persisted
+        // transcript/ledger. Provider errors can carry the request URL — and a
+        // self-configured endpoint may carry a key in its query — so it takes
+        // the same scrub the debug report ZIP uses before it is published.
+        val cleaned = io.agents.nailongclaw.agent.langchain.http.HeaderMask.scrubText(raw)
+        val friendly = ErrorHumanizer.humanize(cleaned)
         if (friendly == null) {
-            publishAssistantResponse("Error: $raw")
+            publishAssistantResponse("Error: $cleaned")
         } else {
             publishAssistantResponse(friendly)
-            addSystem("Raw error: ${raw.take(300)}")
+            addSystem("Raw error: ${cleaned.take(300)}")
         }
     }
 

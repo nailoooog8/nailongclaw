@@ -107,6 +107,10 @@ object TaskOutcomeNotifier : TaskSink {
                         NotificationManager.IMPORTANCE_DEFAULT,
                     ).apply {
                         description = context.getString(R.string.notification_task_channel_description)
+                        // R5 顺手批: pinned explicitly so the default never
+                        // drifts — lockscreen shows the banner but content
+                        // respects the user's sensitive-notification setting.
+                        setLockscreenVisibility(android.app.Notification.VISIBILITY_PRIVATE)
                     }
                 )
             }
@@ -121,7 +125,14 @@ object TaskOutcomeNotifier : TaskSink {
                     R.string.notification_task_blocked_title to record.taskText
                 else -> return
             }
-            val trimmed = text.trim().take(200)
+            // R5 顺手批: provider errors can carry the request URL (and a
+            // self-configured endpoint may carry a key in its query), and
+            // answers can carry URLs or account fragments — all of it would
+            // sit on the lockscreen. Same scrub the debug report ZIP uses,
+            // before the text leaves the process.
+            val trimmed = io.agents.nailongclaw.agent.langchain.http.HeaderMask
+                .scrubText(text.trim())
+                .take(200)
             // Tap → the main screen, same destination as the foreground-service
             // notification: a plain "open the app" gesture, no extras contract.
             val intent = Intent(context, io.agents.nailongclaw.ui.web.ClaudeUiPreviewActivity::class.java)

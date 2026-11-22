@@ -35,12 +35,17 @@ class McpConfirmationCoordinatorTest {
         }
     }
 
-    private fun request(name: String) = McpConfirmationRequest(
+    private fun request(
+        name: String,
+        risk: io.agents.nailongclaw.tool.ToolRiskPolicy.Risk =
+            io.agents.nailongclaw.tool.ToolRiskPolicy.Risk.WRITE,
+    ) = McpConfirmationRequest(
         toolName = name,
         displayName = "echo",
         serverName = "qatools",
         description = "Echoes text back",
         paramsPreview = "text = hello",
+        risk = risk,
     )
 
     /** Parks [block] on its own thread, the way the agent loop calls it. */
@@ -252,5 +257,58 @@ class McpConfirmationCoordinatorTest {
         McpConfirmationCoordinator.submit(McpConfirmationGate.Decision.DENY)
         thread.join(5_000)
         assertEquals(McpConfirmationGate.Outcome.DENY_BY_USER, first.get().outcome)
+    }
+
+    // ---- auto-allow vs the DESTRUCTIVE invariant (R5 顺手批) ----
+
+    @Test
+    fun `auto allow runs a write tier call without asking`() {
+        try {
+            McpConfirmationCoordinator.autoAllowProvider = { true }
+            val surface = FakeSurface()
+            McpConfirmationCoordinator.attach(surface)
+            val result = AtomicReference<McpConfirmationGate.Verdict>()
+            val thread = park {
+                result.set(McpConfirmationCoordinator.awaitDecision(request("mcp_t_auto")))
+            }
+            thread.join(5_000)
+
+            assertEquals(McpConfirmationGate.Outcome.AUTO_ALLOWED, result.get().outcome)
+            assertTrue(result.get().allowed)
+            // No card: that is what the switch is for.
+            assertTrue(surface.shown.isEmpty())
+        } finally {
+            McpConfirmationCoordinator.autoAllowProvider = { false }
+        }
+    }
+
+    @Test
+    fun `auto allow still asks for a destructive call`() {
+        // The gate's own invariant is that DESTRUCTIVE never earns a blanket
+        // yes — not even a remembered one (no 始终允许 on the card). The
+        // convenience switch must not become a more generous granter than the
+        // gate it feeds: the card still comes up.
+        try {
+            McpConfirmationCoordinator.autoAllowProvider = { true }
+            val surface = FakeSurface()
+            McpConfirmationCoordinator.attach(surface)
+            val result = AtomicReference<McpConfirmationGate.Verdict>()
+            val thread = park {
+                result.set(
+                    McpConfirmationCoordinator.awaitDecision(
+                        request("mcp_t_auto_destructive",
+                            risk = io.agents.nailongclaw.tool.ToolRiskPolicy.Risk.DESTRUCTIVE)
+                    )
+                )
+            }
+            waitUntil { surface.shown.size == 1 }
+
+            McpConfirmationCoordinator.submit(McpConfirmationGate.Decision.DENY)
+            thread.join(5_000)
+            assertEquals(McpConfirmationGate.Outcome.DENY_BY_USER, result.get().outcome)
+            assertFalse(result.get().allowed)
+        } finally {
+            McpConfirmationCoordinator.autoAllowProvider = { false }
+        }
     }
 }
