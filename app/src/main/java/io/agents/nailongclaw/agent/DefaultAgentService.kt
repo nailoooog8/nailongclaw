@@ -161,6 +161,14 @@ class DefaultAgentService : AgentService {
     }
 
     override fun updateConfig(config: AgentConfig) {
+        // Same-value update (a no-op model switch — e.g. tapping the
+        // already-active tab) used to cancel a running task for nothing.
+        // Compare the whole config: nothing changed, nothing to cancel or
+        // rebuild (BACKLOG P3, filed 2026-11-21).
+        if (::config.isInitialized && config == this.config) {
+            XLog.i(TAG, "Config update is a no-op (same values) — nothing rebuilt, task untouched")
+            return
+        }
         if (running.get()) {
             cancel()
             XLog.w(TAG, "Task was running during config update, cancelled")

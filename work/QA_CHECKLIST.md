@@ -2230,6 +2230,15 @@ Markdown 导出是人读分享件（只有正文/标签/置顶），损失留存
 - ✅ **设备全链**（h79，8 条账本）：UI 导出 → 清空（确认卡「将删除全部 8 条」）→「导入 JSON（从导出恢复）」→ SAF 选 Downloads 里的暂存文件 → 确认卡「**将导入 8 条记忆**。已存在的相同条目会跳过；召回计数从零开始」→ 导入 → **记忆（8）全部还原**（TPLINK/Chengdu/ThinkPad/Japanese/Sunday 全在列表），0 崩。
 - [DRIVE] SAF 驱动法：`registerForActivityResult(OpenDocument)` 的选择器落在 Recent（空）——点 ≡（60,105）→ Downloads → 文件行；导出文件先 `adb pull` 再 `adb push` 到 `/sdcard/Download/` 暂存（app 私有目录 SAF 浏览不到）。
 
+### 2026-11-22（第八轮）— 小额批四件：截图 cache 清理 / no-op 切换守卫 / 令牌框溢出 / 314 挂死不复现
+
+- ✅ **截图 cache 清理策略**（R5 §5 最后一件可动项）：两处截图写盘（`TakeScreenshotTool`/`ShadowGetScreenInfoTool`）写时调 `ScreenshotCache.prune(dir)`——**保留 24h + 最旧超出 20 个即删**（QA 取证窗口内足够）。设备实测：预置 25 个旧文件 + 1 次真实截图 → 目录 **26→20**、新文件保留。单次 `directory listing` 成本，无调度器。
+- ✅ **no-op 切换守卫**（BACKLOG 2026-11-21 边角）：`DefaultAgentService.updateConfig` 加 **`config == this.config` 整相等守卫**——同值更新直接 return，不取消不重建；不同值照旧取消。设备实测：本地任务（wait 25s）运行中点自家 Local tab → 「**Config update is a no-op (same values) — nothing rebuilt, task untouched**」，无 cancelled 日志，任务照常收尾。
+- ✅ **令牌对话框溢出**（vivo 1260px P3）：`ChannelsActivity.tokenDialogContent` 三段式——说明段 / 令牌独立行（MONOSPACE + 高亮 + 可选，包在 `HorizontalScrollView`）/ 尾段；三 locale 按 token 本体 split，零资源改动。设备实测：令牌**首字符可见**、对话框不撑宽。vivo 原始场景留真机复核。
+- ⚖️→✅ **314 模糊任务挂死不复现**：`Copy that token to the clipboard` 本地实测 3 轮干净收尾（clipboard get → set 屏上标题 → finish）。「挂死」是 8192 溢出时代症状；BACKLOG 标随 allowlist 收敛，真机若再现措辞级挂死按 StuckDetector 路线修。
+- [DRIVE] 令牌对话框要过两层：外部自动化先启用（模拟器重装后被关）→ Pairing token 行；`am start` ChannelsActivity 后任务收尾的 auto-return 会把 Compose 面顶回来——开页后别隔太久再点。
+- 全量单测 **796/0**，崩溃卫生 0。
+
 ### 2026-11-22 — R5 安全修复落地 + 模拟器体验 QA（h79 AVD，API 36，HEAD debug 覆装 vc63 调试包）：R5 四腿全过；抓出并即修两体验缺陷（U1/U3）+ 一通知细节（U4）
 
 R5 报告 `docs/security/SECURITY_AUDIT_R5.md`（§9 修复落地 / §10 本轮 QA）。基线 `45c9e5f` 的五笔修复提交（`215a1c0`→`4df279e`）后 HEAD debug 包 `adb install -r` 覆装（vc34 → vc63，数据保留）。证据 `.auto/r5_shade*.png`、`.auto/r5_test.log`（749/0）。

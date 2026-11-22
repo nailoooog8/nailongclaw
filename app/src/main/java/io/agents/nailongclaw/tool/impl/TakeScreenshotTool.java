@@ -74,6 +74,7 @@ public class TakeScreenshotTool extends BaseTool {
                 bitmap.compress(Bitmap.CompressFormat.PNG, 100, fos);
             }
             bitmap.recycle();
+            ScreenshotCache.prune(dir);  // retention: 24h / 20 files (R5 §5 P3)
 
             return ToolResult.success(file.getAbsolutePath());
         } catch (Exception e) {

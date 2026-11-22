@@ -398,6 +398,45 @@ class ChannelsActivity : BaseActivity() {
      * app, so masking it would only push them toward a screenshot. The row
      * itself never displays it.
      */
+    /**
+     * BACKLOG P3 (vivo 1260px): the 32-char unbreakable Crockford token rode
+     * inside the message TextView and pushed the whole dialog out past the
+     * screen's left edge — its first characters were unreadable and 复制令牌
+     * was the only usable path. The token now sits on its own line inside a
+     * horizontal scroller: nothing can widen the dialog past the screen, and
+     * long-press select still works. The sentence strings split on the token
+     * itself, so all three locales flow through the same builder.
+     */
+    private fun tokenDialogContent(token: String): android.view.View {
+        val full = getString(R.string.ext_automation_token_message, token)
+        val parts = full.split(token, limit = 2)
+        val box = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+        }
+        fun body(text: String) = CdsDialog.message(this, text.trim()).apply {
+            setPadding(0, CdsUi.dp(this@ChannelsActivity, 2), 0, CdsUi.dp(this@ChannelsActivity, 2))
+        }
+        box.addView(body(parts.getOrElse(0) { "" }))
+        val tokenView = CdsDialog.message(this, token).apply {
+            typeface = android.graphics.Typeface.MONOSPACE
+            setTextColor(cds.textPrimary)
+            setTextIsSelectable(true)
+        }
+        val scroller = android.widget.HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = true
+            addView(tokenView)
+        }
+        box.addView(
+            scroller,
+            android.widget.LinearLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply { setMargins(0, CdsUi.dp(this@ChannelsActivity, 6), 0, CdsUi.dp(this@ChannelsActivity, 6)) },
+        )
+        if (parts.size > 1) box.addView(body(parts[1]))
+        return box
+    }
+
     private fun showExternalAutomationToken() {
         if (!KVUtils.isExternalAutomationEnabled()) {
             Toast.makeText(this, R.string.ext_automation_token_needs_enabled, Toast.LENGTH_LONG).show()
@@ -415,10 +454,7 @@ class ChannelsActivity : BaseActivity() {
         CdsDialog.show(
             context = this,
             title = getString(R.string.ext_automation_token_title),
-            content = CdsDialog.message(
-                this,
-                getString(R.string.ext_automation_token_message, token)
-            ),
+            content = tokenDialogContent(token),
             confirmText = getString(R.string.ext_automation_copy_token),
             cancelText = getString(R.string.common_cancel),
             neutralText = getString(R.string.ext_automation_reset_token),

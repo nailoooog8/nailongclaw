@@ -93,6 +93,7 @@ public class ShadowGetScreenInfoTool extends BaseTool {
                     try (FileOutputStream fos = new FileOutputStream(file)) {
                         bitmap.compress(Bitmap.CompressFormat.PNG, 100, fos);
                     }
+                    io.agents.nailongclaw.tool.impl.ScreenshotCache.prune(dir);  // 24h / 20 files (R5 sec5 P3)
                     result.append("\n(screenshot: ").append(file.getAbsolutePath()).append(")");
                 } catch (Exception e) {
                     result.append("\n(screenshot failed: ").append(e.getMessage()).append(")");
