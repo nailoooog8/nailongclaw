@@ -91,6 +91,7 @@
     <string name="secure_write_failed">Could not save securely: this device\'s keystore refused to encrypt, so nothing was stored (a token stored in the clear is not an option). Reboot the device and try again; if it persists, report it.</string>
     <string name="channel_config_lan_hint">Enable \"LAN Config\" in Settings to configure via browser</string>
     <string name="channel_config_lan_hint_running">Open %s in your browser to configure</string>
+    <string name="channel_config_tls_fingerprint">Certificate fingerprint (compare with your browser warning): %s</string>
     <string name="channel_config_lan_copied">Address copied</string>
 
     <!-- LLM Config -->

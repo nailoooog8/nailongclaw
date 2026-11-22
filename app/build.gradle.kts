@@ -299,6 +299,11 @@ dependencies {
     // NanoHTTPD 嵌入式 HTTP 服务器（局域网配置服务）
     implementation(libs.nanohttpd)
 
+    // BouncyCastle — LAN 控制台的自签 TLS 证书按设备运行时生成（F5）。Android
+    // 平台没有公开的 X509 签发 API，预置 keystore 等于全网同钥，只能每台设备
+    // 自己生成。bcpkix 传递引入 bcprov。
+    implementation("org.bouncycastle:bcpkix-jdk15to18:1.78.1")
+
     // SnakeYAML — 用户自定义技能配方（YAML recipe）解析
     implementation(libs.snakeyaml)
 

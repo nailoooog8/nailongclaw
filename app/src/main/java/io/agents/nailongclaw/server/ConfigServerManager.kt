@@ -14,6 +14,7 @@ import io.agents.nailongclaw.utils.XLog
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import java.io.File
 import java.net.Inet4Address
 import java.net.NetworkInterface
 
@@ -55,10 +56,17 @@ object ConfigServerManager {
 
         for (port in ConfigServer.PORT until ConfigServer.PORT + MAX_PORT_RETRY) {
             try {
+                // F5: the console carries real bot tokens / the LLM API key in POST
+                // bodies and the PIN header on every request — cleartext HTTP let a
+                // passive same-Wi-Fi observer harvest all of it. The console is
+                // HTTPS-only now, on a per-device self-signed cert (ConsoleTls for
+                // the trust model; fingerprint shows on the phone screen).
+                val tls = ConsoleTls.ensure(File(ctx.filesDir, "console_tls"))
                 val s = ConfigServer(ctx, port)
+                s.makeSecure(tls.serverSocketFactory, null)
                 s.start()
                 server = s
-                XLog.i(TAG, "ConfigServer started on port $port")
+                XLog.i(TAG, "ConfigServer started (HTTPS) on port $port sha256=${tls.fingerprintSha256}")
                 registerNetworkCallback(ctx)
                 return true
             } catch (e: Exception) {
@@ -83,13 +91,15 @@ object ConfigServerManager {
     fun isRunning(): Boolean = server?.isAlive == true
 
     /**
-     * Get the LAN access address, e.g. 192.168.1.100:9527
+     * Get the LAN access address, e.g. https://192.168.1.100:9527 — the console
+     * is HTTPS-only (F5, self-signed cert per ConsoleTls), so the full scheme
+     * travels with the address everywhere it is displayed or copied.
      * Port is read from the running server instance
      */
     fun getAddress(): String? {
         val ip = getWifiIpAddress(appContext ?: return null) ?: return null
         val port = server?.listeningPort ?: return null
-        return "$ip:$port"
+        return "https://$ip:$port"
     }
 
     /**
@@ -168,12 +178,16 @@ object ConfigServerManager {
                 // IP may change after WiFi reconnect, restart the server
                 if (KVUtils.isConfigServerEnabled() && !isRunning()) {
                     val ctx = appContext ?: return
+                    // Same TLS bootstrap as start() — the restart path must never
+                    // fall back to cleartext just because WiFi bounced.
+                    val tls = ConsoleTls.ensure(File(ctx.filesDir, "console_tls"))
                     for (port in ConfigServer.PORT until ConfigServer.PORT + MAX_PORT_RETRY) {
                         try {
                             val s = ConfigServer(ctx, port)
+                            s.makeSecure(tls.serverSocketFactory, null)
                             s.start()
                             server = s
-                            XLog.i(TAG, "ConfigServer restarted on port $port")
+                            XLog.i(TAG, "ConfigServer restarted (HTTPS) on port $port")
                             break
                         } catch (e: Exception) {
                             XLog.e(TAG, "Port $port unavailable on restart: ${e.message}")

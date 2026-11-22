@@ -2193,6 +2193,15 @@ BACKLOG P2（`SEMANTIC_FLOOR=0.30` 不构成准入）的实测与修复。新工
 
 **驱动法沉淀**：`--es probe_text` 的措辞要与全部条目做**词法零重叠核对**（`matches()` 是子串包含，"birthday of the user" 会因 "user"⊂"users" 词法中招——第一轮诱饵就是这么被污染的）；带撇号的 memory_save content 会被两层 shell 剥掉（`user's` 存不进去，改写措辞绕开）；探针前等 `entries=8`（补算 daemon 全量完成）再采数。
 
+### 2026-11-22（第四轮）— F5 收编：LAN 控制台 HTTPS-only（按设备自签证书 + 屏显指纹）；TLSv1.3 实测、明文零泄漏
+
+F5 的残余暴露面是**入站方向**（GET/POST 响应早已掩码）：POST 体里的真实 bot token/LLM 密钥 + 每请求的 `X-Config-PIN` 头。修：控制台改 HTTPS-only——
+
+- **证书按设备生成**（预置 keystore = 全网同钥，对拿得到 APK 的攻击者无意义）：`ConsoleTls` RSA-2048 / 10 年 / SAN `nailongclaw.local` / KeyUsage+ServerAuth，PKCS12 落 `filesDir/console_tls/`。**Android PKCS12 空密码 store 写 0 字节文件**（宿主 JDK 21 能空密码，设备不行——模拟器上第一次起服全端口 "no data in keystore stream" 抓的）→ 随机密码落盘同目录（同沙箱保护）+ **载入失败自愈重建**（实测自愈路径：0 字节残留被检出并重建）。
+- `makeSecure` 接在 start() 与 WiFi-bounce 自动重启两路（重启不回落明文）；`getAddress()` 带 `https://` scheme；渠道配置页 hint 下多一行证书指纹（zh/en/ja 三 locale）。
+- **设备实测**（h79 AVD——本镜像无 WiFi transport，需 `cmd wifi set-wifi-enabled enabled` + `cmd wifi connect-network AndroidWifi open none` 才能过 isWifiConnected 门）：`adb forward` 后宿主 TLS 探测 → **TLSv1.3 / TLS_AES_256_GCM_SHA384 / HTTP 200**；**指纹三方一致**（logcat = 配置页 UI = 宿主 `getpeercert(True)` 的 SHA-256，`af1664c5…`）；同端口明文 HTTP 探测**零字节回显**。崩溃卫生 0。
+- **QA 驱动法**：`adb reverse` 在 Windows 宿主上监听起不来（refused，已知坑）——用 `adb forward tcp:<host> tcp:9527` 方向才对；模拟器 WiFi 门是 `cmd wifi` 两连，不是 `svc wifi`。
+
 ### 2026-11-22 — R5 安全修复落地 + 模拟器体验 QA（h79 AVD，API 36，HEAD debug 覆装 vc63 调试包）：R5 四腿全过；抓出并即修两体验缺陷（U1/U3）+ 一通知细节（U4）
 
 R5 报告 `docs/security/SECURITY_AUDIT_R5.md`（§9 修复落地 / §10 本轮 QA）。基线 `45c9e5f` 的五笔修复提交（`215a1c0`→`4df279e`）后 HEAD debug 包 `adb install -r` 覆装（vc34 → vc63，数据保留）。证据 `.auto/r5_shade*.png`、`.auto/r5_test.log`（749/0）。

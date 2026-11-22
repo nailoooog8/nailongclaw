@@ -21,7 +21,9 @@ import androidx.activity.result.contract.ActivityResultContract
 import io.agents.nailongclaw.R
 import io.agents.nailongclaw.base.BaseActivity
 import io.agents.nailongclaw.channel.ChannelManager
+import java.io.File
 import io.agents.nailongclaw.server.ConfigServerManager
+import io.agents.nailongclaw.server.ConsoleTls
 import io.agents.nailongclaw.utils.KVUtils
 import io.agents.nailongclaw.widget.CommonToolbar
 import io.agents.nailongclaw.widget.KButton
@@ -194,12 +196,18 @@ class ChannelConfigActivity : BaseActivity() {
         val ivCopy = findViewById<ImageView>(R.id.ivCopyAddress)
         val address = ConfigServerManager.getAddress()
         if (ConfigServerManager.isRunning() && address != null) {
-            val url = "http://$address"
-            tvLanHint.text = getString(R.string.channel_config_lan_hint_running, url)
+            // getAddress() already carries the https:// scheme (F5: the console is
+            // TLS-only). The cert fingerprint rides under the URL so the user can
+            // verify the browser's warning against the phone screen — the phone is
+            // the trust anchor, never the served page.
+            val tls = ConsoleTls.ensure(File(filesDir, "console_tls"))
+            val hint = getString(R.string.channel_config_lan_hint_running, address) + "\n" +
+                getString(R.string.channel_config_tls_fingerprint, tls.fingerprintSha256.chunked(8).joinToString(" "))
+            tvLanHint.text = hint
             ivCopy.visibility = View.VISIBLE
             ivCopy.setOnClickListener {
                 val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                clipboard.setPrimaryClip(ClipData.newPlainText("lan_config_url", url))
+                clipboard.setPrimaryClip(ClipData.newPlainText("lan_config_url", address))
                 Toast.makeText(this, R.string.channel_config_lan_copied, Toast.LENGTH_SHORT).show()
             }
         } else {
