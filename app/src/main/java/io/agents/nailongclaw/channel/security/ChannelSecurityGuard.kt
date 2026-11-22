@@ -420,11 +420,11 @@ object ChannelSecurityGuard {
             ) {
                 BruteForceGuard.onSuccess(guardKey)
                 addSenderToWhitelist(channel, trimmedSenderId)
-                XLog.i(TAG, "Sender $trimmedSenderId successfully paired on ${channel.displayName}")
+                XLog.i(TAG, "Sender ${redactId(trimmedSenderId)} successfully paired on ${channel.displayName}")
                 Decision.Reject("绑定成功！设备已授权，可正常接收与执行指令。")
             } else {
                 val lockoutMs = BruteForceGuard.onFailure(guardKey)
-                XLog.w(TAG, "Sender pairing failed on ${channel.displayName} senderId=$trimmedSenderId lockoutMs=$lockoutMs")
+                XLog.w(TAG, "Sender pairing failed on ${channel.displayName} senderId=${redactId(trimmedSenderId)} lockoutMs=$lockoutMs")
                 if (lockoutMs > 0) {
                     Decision.Reject(
                         "PIN 码错误次数过多，已临时锁定 ${lockoutMs / 1000} 秒。" +
@@ -448,9 +448,12 @@ object ChannelSecurityGuard {
         }
 
         // 5. Unauthorized and not a bind command: reject, log warning, and resolutely DO NOT call TaskOrchestrator!
+        // R5 顺手批: senderId is redacted (this file's own rule) and the
+        // message body stays out entirely — it is someone else's writing and
+        // used to ride the debug-report ZIP verbatim.
         XLog.w(
             TAG,
-            "Security ALERT: Unauthorized message rejected from sender=$trimmedSenderId on ${channel.displayName}: ${trimmedMessage.take(60)}"
+            "Security ALERT: Unauthorized message rejected from sender=${redactId(trimmedSenderId)} on ${channel.displayName} (len=${trimmedMessage.length})"
         )
         return Decision.Reject("未授权设备。请在手机 NailongClaw 设置中查看配对码，并发送 /bind <配对码> 绑定")
     }

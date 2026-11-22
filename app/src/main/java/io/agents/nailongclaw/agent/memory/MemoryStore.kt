@@ -377,7 +377,9 @@ object MemoryStore {
                 entries[entries.indexOf(dup)] = merged
                 cache = entries
                 persistLocked()
-                XLog.d(TAG, "memory_save merged into ${merged.id} (${merged.content.take(40)})")
+                // R5 顺手批: memory bodies used to ride log lines into the
+                // debug-report ZIP — lengths and ids are diagnostic enough.
+                XLog.d(TAG, "memory_save merged into ${merged.id} (len=${merged.content.length})")
                 return RememberResult.Stored(merged, merged = true)
             }
 
@@ -420,10 +422,10 @@ object MemoryStore {
                         entries[i] = old.copy(conflictsWith = (old.conflictsWith + entry.id).distinct())
                     }
                 }
-                XLog.w(TAG, "memory_save: ${flagged.size} memory(ies) conflict with \"${text.take(40)}\" — flagged, not superseded")
+                XLog.w(TAG, "memory_save: ${flagged.size} memory(ies) conflict with the new entry (len=${text.length}) — flagged, not superseded")
             }
             if (superseded.isNotEmpty()) {
-                XLog.w(TAG, "memory_save superseded ${superseded.size} memory(ies) with \"${text.take(40)}\"")
+                XLog.w(TAG, "memory_save superseded ${superseded.size} memory(ies) (len=${text.length})")
             }
             evictLocked(entries, now)
             cache = entries
@@ -433,7 +435,7 @@ object MemoryStore {
             // dropped the newcomer itself — then the local object is all
             // there is to report.
             val asStored = entries.firstOrNull { it.id == entry.id } ?: entry
-            XLog.i(TAG, "memory_save: ${entry.kind} \"${entry.content.take(40)}\" (${entries.size} total)")
+            XLog.i(TAG, "memory_save: ${entry.kind} (len=${entry.content.length}) (${entries.size} total)")
             RememberResult.Stored(asStored, conflicts = flagged, superseded = superseded)
         }
     }

@@ -49,7 +49,9 @@ class PipelineRouter(private val context: Context) {
         // not be partially handled by Tier 1 deterministic matching.
         val lower = task.lowercase()
         if (lower.contains(" and ") || lower.contains(" then ") || lower.contains(" after ")) {
-            XLog.i(TAG, "Compound task detected, skipping Tier 1: $task")
+            // R5 顺手批: task text is user (or remote-sender) content — the
+            // routing decision is the diagnostic, not the wording.
+            XLog.i(TAG, "Compound task detected, skipping Tier 1 (len=${task.length})")
             return Route.AgentLoop(task)
         }
 
@@ -82,7 +84,7 @@ class PipelineRouter(private val context: Context) {
         }
 
         // No deterministic match → Tier 3 agent loop
-        XLog.i(TAG, "No deterministic match, falling through to agent loop: $task")
+        XLog.i(TAG, "No deterministic match, falling through to agent loop (len=${task.length})")
         return Route.AgentLoop(task)
     }
 
