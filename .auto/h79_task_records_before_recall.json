@@ -1,0 +1,733 @@
+{
+  "version": 1,
+  "records": [
+    {
+      "id": "task_1794637477865",
+      "taskText": "how did i set up the wireless network last time",
+      "channel": "LOCAL",
+      "originActivity": "io.agents.nailongclaw.ui.web.ClaudeUiPreviewActivity",
+      "createdAt": 1794637477950,
+      "updatedAt": 1794637507841,
+      "status": "FAILED",
+      "steps": [],
+      "error": "AI service call failed: Failed to call nativeSendMessage: INVALID_ARGUMENT: Input token ids are too long. Exceeding the maximum number of tokens allowed: 8218 >= 8192"
+    },
+    {
+      "id": "task_1794744838090",
+      "taskText": "what time is it now? answer in one short sentence",
+      "channel": "LOCAL",
+      "originActivity": "io.agents.nailongclaw.ui.web.ClaudeUiPreviewActivity",
+      "createdAt": 1794744838112,
+      "updatedAt": 1794744858859,
+      "status": "FAILED",
+      "steps": [],
+      "error": "AI service call failed: Failed to call nativeSendMessage: INVALID_ARGUMENT: Input token ids are too long. Exceeding the maximum number of tokens allowed: 8219 >= 8192"
+    },
+    {
+      "id": "debug_1794744885131",
+      "taskText": "what",
+      "channel": "LOCAL",
+      "createdAt": 1794744885131,
+      "updatedAt": 1794744893078,
+      "status": "FAILED",
+      "steps": [],
+      "error": "AI service call failed: Failed to call nativeSendMessage: INVALID_ARGUMENT: Input token ids are too long. Exceeding the maximum number of tokens allowed: 8209 >= 8192"
+    },
+    {
+      "id": "debug_1794745040851",
+      "taskText": "what",
+      "channel": "LOCAL",
+      "createdAt": 1794745040851,
+      "updatedAt": 1794745050047,
+      "status": "FAILED",
+      "steps": [],
+      "error": "AI service call failed: Failed to call nativeSendMessage: INVALID_ARGUMENT: Input token ids are too long. Exceeding the maximum number of tokens allowed: 8209 >= 8192"
+    },
+    {
+      "id": "debug_1794745113543",
+      "taskText": "what",
+      "channel": "LOCAL",
+      "createdAt": 1794745113543,
+      "updatedAt": 1794745121330,
+      "status": "FAILED",
+      "steps": [],
+      "error": "AI service call failed: Failed to call nativeSendMessage: INVALID_ARGUMENT: Input token ids are too long. Exceeding the maximum number of tokens allowed: 8209 >= 8192"
+    },
+    {
+      "id": "debug_1794745166761",
+      "taskText": "what",
+      "channel": "LOCAL",
+      "createdAt": 1794745166761,
+      "updatedAt": 1794745174540,
+      "status": "FAILED",
+      "steps": [],
+      "error": "AI service call failed: Failed to call nativeSendMessage: INVALID_ARGUMENT: Input token ids are too long. Exceeding the maximum number of tokens allowed: 8209 >= 8192"
+    },
+    {
+      "id": "debug_1794745337046",
+      "taskText": "what",
+      "channel": "LOCAL",
+      "createdAt": 1794745337046,
+      "updatedAt": 1794745345711,
+      "status": "FAILED",
+      "steps": [],
+      "error": "AI service call failed: Failed to call nativeSendMessage: INVALID_ARGUMENT: Input token ids are too long. Exceeding the maximum number of tokens allowed: 8209 >= 8192"
+    },
+    {
+      "id": "debug_1794745400405",
+      "taskText": "what",
+      "channel": "LOCAL",
+      "createdAt": 1794745400405,
+      "updatedAt": 1794745404276,
+      "status": "FAILED",
+      "steps": [],
+      "error": "AI service call failed: Task cancelled"
+    },
+    {
+      "id": "debug_1794745432137",
+      "taskText": "what",
+      "channel": "LOCAL",
+      "createdAt": 1794745432137,
+      "updatedAt": 1794745439986,
+      "status": "FAILED",
+      "steps": [],
+      "error": "AI service call failed: Failed to call nativeSendMessage: INVALID_ARGUMENT: Input token ids are too long. Exceeding the maximum number of tokens allowed: 8209 >= 8192"
+    },
+    {
+      "id": "task_1794745441033",
+      "taskText": "second",
+      "channel": "LOCAL",
+      "originActivity": "io.agents.nailongclaw.ui.web.ClaudeUiPreviewActivity",
+      "createdAt": 1794745441059,
+      "updatedAt": 1794745449085,
+      "status": "FAILED",
+      "steps": [],
+      "error": "AI service call failed: Failed to call nativeSendMessage: INVALID_ARGUMENT: Input token ids are too long. Exceeding the maximum number of tokens allowed: 8209 >= 8192"
+    },
+    {
+      "id": "debug_1794745495738",
+      "taskText": "what",
+      "channel": "LOCAL",
+      "createdAt": 1794745495738,
+      "updatedAt": 1794745502818,
+      "status": "FAILED",
+      "steps": [],
+      "error": "AI service call failed: Local model session already in use"
+    },
+    {
+      "id": "debug_1794745578455",
+      "taskText": "what",
+      "channel": "LOCAL",
+      "createdAt": 1794745578455,
+      "updatedAt": 1794745585571,
+      "status": "FAILED",
+      "steps": [],
+      "error": "AI service call failed: Local model session already in use"
+    },
+    {
+      "id": "debug_1794747657836",
+      "taskText": "open",
+      "channel": "LOCAL",
+      "createdAt": 1794747657836,
+      "updatedAt": 1794747665168,
+      "status": "FAILED",
+      "steps": [],
+      "error": "AI service call failed: Local model session already in use"
+    },
+    {
+      "id": "debug_1794747728183",
+      "taskText": "open the camera",
+      "channel": "LOCAL",
+      "createdAt": 1794747728183,
+      "updatedAt": 1794747730204,
+      "status": "COMPLETED",
+      "steps": [],
+      "answer": "Opening camera"
+    },
+    {
+      "id": "debug_1794747782299",
+      "taskText": "open settings then open calculator",
+      "channel": "LOCAL",
+      "createdAt": 1794747782300,
+      "updatedAt": 1794747789436,
+      "status": "FAILED",
+      "steps": [],
+      "error": "AI service call failed: Local model session already in use"
+    },
+    {
+      "id": "debug_1794748019392",
+      "taskText": "open settings then open calculator",
+      "channel": "LOCAL",
+      "createdAt": 1794748019392,
+      "updatedAt": 1794748019418,
+      "status": "FAILED",
+      "steps": [],
+      "error": "Accessibility service is not enabled"
+    },
+    {
+      "id": "debug_1794748122352",
+      "taskText": "open settings then open calculator",
+      "channel": "LOCAL",
+      "createdAt": 1794748122352,
+      "updatedAt": 1794748135213,
+      "status": "FAILED",
+      "steps": [],
+      "error": "AI service call failed: Failed to call nativeSendMessage: INVALID_ARGUMENT: Input token ids are too long. Exceeding the maximum number of tokens allowed: 8609 >= 8192"
+    },
+    {
+      "id": "debug_1794748482458",
+      "taskText": "h84 ball",
+      "channel": "LOCAL",
+      "createdAt": 1794748482458,
+      "updatedAt": 1794748490521,
+      "status": "COMPLETED",
+      "steps": [
+        {
+          "at": 1794748482486,
+          "kind": "PROGRESS",
+          "text": "Step 1/2: 停留四秒一"
+        },
+        {
+          "at": 1794748486498,
+          "kind": "TOOL",
+          "text": "Waited for 4000ms",
+          "toolName": "Wait",
+          "success": true
+        },
+        {
+          "at": 1794748486506,
+          "kind": "PROGRESS",
+          "text": "Step 2/2: 停留四秒二"
+        },
+        {
+          "at": 1794748490514,
+          "kind": "TOOL",
+          "text": "Waited for 4000ms",
+          "toolName": "Wait",
+          "success": true
+        }
+      ],
+      "answer": "Skill 'H84 悬浮球演示' completed successfully in 2 steps."
+    },
+    {
+      "id": "debug_1794748709053",
+      "taskText": "h84 ball",
+      "channel": "LOCAL",
+      "createdAt": 1794748709053,
+      "updatedAt": 1794748717108,
+      "status": "COMPLETED",
+      "steps": [
+        {
+          "at": 1794748709067,
+          "kind": "PROGRESS",
+          "text": "Step 1/2: 停留四秒一"
+        },
+        {
+          "at": 1794748713079,
+          "kind": "TOOL",
+          "text": "Waited for 4000ms",
+          "toolName": "Wait",
+          "success": true
+        },
+        {
+          "at": 1794748713085,
+          "kind": "PROGRESS",
+          "text": "Step 2/2: 停留四秒二"
+        },
+        {
+          "at": 1794748717100,
+          "kind": "TOOL",
+          "text": "Waited for 4000ms",
+          "toolName": "Wait",
+          "success": true
+        }
+      ],
+      "answer": "Skill 'H84 悬浮球演示' completed successfully in 2 steps."
+    },
+    {
+      "id": "debug_1794748747287",
+      "taskText": "h84 ball",
+      "channel": "LOCAL",
+      "createdAt": 1794748747287,
+      "updatedAt": 1794748755328,
+      "status": "COMPLETED",
+      "steps": [
+        {
+          "at": 1794748747299,
+          "kind": "PROGRESS",
+          "text": "Step 1/2: 停留四秒一"
+        },
+        {
+          "at": 1794748751307,
+          "kind": "TOOL",
+          "text": "Waited for 4000ms",
+          "toolName": "Wait",
+          "success": true
+        },
+        {
+          "at": 1794748751311,
+          "kind": "PROGRESS",
+          "text": "Step 2/2: 停留四秒二"
+        },
+        {
+          "at": 1794748755322,
+          "kind": "TOOL",
+          "text": "Waited for 4000ms",
+          "toolName": "Wait",
+          "success": true
+        }
+      ],
+      "answer": "Skill 'H84 悬浮球演示' completed successfully in 2 steps."
+    },
+    {
+      "id": "debug_1794748867237",
+      "taskText": "open settings then open calculator",
+      "channel": "LOCAL",
+      "createdAt": 1794748867237,
+      "updatedAt": 1794748877745,
+      "status": "FAILED",
+      "steps": [],
+      "error": "AI service call failed: Failed to call nativeSendMessage: INVALID_ARGUMENT: Input token ids are too long. Exceeding the maximum number of tokens allowed: 8731 >= 8192"
+    },
+    {
+      "id": "debug_1794749071690",
+      "taskText": "h84 ball",
+      "channel": "LOCAL",
+      "createdAt": 1794749071690,
+      "updatedAt": 1794749079730,
+      "status": "COMPLETED",
+      "steps": [
+        {
+          "at": 1794749071704,
+          "kind": "PROGRESS",
+          "text": "Step 1/2: 停留四秒一"
+        },
+        {
+          "at": 1794749075715,
+          "kind": "TOOL",
+          "text": "Waited for 4000ms",
+          "toolName": "Wait",
+          "success": true
+        },
+        {
+          "at": 1794749075718,
+          "kind": "PROGRESS",
+          "text": "Step 2/2: 停留四秒二"
+        },
+        {
+          "at": 1794749079726,
+          "kind": "TOOL",
+          "text": "Waited for 4000ms",
+          "toolName": "Wait",
+          "success": true
+        }
+      ],
+      "answer": "Skill 'H84 悬浮球演示' completed successfully in 2 steps."
+    },
+    {
+      "id": "task_1794749285639",
+      "taskText": "h84 ball",
+      "channel": "LOCAL",
+      "originActivity": "io.agents.nailongclaw.ui.chat.ComposeChatActivity",
+      "createdAt": 1794749285700,
+      "updatedAt": 1794749293747,
+      "status": "COMPLETED",
+      "steps": [
+        {
+          "at": 1794749285722,
+          "kind": "PROGRESS",
+          "text": "Step 1/2: 停留四秒一"
+        },
+        {
+          "at": 1794749289728,
+          "kind": "TOOL",
+          "text": "Waited for 4000ms",
+          "toolName": "Wait",
+          "success": true
+        },
+        {
+          "at": 1794749289732,
+          "kind": "PROGRESS",
+          "text": "Step 2/2: 停留四秒二"
+        },
+        {
+          "at": 1794749293742,
+          "kind": "TOOL",
+          "text": "Waited for 4000ms",
+          "toolName": "Wait",
+          "success": true
+        }
+      ],
+      "answer": "Skill 'H84 悬浮球演示' completed successfully in 2 steps."
+    },
+    {
+      "id": "task_1794749324076",
+      "taskText": "draftinterrupt",
+      "channel": "LOCAL",
+      "originActivity": "io.agents.nailongclaw.ui.chat.ComposeChatActivity",
+      "createdAt": 1794749324123,
+      "updatedAt": 1794749332673,
+      "status": "FAILED",
+      "steps": [],
+      "error": "AI service call failed: Failed to call nativeSendMessage: INVALID_ARGUMENT: Input token ids are too long. Exceeding the maximum number of tokens allowed: 8210 >= 8192"
+    },
+    {
+      "id": "task_1794749472924",
+      "taskText": "h84 ball",
+      "channel": "LOCAL",
+      "originActivity": "io.agents.nailongclaw.ui.chat.ComposeChatActivity",
+      "createdAt": 1794749472969,
+      "updatedAt": 1794749489048,
+      "status": "COMPLETED",
+      "steps": [
+        {
+          "at": 1794749472993,
+          "kind": "PROGRESS",
+          "text": "Step 1/2: 停留八秒一"
+        },
+        {
+          "at": 1794749481012,
+          "kind": "TOOL",
+          "text": "Waited for 8000ms",
+          "toolName": "Wait",
+          "success": true
+        },
+        {
+          "at": 1794749481021,
+          "kind": "PROGRESS",
+          "text": "Step 2/2: 停留八秒二"
+        },
+        {
+          "at": 1794749489038,
+          "kind": "TOOL",
+          "text": "Waited for 8000ms",
+          "toolName": "Wait",
+          "success": true
+        }
+      ],
+      "answer": "Skill 'H84 悬浮球演示' completed successfully in 2 steps."
+    },
+    {
+      "id": "task_1794749499608",
+      "taskText": "draftinterrupt",
+      "channel": "LOCAL",
+      "originActivity": "io.agents.nailongclaw.ui.chat.ComposeChatActivity",
+      "createdAt": 1794749499691,
+      "updatedAt": 1794749508157,
+      "status": "FAILED",
+      "steps": [],
+      "error": "AI service call failed: Failed to call nativeSendMessage: INVALID_ARGUMENT: Input token ids are too long. Exceeding the maximum number of tokens allowed: 8210 >= 8192"
+    },
+    {
+      "id": "task_1794749584972",
+      "taskText": "h84 ball",
+      "channel": "LOCAL",
+      "originActivity": "io.agents.nailongclaw.ui.chat.ComposeChatActivity",
+      "createdAt": 1794749585023,
+      "updatedAt": 1794749601096,
+      "status": "COMPLETED",
+      "steps": [
+        {
+          "at": 1794749585048,
+          "kind": "PROGRESS",
+          "text": "Step 1/2: 停留八秒一"
+        },
+        {
+          "at": 1794749593065,
+          "kind": "TOOL",
+          "text": "Waited for 8000ms",
+          "toolName": "Wait",
+          "success": true
+        },
+        {
+          "at": 1794749593075,
+          "kind": "PROGRESS",
+          "text": "Step 2/2: 停留八秒二"
+        },
+        {
+          "at": 1794749601088,
+          "kind": "TOOL",
+          "text": "Waited for 8000ms",
+          "toolName": "Wait",
+          "success": true
+        }
+      ],
+      "answer": "Skill 'H84 悬浮球演示' completed successfully in 2 steps."
+    },
+    {
+      "id": "task_1794749602116",
+      "taskText": "draftinterrupt",
+      "channel": "LOCAL",
+      "originActivity": "io.agents.nailongclaw.ui.chat.ComposeChatActivity",
+      "createdAt": 1794749602117,
+      "updatedAt": 1794749610116,
+      "status": "FAILED",
+      "steps": [],
+      "error": "AI service call failed: Failed to call nativeSendMessage: INVALID_ARGUMENT: Input token ids are too long. Exceeding the maximum number of tokens allowed: 8210 >= 8192"
+    },
+    {
+      "id": "task_1794749919378",
+      "taskText": "h84 ball",
+      "channel": "LOCAL",
+      "originActivity": "io.agents.nailongclaw.ui.chat.ComposeChatActivity",
+      "createdAt": 1794749919425,
+      "updatedAt": 1794749926321,
+      "status": "FAILED",
+      "steps": [
+        {
+          "at": 1794749919440,
+          "kind": "PROGRESS",
+          "text": "Step 1/2: 停留八秒一"
+        }
+      ],
+      "error": "Interrupted: the app stopped before this task finished."
+    },
+    {
+      "id": "task_1794750037500",
+      "taskText": "h84 ball",
+      "channel": "LOCAL",
+      "originActivity": "io.agents.nailongclaw.ui.chat.ComposeChatActivity",
+      "createdAt": 1794750037587,
+      "updatedAt": 1794750061717,
+      "status": "COMPLETED",
+      "steps": [
+        {
+          "at": 1794750037617,
+          "kind": "PROGRESS",
+          "text": "Step 1/3: 停留八秒一"
+        },
+        {
+          "at": 1794750045647,
+          "kind": "TOOL",
+          "text": "Waited for 8000ms",
+          "toolName": "Wait",
+          "success": true
+        },
+        {
+          "at": 1794750045659,
+          "kind": "PROGRESS",
+          "text": "Step 2/3: 停留八秒二"
+        },
+        {
+          "at": 1794750053675,
+          "kind": "TOOL",
+          "text": "Waited for 8000ms",
+          "toolName": "Wait",
+          "success": true
+        },
+        {
+          "at": 1794750053685,
+          "kind": "PROGRESS",
+          "text": "Step 3/3: 停留八秒三"
+        },
+        {
+          "at": 1794750061705,
+          "kind": "TOOL",
+          "text": "Waited for 8000ms",
+          "toolName": "Wait",
+          "success": true
+        }
+      ],
+      "answer": "Skill 'H84 悬浮球演示' completed successfully in 3 steps."
+    },
+    {
+      "id": "debug_1794754952447",
+      "taskText": "cancelprobe",
+      "channel": "LOCAL",
+      "createdAt": 1794754952447,
+      "updatedAt": 1794754968540,
+      "status": "CANCELLED",
+      "steps": [
+        {
+          "at": 1794754952487,
+          "kind": "PROGRESS",
+          "text": "Step 1/3: step one waiting 8s"
+        },
+        {
+          "at": 1794754960512,
+          "kind": "TOOL",
+          "text": "Waited for 8000ms",
+          "toolName": "Wait",
+          "success": true
+        },
+        {
+          "at": 1794754960523,
+          "kind": "PROGRESS",
+          "text": "Step 2/3: step two waiting 8s"
+        },
+        {
+          "at": 1794754968534,
+          "kind": "TOOL",
+          "text": "Waited for 8000ms",
+          "toolName": "Wait",
+          "success": true
+        }
+      ]
+    },
+    {
+      "id": "debug_1794755015747",
+      "taskText": "overflow",
+      "channel": "LOCAL",
+      "createdAt": 1794755015748,
+      "updatedAt": 1794755015779,
+      "status": "FAILED",
+      "steps": [],
+      "error": "Accessibility service is not enabled"
+    },
+    {
+      "id": "debug_1794755156651",
+      "taskText": "overflow",
+      "channel": "LOCAL",
+      "createdAt": 1794755156651,
+      "updatedAt": 1794755167633,
+      "status": "FAILED",
+      "steps": [],
+      "error": "AI service call failed: Failed to call nativeSendMessage: INVALID_ARGUMENT: Input token ids are too long. Exceeding the maximum number of tokens allowed: 8209 >= 8192"
+    },
+    {
+      "id": "debug_1794755287575",
+      "taskText": "overflow",
+      "channel": "LOCAL",
+      "createdAt": 1794755287575,
+      "updatedAt": 1794755295881,
+      "status": "FAILED",
+      "steps": [],
+      "error": "AI service call failed: Failed to call nativeSendMessage: INVALID_ARGUMENT: Input token ids are too long. Exceeding the maximum number of tokens allowed: 8209 >= 8192"
+    },
+    {
+      "id": "debug_1795259616302",
+      "taskText": "what",
+      "channel": "LOCAL",
+      "createdAt": 1795259616302,
+      "updatedAt": 1795259679498,
+      "status": "CANCELLED",
+      "steps": [
+        {
+          "at": 1795259670434,
+          "kind": "TOOL",
+          "text": "[n1]  scroll (540,505)\n  [n2] \"h84 ball\" (938,375)\n  [n3] \"Nov 15, 9:28 PM\" (942,446)\n  [n4] \"Step 1/2: 停留四秒一\" (540,511)\n  [n5] \"Wait...\" (540,584)\n  [n6] \"Wait → Waited for 4000ms\" (357,648)\n[n7]  tap (75,141)\n  [n8] \"Menu\" (74,147)\n[n9] \"NailongClaw\" (280,147)\n[n10]  tap (718,141)\n  [n11] \"Local\" ...",
+          "toolName": "Get Screen Info",
+          "success": true
+        },
+        {
+          "at": 1795259679487,
+          "kind": "TOOL",
+          "text": "Failed to tap node n10 at (718, 141)",
+          "toolName": "Tap Node",
+          "success": false
+        }
+      ]
+    },
+    {
+      "id": "debug_1795259757303",
+      "taskText": "what is 2 plus 2 reply briefly",
+      "channel": "LOCAL",
+      "createdAt": 1795259757303,
+      "updatedAt": 1795259798711,
+      "status": "COMPLETED",
+      "steps": [],
+      "answer": "2 plus 2 equals 4."
+    },
+    {
+      "id": "debug_1795265696788",
+      "taskText": "open the settings app",
+      "channel": "LOCAL",
+      "createdAt": 1795265696788,
+      "updatedAt": 1795265696972,
+      "status": "COMPLETED",
+      "steps": [],
+      "answer": "Opening Settings"
+    },
+    {
+      "id": "debug_1795265788276",
+      "taskText": "what is 2 plus 2",
+      "channel": "LOCAL",
+      "createdAt": 1795265788276,
+      "updatedAt": 1795265830131,
+      "status": "COMPLETED",
+      "steps": [],
+      "answer": "2 plus 2 equals 4."
+    },
+    {
+      "id": "task_1795326564465",
+      "taskText": "schedule a task 2 minutes from now - task text:call 1234567",
+      "channel": "LOCAL",
+      "originActivity": "io.agents.nailongclaw.ui.web.ClaudeUiPreviewActivity",
+      "createdAt": 1795326564473,
+      "updatedAt": 1795326564544,
+      "status": "COMPLETED",
+      "steps": [],
+      "answer": "Dialing 1234567"
+    },
+    {
+      "id": "task_1795326770174",
+      "taskText": "schedule a one-time task 2 minutes from now. task text:dial1234567",
+      "channel": "LOCAL",
+      "originActivity": "io.agents.nailongclaw.ui.web.ClaudeUiPreviewActivity",
+      "createdAt": 1795326770181,
+      "updatedAt": 1795326850234,
+      "status": "COMPLETED",
+      "steps": [],
+      "answer": "I do not have a tool that allows me to schedule a one-time task for a future time. I can only perform actions based on the current screen or use the provided tools for specific tasks like making calls, sending messages, or searching the web."
+    },
+    {
+      "id": "sched_r5-qa-2_1795327260316",
+      "taskText": "call 1234567",
+      "channel": "SCHEDULED",
+      "createdAt": 1795327260335,
+      "updatedAt": 1795327260377,
+      "status": "COMPLETED",
+      "steps": [],
+      "answer": "Blocked: Dialing 1234567"
+    },
+    {
+      "id": "sched_r5-qa-3_1795327693139",
+      "taskText": "call 1234567",
+      "channel": "SCHEDULED",
+      "createdAt": 1795327693154,
+      "updatedAt": 1795327693192,
+      "status": "FAILED",
+      "steps": [],
+      "error": "Tool 'android.intent.action.DIAL' is blocked for scheduled tasks. A scheduled task runs with nobody watching the screen, so it may only observe (read-only tools) — anything that acts on the world is refused. Tell the user this part needs to be run from the NailongClaw app while they are present, and answer what you can from what you observed."
+    },
+    {
+      "id": "task_1795327772023",
+      "taskText": "call 9876543",
+      "channel": "LOCAL",
+      "originActivity": "io.agents.nailongclaw.ui.web.ClaudeUiPreviewActivity",
+      "createdAt": 1795327772033,
+      "updatedAt": 1795327772076,
+      "status": "COMPLETED",
+      "steps": [],
+      "answer": "Dialing 9876543"
+    },
+    {
+      "id": "sched_r5-qa-4_1795328206529",
+      "taskText": "call 1234567",
+      "channel": "SCHEDULED",
+      "createdAt": 1795328206547,
+      "updatedAt": 1795328206587,
+      "status": "FAILED",
+      "steps": [],
+      "error": "Tool 'call' is blocked for scheduled tasks. A scheduled task runs with nobody watching the screen, so it may only observe (read-only tools) — anything that acts on the world is refused. Tell the user this part needs to be run from the NailongClaw app while they are present, and answer what you can from what you observed."
+    },
+    {
+      "id": "debug_1795332831377",
+      "taskText": "what",
+      "channel": "LOCAL",
+      "createdAt": 1795332831377,
+      "updatedAt": 1795332904276,
+      "status": "COMPLETED",
+      "steps": [
+        {
+          "at": 1795332898771,
+          "kind": "TOOL",
+          "text": "[n1] \"NailongClaw — 设计稿\" (541,1169)\n  [n2]  tap (541,1169)\n  [n3]  tap (541,1169)\n  [n4]  tap (541,1169)\n  [n5]  tap (541,1169)\n  [n6]  tap (541,1169)\n  [n7]  tap (541,1169)\n  [n8] \"会话列表\" tap (124,132)\n  [n9] \"新对话\" (324,131)\n  [n10] \"Gemma 4 E2B — 2.6GB · 本地\" (755,132)\n  [n11] \"跳至最新\" tap (540,1251)\n...",
+          "toolName": "Get Screen Info",
+          "success": true
+        }
+      ],
+      "answer": "Failed to call nativeSendMessage: INVALID_ARGUMENT: Failed to parse tool calls from"
+    }
+  ]
+}

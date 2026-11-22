@@ -1,0 +1,144 @@
+11-22 10:34:10.816  2396  2396 I DebugTaskReceiver: embedding_probe q="how is my home wifi configured" entries=8
+11-22 10:34:10.817  2396  2396 I DebugTaskReceiver:   cosine 0.7594 a6e1270497a5
+11-22 10:34:10.817  2396  2396 I DebugTaskReceiver:   cosine 0.6948 196500848024
+11-22 10:34:10.818  2396  2396 I DebugTaskReceiver:   cosine 0.6778 7e2ebfdf5521
+11-22 10:34:10.819  2396  2396 I DebugTaskReceiver:   cosine 0.6645 77ecb58414e3
+11-22 10:34:10.819  2396  2396 I DebugTaskReceiver:   cosine 0.6574 50aee036ddaa
+11-22 10:34:10.820  2396  2396 I DebugTaskReceiver:   cosine 0.6540 c7020e0733ed
+11-22 10:34:10.820  2396  2396 I DebugTaskReceiver:   cosine 0.6458 4a753f748f76
+11-22 10:34:10.821  2396  2396 I DebugTaskReceiver:   cosine 0.6358 bfb560983de3
+11-22 10:34:13.012  2396  2396 I DebugTaskReceiver: embedding_probe q="where does the sibling of the user live" entries=8
+11-22 10:34:13.012  2396  2396 I DebugTaskReceiver:   cosine 0.7969 c7020e0733ed
+11-22 10:34:13.013  2396  2396 I DebugTaskReceiver:   cosine 0.6941 196500848024
+11-22 10:34:13.013  2396  2396 I DebugTaskReceiver:   cosine 0.6844 50aee036ddaa
+11-22 10:34:13.013  2396  2396 I DebugTaskReceiver:   cosine 0.6840 a6e1270497a5
+11-22 10:34:13.014  2396  2396 I DebugTaskReceiver:   cosine 0.6823 77ecb58414e3
+11-22 10:34:13.014  2396  2396 I DebugTaskReceiver:   cosine 0.6412 7e2ebfdf5521
+11-22 10:34:13.015  2396  2396 I DebugTaskReceiver:   cosine 0.6404 4a753f748f76
+11-22 10:34:13.015  2396  2396 I DebugTaskReceiver:   cosine 0.6249 bfb560983de3
+11-22 10:34:15.211  2396  2396 I DebugTaskReceiver: embedding_probe q="favorite display theme setting" entries=8
+11-22 10:34:15.212  2396  2396 I DebugTaskReceiver:   cosine 0.8058 196500848024
+11-22 10:34:15.212  2396  2396 I DebugTaskReceiver:   cosine 0.6534 a6e1270497a5
+11-22 10:34:15.213  2396  2396 I DebugTaskReceiver:   cosine 0.6497 77ecb58414e3
+11-22 10:34:15.213  2396  2396 I DebugTaskReceiver:   cosine 0.6371 50aee036ddaa
+11-22 10:34:15.213  2396  2396 I DebugTaskReceiver:   cosine 0.6352 7e2ebfdf5521
+11-22 10:34:15.214  2396  2396 I DebugTaskReceiver:   cosine 0.6184 bfb560983de3
+11-22 10:34:15.214  2396  2396 I DebugTaskReceiver:   cosine 0.6140 c7020e0733ed
+11-22 10:34:15.214  2396  2396 I DebugTaskReceiver:   cosine 0.6000 4a753f748f76
+11-22 10:34:17.419  2396  2396 I DebugTaskReceiver: embedding_probe q="when does the bike need maintenance" entries=8
+11-22 10:34:17.419  2396  2396 I DebugTaskReceiver:   cosine 0.8596 bfb560983de3
+11-22 10:34:17.420  2396  2396 I DebugTaskReceiver:   cosine 0.7138 7e2ebfdf5521
+11-22 10:34:17.421  2396  2396 I DebugTaskReceiver:   cosine 0.6599 196500848024
+11-22 10:34:17.421  2396  2396 I DebugTaskReceiver:   cosine 0.6522 77ecb58414e3
+11-22 10:34:17.422  2396  2396 I DebugTaskReceiver:   cosine 0.6312 a6e1270497a5
+11-22 10:34:17.422  2396  2396 I DebugTaskReceiver:   cosine 0.6292 50aee036ddaa
+11-22 10:34:17.423  2396  2396 I DebugTaskReceiver:   cosine 0.6225 c7020e0733ed
+11-22 10:34:17.423  2396  2396 I DebugTaskReceiver:   cosine 0.5991 4a753f748f76
+11-22 10:34:19.605  2396  2396 I DebugTaskReceiver: embedding_probe q="which computer is used for the job" entries=8
+11-22 10:34:19.606  2396  2396 I DebugTaskReceiver:   cosine 0.7409 4a753f748f76
+11-22 10:34:19.606  2396  2396 I DebugTaskReceiver:   cosine 0.6868 bfb560983de3
+11-22 10:34:19.606  2396  2396 I DebugTaskReceiver:   cosine 0.6817 196500848024
+11-22 10:34:19.608  2396  2396 I DebugTaskReceiver:   cosine 0.6814 a6e1270497a5
+11-22 10:34:19.608  2396  2396 I DebugTaskReceiver:   cosine 0.6794 50aee036ddaa
+11-22 10:34:19.609  2396  2396 I DebugTaskReceiver:   cosine 0.6755 7e2ebfdf5521
+11-22 10:34:19.609  2396  2396 I DebugTaskReceiver:   cosine 0.6679 c7020e0733ed
+11-22 10:34:19.610  2396  2396 I DebugTaskReceiver:   cosine 0.6416 77ecb58414e3
+11-22 10:34:21.774  2396  2396 I DebugTaskReceiver: embedding_probe q="weekly family meal schedule" entries=8
+11-22 10:34:21.774  2396  2396 I DebugTaskReceiver:   cosine 0.7982 77ecb58414e3
+11-22 10:34:21.775  2396  2396 I DebugTaskReceiver:   cosine 0.6724 7e2ebfdf5521
+11-22 10:34:21.775  2396  2396 I DebugTaskReceiver:   cosine 0.6628 50aee036ddaa
+11-22 10:34:21.775  2396  2396 I DebugTaskReceiver:   cosine 0.6505 196500848024
+11-22 10:34:21.776  2396  2396 I DebugTaskReceiver:   cosine 0.6241 bfb560983de3
+11-22 10:34:21.777  2396  2396 I DebugTaskReceiver:   cosine 0.5914 c7020e0733ed
+11-22 10:34:21.777  2396  2396 I DebugTaskReceiver:   cosine 0.5744 a6e1270497a5
+11-22 10:34:21.777  2396  2396 I DebugTaskReceiver:   cosine 0.5491 4a753f748f76
+11-22 10:34:23.985  2396  2396 I DebugTaskReceiver: embedding_probe q="how often to water the flowers" entries=8
+11-22 10:34:23.985  2396  2396 I DebugTaskReceiver:   cosine 0.8629 7e2ebfdf5521
+11-22 10:34:23.986  2396  2396 I DebugTaskReceiver:   cosine 0.6983 bfb560983de3
+11-22 10:34:23.986  2396  2396 I DebugTaskReceiver:   cosine 0.6894 196500848024
+11-22 10:34:23.986  2396  2396 I DebugTaskReceiver:   cosine 0.6753 77ecb58414e3
+11-22 10:34:23.987  2396  2396 I DebugTaskReceiver:   cosine 0.6686 50aee036ddaa
+11-22 10:34:23.987  2396  2396 I DebugTaskReceiver:   cosine 0.6446 c7020e0733ed
+11-22 10:34:23.988  2396  2396 I DebugTaskReceiver:   cosine 0.6297 a6e1270497a5
+11-22 10:34:23.989  2396  2396 I DebugTaskReceiver:   cosine 0.5918 4a753f748f76
+11-22 10:34:26.170  2396  2396 I DebugTaskReceiver: embedding_probe q="what language is being studied" entries=8
+11-22 10:34:26.171  2396  2396 I DebugTaskReceiver:   cosine 0.7727 50aee036ddaa
+11-22 10:34:26.171  2396  2396 I DebugTaskReceiver:   cosine 0.6863 196500848024
+11-22 10:34:26.171  2396  2396 I DebugTaskReceiver:   cosine 0.6805 c7020e0733ed
+11-22 10:34:26.172  2396  2396 I DebugTaskReceiver:   cosine 0.6711 77ecb58414e3
+11-22 10:34:26.172  2396  2396 I DebugTaskReceiver:   cosine 0.6703 a6e1270497a5
+11-22 10:34:26.173  2396  2396 I DebugTaskReceiver:   cosine 0.6624 7e2ebfdf5521
+11-22 10:34:26.173  2396  2396 I DebugTaskReceiver:   cosine 0.6522 4a753f748f76
+11-22 10:34:26.174  2396  2396 I DebugTaskReceiver:   cosine 0.6515 bfb560983de3
+11-22 10:34:28.349  2396  2396 I DebugTaskReceiver: embedding_probe q="recipe for chocolate cake" entries=8
+11-22 10:34:28.349  2396  2396 I DebugTaskReceiver:   cosine 0.6735 77ecb58414e3
+11-22 10:34:28.350  2396  2396 I DebugTaskReceiver:   cosine 0.6513 7e2ebfdf5521
+11-22 10:34:28.350  2396  2396 I DebugTaskReceiver:   cosine 0.6475 bfb560983de3
+11-22 10:34:28.350  2396  2396 I DebugTaskReceiver:   cosine 0.6438 196500848024
+11-22 10:34:28.351  2396  2396 I DebugTaskReceiver:   cosine 0.6172 c7020e0733ed
+11-22 10:34:28.351  2396  2396 I DebugTaskReceiver:   cosine 0.5807 a6e1270497a5
+11-22 10:34:28.351  2396  2396 I DebugTaskReceiver:   cosine 0.5746 4a753f748f76
+11-22 10:34:28.351  2396  2396 I DebugTaskReceiver:   cosine 0.5733 50aee036ddaa
+11-22 10:34:30.546  2396  2396 I DebugTaskReceiver: embedding_probe q="who won the football match yesterday" entries=8
+11-22 10:34:30.546  2396  2396 I DebugTaskReceiver:   cosine 0.6658 77ecb58414e3
+11-22 10:34:30.547  2396  2396 I DebugTaskReceiver:   cosine 0.6460 50aee036ddaa
+11-22 10:34:30.548  2396  2396 I DebugTaskReceiver:   cosine 0.6451 196500848024
+11-22 10:34:30.548  2396  2396 I DebugTaskReceiver:   cosine 0.6351 bfb560983de3
+11-22 10:34:30.549  2396  2396 I DebugTaskReceiver:   cosine 0.6278 7e2ebfdf5521
+11-22 10:34:30.549  2396  2396 I DebugTaskReceiver:   cosine 0.6249 a6e1270497a5
+11-22 10:34:30.550  2396  2396 I DebugTaskReceiver:   cosine 0.6098 c7020e0733ed
+11-22 10:34:30.550  2396  2396 I DebugTaskReceiver:   cosine 0.5648 4a753f748f76
+11-22 10:34:32.743  2396  2396 I DebugTaskReceiver: embedding_probe q="weather forecast for tomorrow" entries=8
+11-22 10:34:32.744  2396  2396 I DebugTaskReceiver:   cosine 0.7008 7e2ebfdf5521
+11-22 10:34:32.744  2396  2396 I DebugTaskReceiver:   cosine 0.6729 196500848024
+11-22 10:34:32.745  2396  2396 I DebugTaskReceiver:   cosine 0.6520 bfb560983de3
+11-22 10:34:32.745  2396  2396 I DebugTaskReceiver:   cosine 0.6517 77ecb58414e3
+11-22 10:34:32.745  2396  2396 I DebugTaskReceiver:   cosine 0.6393 50aee036ddaa
+11-22 10:34:32.746  2396  2396 I DebugTaskReceiver:   cosine 0.6310 a6e1270497a5
+11-22 10:34:32.746  2396  2396 I DebugTaskReceiver:   cosine 0.6183 c7020e0733ed
+11-22 10:34:32.746  2396  2396 I DebugTaskReceiver:   cosine 0.5694 4a753f748f76
+11-22 10:34:34.938  2396  2396 I DebugTaskReceiver: embedding_probe q="how to tie a bowline knot" entries=8
+11-22 10:34:34.938  2396  2396 I DebugTaskReceiver:   cosine 0.6711 7e2ebfdf5521
+11-22 10:34:34.939  2396  2396 I DebugTaskReceiver:   cosine 0.6483 bfb560983de3
+11-22 10:34:34.939  2396  2396 I DebugTaskReceiver:   cosine 0.6404 196500848024
+11-22 10:34:34.939  2396  2396 I DebugTaskReceiver:   cosine 0.6242 a6e1270497a5
+11-22 10:34:34.940  2396  2396 I DebugTaskReceiver:   cosine 0.6213 77ecb58414e3
+11-22 10:34:34.942  2396  2396 I DebugTaskReceiver:   cosine 0.6082 50aee036ddaa
+11-22 10:34:34.943  2396  2396 I DebugTaskReceiver:   cosine 0.5838 4a753f748f76
+11-22 10:34:34.944  2396  2396 I DebugTaskReceiver:   cosine 0.5751 c7020e0733ed
+11-22 10:34:37.129  2396  2396 I DebugTaskReceiver: embedding_probe q="best budget noise cancelling headphones" entries=8
+11-22 10:34:37.129  2396  2396 I DebugTaskReceiver:   cosine 0.6871 196500848024
+11-22 10:34:37.130  2396  2396 I DebugTaskReceiver:   cosine 0.6520 7e2ebfdf5521
+11-22 10:34:37.130  2396  2396 I DebugTaskReceiver:   cosine 0.6377 bfb560983de3
+11-22 10:34:37.131  2396  2396 I DebugTaskReceiver:   cosine 0.6328 50aee036ddaa
+11-22 10:34:37.131  2396  2396 I DebugTaskReceiver:   cosine 0.6241 a6e1270497a5
+11-22 10:34:37.132  2396  2396 I DebugTaskReceiver:   cosine 0.6077 4a753f748f76
+11-22 10:34:37.132  2396  2396 I DebugTaskReceiver:   cosine 0.5912 77ecb58414e3
+11-22 10:34:37.133  2396  2396 I DebugTaskReceiver:   cosine 0.5839 c7020e0733ed
+11-22 10:34:39.324  2396  2396 I DebugTaskReceiver: embedding_probe q="capital city of Australia" entries=8
+11-22 10:34:39.324  2396  2396 I DebugTaskReceiver:   cosine 0.6803 c7020e0733ed
+11-22 10:34:39.325  2396  2396 I DebugTaskReceiver:   cosine 0.6647 7e2ebfdf5521
+11-22 10:34:39.326  2396  2396 I DebugTaskReceiver:   cosine 0.6458 bfb560983de3
+11-22 10:34:39.326  2396  2396 I DebugTaskReceiver:   cosine 0.6370 50aee036ddaa
+11-22 10:34:39.326  2396  2396 I DebugTaskReceiver:   cosine 0.6367 77ecb58414e3
+11-22 10:34:39.327  2396  2396 I DebugTaskReceiver:   cosine 0.6301 a6e1270497a5
+11-22 10:34:39.328  2396  2396 I DebugTaskReceiver:   cosine 0.6229 196500848024
+11-22 10:34:39.328  2396  2396 I DebugTaskReceiver:   cosine 0.5810 4a753f748f76
+11-22 10:34:41.506  2396  2396 I DebugTaskReceiver: embedding_probe q="how to remove a coffee stain" entries=8
+11-22 10:34:41.506  2396  2396 I DebugTaskReceiver:   cosine 0.6989 7e2ebfdf5521
+11-22 10:34:41.507  2396  2396 I DebugTaskReceiver:   cosine 0.6801 196500848024
+11-22 10:34:41.507  2396  2396 I DebugTaskReceiver:   cosine 0.6633 bfb560983de3
+11-22 10:34:41.508  2396  2396 I DebugTaskReceiver:   cosine 0.6261 77ecb58414e3
+11-22 10:34:41.508  2396  2396 I DebugTaskReceiver:   cosine 0.6254 50aee036ddaa
+11-22 10:34:41.508  2396  2396 I DebugTaskReceiver:   cosine 0.6038 a6e1270497a5
+11-22 10:34:41.509  2396  2396 I DebugTaskReceiver:   cosine 0.5956 4a753f748f76
+11-22 10:34:41.510  2396  2396 I DebugTaskReceiver:   cosine 0.5880 c7020e0733ed
+11-22 10:34:43.707  2396  2396 I DebugTaskReceiver: embedding_probe q="stock price of the company I invest in" entries=8
+11-22 10:34:43.708  2396  2396 I DebugTaskReceiver:   cosine 0.6709 bfb560983de3
+11-22 10:34:43.709  2396  2396 I DebugTaskReceiver:   cosine 0.6676 7e2ebfdf5521
+11-22 10:34:43.709  2396  2396 I DebugTaskReceiver:   cosine 0.6667 c7020e0733ed
+11-22 10:34:43.709  2396  2396 I DebugTaskReceiver:   cosine 0.6590 50aee036ddaa
+11-22 10:34:43.710  2396  2396 I DebugTaskReceiver:   cosine 0.6513 196500848024
+11-22 10:34:43.710  2396  2396 I DebugTaskReceiver:   cosine 0.6374 a6e1270497a5
+11-22 10:34:43.711  2396  2396 I DebugTaskReceiver:   cosine 0.6283 77ecb58414e3
+11-22 10:34:43.711  2396  2396 I DebugTaskReceiver:   cosine 0.6214 4a753f748f76
