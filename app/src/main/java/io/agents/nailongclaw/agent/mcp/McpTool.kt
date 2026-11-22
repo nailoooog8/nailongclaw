@@ -97,7 +97,16 @@ class McpTool(
                 ContextFence.wrap("mcp:${server.name}", client.callTool(remote.name, params))
             )
         } catch (e: Exception) {
-            ToolResult.error("MCP tool '${remote.name}' failed: ${e.message}")
+            // R5-05: the error body is the same third-party server talking as
+            // the success result — an attacker-controlled server can put
+            // instructions in it and hope that arriving as an "error" exempts
+            // it from the fence. The success half is wrapped above; the
+            // failure half gets the same treatment (R3-03 covers both halves
+            // of the exchange, not just the happy path).
+            ToolResult.error(
+                "MCP tool '${remote.name}' failed: " +
+                    ContextFence.wrap("mcp:${server.name}", e.message ?: "unknown error")
+            )
         }
     }
 

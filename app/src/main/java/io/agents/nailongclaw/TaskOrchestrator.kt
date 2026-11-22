@@ -19,6 +19,7 @@ import io.agents.nailongclaw.service.ClawAccessibilityService
 import io.agents.nailongclaw.service.ForegroundService
 import io.agents.nailongclaw.task.TaskRecordStore
 import io.agents.nailongclaw.tool.ToolResult
+import io.agents.nailongclaw.tool.ToolRiskPolicy
 import io.agents.nailongclaw.utils.XLog
 
 /**
@@ -372,9 +373,34 @@ class TaskOrchestrator(
         val route = pipelineRouter.route(task)
         when (route) {
             is PipelineRouter.Route.DirectIntent -> {
+                // R5-06: Tier 1 used to start activities without ever touching
+                // the tool risk gate — executeIntent calls startActivity
+                // directly, so a remote or scheduled task saying "call …" or
+                // "open https://…" put UI on the screen with nobody watching,
+                // while the same ask routed as a tool would have been refused.
+                // Every DirectIntent is an actuator (dialer, SMS composer,
+                // URL view), so it takes the same channel gate as the tools;
+                // no intent action is READ_ONLY, so unattended sources are
+                // always refused here.
+                val intentName = route.intent.action ?: "direct_intent"
+                if (ToolRiskPolicy.isBlockedForChannel(intentName, channel)) {
+                    XLog.i(TAG, "Pipeline Tier 1: DirectIntent refused for ${channel?.displayName}")
+                    val reason = ToolRiskPolicy.blockReason(intentName, channel)
+                    emit(TaskEvent.Completed("Blocked: ${route.description}"))
+                    ChannelManager.sendMessage(channel, "✗ ${route.description}: $reason", messageID)
+                    val session = releaseTask()
+                    if (session.isRunning) {
+                        ForegroundService.resetToIdle(ClawApplication.instance)
+                        FloatingCircleManager.setErrorState("Blocked: ${route.description}")
+                        onTaskFinished()
+                    }
+                    return
+                }
                 XLog.i(TAG, "Pipeline Tier 1: DirectIntent — ${route.description}")
                 pipelineRouter.executeIntent(route.intent)
-                XLog.i(TAG, "onComplete: rounds=0, totalTokens=0, model=direct, answer=${route.description}")
+                // R5 顺手批: answers are user-derived content; the log keeps
+                // the shape (length), not the text.
+                XLog.i(TAG, "onComplete: rounds=0, totalTokens=0, model=direct, answerLen=${route.description.length}")
                 val session = releaseTask()
                 if (session.isRunning) {
                     emit(TaskEvent.Completed(route.description))
@@ -423,7 +449,7 @@ class TaskOrchestrator(
                             onTaskFinished()
                         }
                     }
-                    XLog.i(TAG, "onComplete: rounds=0, totalTokens=0, model=direct, answer=$answer")
+                    XLog.i(TAG, "onComplete: rounds=0, totalTokens=0, model=direct, answerLen=${answer.length}")
                 }, "direct-tool-${route.toolName}").start()
                 return
             }
@@ -634,7 +660,7 @@ class TaskOrchestrator(
             override fun onComplete(round: Int, finalAnswer: String, totalTokens: Int, modelName: String?) {
                 watchdog.disarm()
                 currentWatchdog = null
-                XLog.i(TAG, "onComplete: rounds=$round, totalTokens=$totalTokens, model=$modelName, answer=$finalAnswer")
+                XLog.i(TAG, "onComplete: rounds=$round, totalTokens=$totalTokens, model=$modelName, answerLen=${finalAnswer.length}")
                 val cancelAnswers = setOf(
                     ClawApplication.instance.getString(R.string.agent_task_cancel),
                     ClawApplication.instance.getString(R.string.agent_task_cancelled),
@@ -741,18 +767,14 @@ class TaskOrchestrator(
                     ClawApplication.instance.getString(R.string.channel_msg_system_dialog_blocked),
                     blockedMessageId
                 )
-                try {
-                    val service = ClawAccessibilityService.getInstance()
-                    val bitmap = service?.takeScreenshot(5000)
-                    if (bitmap != null) {
-                        val stream = java.io.ByteArrayOutputStream()
-                        bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 80, stream)
-                        bitmap.recycle()
-                        ChannelManager.sendImage(blockedChannel, stream.toByteArray(), blockedMessageId)
-                    }
-                } catch (e: Exception) {
-                    XLog.e(TAG, "Failed to send screenshot for system dialog", e)
-                }
+                // R5-03: this branch used to follow the notice with an
+                // automatic full-screen screenshot of the real display, sent
+                // to the same channel. sendImage is a no-op for LOCAL, so the
+                // bitmap only ever left the device toward a remote chat — the
+                // user's whole screen at that moment, outside the tool risk
+                // gate and with the trigger inducible by an unreadable
+                // overlay. Text-only notice now; a remote user who wants the
+                // screen gets it from the on-device app, not a silent push.
                 FloatingCircleManager.setErrorState()
                 onTaskFinished()
             }
