@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.util.Base64
 import io.agents.nailongclaw.agent.llm.LocalBackendHealth
+import io.agents.nailongclaw.agent.memory.MemoryStore
 import io.agents.nailongclaw.agent.llm.ModelConfigRepository
 import io.agents.nailongclaw.service.AutoReplyManager
 import io.agents.nailongclaw.support.DebugReportManager
@@ -68,7 +69,7 @@ class DebugTaskReceiver : BroadcastReceiver() {
             return
         }
         if (supportAction.isNotEmpty()) {
-            handleSupportDebug(context, supportAction)
+            handleSupportDebug(context, supportAction, intent)
             return
         }
         if (directTool.isNotEmpty()) {
@@ -279,7 +280,7 @@ class DebugTaskReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun handleSupportDebug(context: Context, action: String) {
+    private fun handleSupportDebug(context: Context, action: String, intent: Intent) {
         try {
             when (action.lowercase()) {
                 "build_debug_report" -> {
@@ -289,6 +290,25 @@ class DebugTaskReceiver : BroadcastReceiver() {
                         "Built debug report: ${output.absolutePath} (${output.length()} bytes)"
                     )
                     breadcrumb(context, "support build_debug_report path=${output.absolutePath} bytes=${output.length()}")
+                }
+                "embedding_probe" -> {
+                    // Contrast-set evaluation (BACKLOG P2, floor calibration): dump the
+                    // raw cosine of one query text against every bank entry vector.
+                    // Drive: --es support_action embedding_probe --es probe_text "…"
+                    val text = intent.getStringExtra("probe_text")?.trim().orEmpty()
+                    if (text.isEmpty()) {
+                        XLog.w("DebugTaskReceiver", "embedding_probe needs --es probe_text")
+                    } else {
+                        val scores = MemoryStore.debugSemanticScores(text)
+                        if (scores == null) {
+                            XLog.w("DebugTaskReceiver", "embedding_probe: embedder unavailable (bank off / semantic off / model missing)")
+                        } else {
+                            XLog.i("DebugTaskReceiver", "embedding_probe q=\"$text\" entries=${scores.size}")
+                            scores.forEach { (id, c) ->
+                                XLog.i("DebugTaskReceiver", "  cosine ${"%.4f".format(c)} $id")
+                            }
+                        }
+                    }
                 }
                 else -> {
                     XLog.w("DebugTaskReceiver", "Unknown support_action=$action")

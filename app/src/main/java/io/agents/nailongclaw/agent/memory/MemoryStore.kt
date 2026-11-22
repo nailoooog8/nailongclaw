@@ -107,6 +107,21 @@ object MemoryStore {
      */
     private const val SEMANTIC_FLOOR = 0.30f
 
+    /**
+     * How far below the bank's best cosine a candidate may sit and still be a
+     * semantic recall hit. An absolute floor cannot do this job on EmbeddingGemma:
+     * its raw cosine for unrelated text sits at ~0.63–0.70 (2026-11-22 contrast
+     * set, 8 paraphrase + 8 unrelated probes against an 8-entry bank) — any floor
+     * below ~0.70 admits everything, any floor above it starts eating true
+     * paraphrases, whose measured margin over the best unrelated entry was only
+     * 0.054–0.165. Riding the per-query top instead: 0.08 keeps every measured
+     * paraphrase (min gap 0.054) with headroom, while an unrelated query's
+     * per-entry spread (~0.10) collapses the return set from "the whole bank" to
+     * the top handful. Recalibrate on a larger contrast set before touching
+     * (BACKLOG P2 tracks the evaluation harness).
+     */
+    private const val RECALL_RELATIVE_MARGIN = 0.08f
+
     /** Fence around agent-written memory text inside the system prompt. */
     private const val OPEN_FENCE = "<memory>"
     private const val CLOSE_FENCE = "</memory>"
@@ -293,9 +308,19 @@ object MemoryStore {
                 .filter {
                     kind.isNullOrBlank() || !MemoryKind.isValid(kind) || it.kind == kind
                 }
-            val hits = pool.filter {
-                qTerms.isEmpty() || matches(it, qTerms) ||
-                    relevance(it, qVec, vectors) >= SEMANTIC_FLOOR
+            val relScores = pool.map { it to relevance(it, qVec, vectors) }
+            val topSemantic = relScores.maxOfOrNull { it.second } ?: 0f
+            val hits = relScores.mapNotNull { (entry, rel) ->
+                // The semantic branch needs BOTH terms. The absolute floor alone
+                // cannot separate on EmbeddingGemma — its raw cosine for unrelated
+                // text sits at ~0.63–0.70 (2026-11-22 contrast set, 8 paraphrase +
+                // 8 unrelated probes), so any floor below ~0.70 admits the whole
+                // bank. [RECALL_RELATIVE_MARGIN] rides the per-query top instead.
+                // It stays compounded with the floor so a future embedder with a
+                // lower baseline (or a zero/orthogonal vector) still fails the
+                // absolute term.
+                val semanticHit = rel >= SEMANTIC_FLOOR && rel >= topSemantic - RECALL_RELATIVE_MARGIN
+                if (qTerms.isEmpty() || matches(entry, qTerms) || semanticHit) entry else null
             }
                 .map { score(it, qTerms, now, qVec, vectors) to it }
                 .sortedByDescending { it.first }
@@ -315,6 +340,27 @@ object MemoryStore {
                 persistLocked()
             }
             hits.map { Scored(it, score(it, qTerms, now, qVec, vectors)) }
+        }
+    }
+
+    /**
+     * Debug/QA probe, never called from production paths: embeds [query] and
+     * returns every live entry's raw cosine similarity, sorted descending.
+     *
+     * Exposes the semantic scores the recall floor adjudicates, so the
+     * contrast-set evaluation (BACKLOG P2 — floor calibration) can measure the
+     * real model distribution instead of inferring it from recall hit/miss.
+     * Returns null when the embedder is unavailable (bank disabled, semantic
+     * flag off, model missing, embed failed) — the same degradation as briefing.
+     */
+    internal fun debugSemanticScores(query: String): List<Pair<String, Float>>? {
+        val emb = embedder()
+        val qVec = emb?.let { runCatching { it.embed(query) }.getOrNull() } ?: return null
+        return synchronized(lock) {
+            val vectors = loadVectorsLocked(emb)
+            loadLocked().filter { !it.isInvalidated }.mapNotNull { e ->
+                vectors[e.id]?.let { v -> e.id to cosine(qVec, v) }
+            }.sortedByDescending { it.second }
         }
     }
 

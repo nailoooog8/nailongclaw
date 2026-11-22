@@ -2180,6 +2180,19 @@ Format: `[date] [status] [test-id] description`
 - ✅ **崩溃卫生**：exit-info 仅 FORCE STOP（我）+ PACKAGE UPDATED（装机），零崩。
 - [DRIVE] **直连工具驱动法（零 LLM，绕开 0.18 回喂 bug）**：`adb shell "am broadcast -a io.agents.nailongclaw.DEBUG_TASK -n io.agents.nailongclaw/.debug.DebugTaskReceiver --es tool memory_recall --es params_json '{\"query\":\"…\"}'"`——整条命令包一层双引号 + 内层 `{\"…\"}`（直接 `--es params_json '{"query":"…"}'` 会被两层 shell 剥掉内引号，JSON 解析报 Unterminated object）。结果正文在 `Debug tool success` 后续多行（grep -A6 才看得全，R5 围栏掩正文单行 grep 会被骗）。
 
+### 2026-11-22（第三轮）— 语义地板校准：配对集实测（探针法）→ 双道准入（绝对地板 + 相对边际 0.08）；换述 8/8 top-1
+
+BACKLOG P2（`SEMANTIC_FLOOR=0.30` 不构成准入）的实测与修复。新工具：`DebugTaskReceiver` 加 `embedding_probe` support_action（debug-only）——`am broadcast … --es support_action embedding_probe --es probe_text "…"`，logcat 逐行 dump 该查询对全库条目的原始 cosine（`MemoryStore.debugSemanticScores`），召回决策第一次有了定量视图。
+
+**配对集**（8 条多样化账本：wifi/深色模式/摩托保养/周日家宴/阳台浇花/学日语/姐姐成都/ThinkPad，直连 `memory_save` 存入；探针措辞与条目零词法重叠逐条核过）：
+
+- **换述 8/8 全部 top-1**，领先最佳无关条目 **0.0541–0.1646**（最窄是 thinkpad 0.0541）。
+- **无关 8 发**：榜首 cosine **0.6658–0.7008**，条目间 spread 平均 ~0.099——**基线高度 ~0.63–0.70，绝对地板无解**：低于 ~0.70 放行整库（这正是 0.30 失效的原因），高于 0.70 开始吃真换述（窗口只有 0.05 宽）。
+
+**修复**：`MemoryStore.recall` 语义支路改双道准入——`rel >= SEMANTIC_FLOOR(0.30, 保留，护正交向量与未来低基线 embedder)` **且** `rel >= 榜首 − RECALL_RELATIVE_MARGIN(0.08)`（≥ 实测 min gap 0.054 留裕度）。JVM +2 钉（边际外近失者排除/边际内紧跟者保留），全套 770/0；设备复验：换述查询目标恒 top-1（TPLINK），无关查询返回集受边际+limit 双重约束、排序正确。MEMORY_BANK 门槛段已同步（原文「无关对约 0.1–0.3」的假设被实测推翻，改为两道准入的描述）。
+
+**驱动法沉淀**：`--es probe_text` 的措辞要与全部条目做**词法零重叠核对**（`matches()` 是子串包含，"birthday of the user" 会因 "user"⊂"users" 词法中招——第一轮诱饵就是这么被污染的）；带撇号的 memory_save content 会被两层 shell 剥掉（`user's` 存不进去，改写措辞绕开）；探针前等 `entries=8`（补算 daemon 全量完成）再采数。
+
 ### 2026-11-22 — R5 安全修复落地 + 模拟器体验 QA（h79 AVD，API 36，HEAD debug 覆装 vc63 调试包）：R5 四腿全过；抓出并即修两体验缺陷（U1/U3）+ 一通知细节（U4）
 
 R5 报告 `docs/security/SECURITY_AUDIT_R5.md`（§9 修复落地 / §10 本轮 QA）。基线 `45c9e5f` 的五笔修复提交（`215a1c0`→`4df279e`）后 HEAD debug 包 `adb install -r` 覆装（vc34 → vc63，数据保留）。证据 `.auto/r5_shade*.png`、`.auto/r5_test.log`（749/0）。

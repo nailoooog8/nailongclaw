@@ -157,6 +157,45 @@ class MemorySemanticRankingTest {
         assertTrue(MemoryStore.recall("WiFi 怎么连").isEmpty())
     }
 
+    // ── The relative margin (floor calibration, 2026-11-22 contrast set) ─────
+
+    /**
+     * Both entries clear the absolute floor (0.80 and 1.00 ≫ 0.30); the
+     * relative margin is what excludes the near-miss. Measured on-device:
+     * true paraphrases beat the best unrelated entry by ≥0.054, so a candidate
+     * trailing the top by 0.20 must not ride along as a "hit".
+     */
+    @Test
+    fun `a candidate trailing the top beyond the relative margin is not a recall hit`() {
+        val coffee = rememberAndStore("用户喜欢深烘咖啡豆")
+        val running = rememberAndStore("用户每周跑步三次")
+        MemoryStore.embedderOverride = fake
+        seedVector(coffee.entry.id, floatArrayOf(1f, 0f, 0f))          // cosine 1.00 with the query
+        seedVector(running.entry.id, floatArrayOf(0.8f, 0.6f, 0f))     // cosine 0.80 — 0.20 behind
+        MemoryStore.invalidate()
+
+        val hits = MemoryStore.recall("WiFi 怎么连")
+
+        assertEquals("the near-miss must be excluded by the relative margin", 1, hits.size)
+        assertEquals(coffee.entry.id, hits[0].entry.id)
+    }
+
+    @Test
+    fun `a close runner-up within the relative margin stays a recall hit`() {
+        val coffee = rememberAndStore("用户喜欢深烘咖啡豆")
+        val running = rememberAndStore("用户每周跑步三次")
+        MemoryStore.embedderOverride = fake
+        seedVector(coffee.entry.id, floatArrayOf(1f, 0f, 0f))          // cosine 1.00
+        seedVector(running.entry.id, floatArrayOf(0.95f, 0.3122f, 0f)) // cosine 0.95 — 0.05 behind
+        MemoryStore.invalidate()
+
+        val hits = MemoryStore.recall("WiFi 怎么连")
+
+        assertEquals(2, hits.size)
+        assertEquals("top first, runner-up second", coffee.entry.id, hits[0].entry.id)
+        assertEquals(running.entry.id, hits[1].entry.id)
+    }
+
     // ── Per-entry fallback ───────────────────────────────────────────────────
 
     @Test
