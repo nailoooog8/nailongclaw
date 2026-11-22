@@ -6,6 +6,7 @@ package io.agents.nailongclaw.channel.security
 import com.tencent.mmkv.MMKV
 import io.agents.nailongclaw.channel.Channel
 import io.agents.nailongclaw.utils.BruteForceGuard
+import io.agents.nailongclaw.utils.SecretBox
 import io.agents.nailongclaw.utils.XLog
 import java.util.regex.Pattern
 
@@ -54,6 +55,26 @@ object ChannelSecurityGuard {
      * "when pairing happened" without waiting on a real clock.
      */
     internal var nowMillis: () -> Long = { System.currentTimeMillis() }
+
+    /**
+     * PIN cipher seam. The device implementation routes through [SecretBox]
+     * (Android Keystore-backed AES/GCM); JVM tests swap in a reversible fake
+     * because the Android Keystore does not exist there — same isolation the
+     * [Storage] seam provides for MMKV.
+     */
+    interface PinCipher {
+        fun isEncrypted(stored: String): Boolean
+        fun encrypt(plain: String): String?
+        fun decrypt(stored: String): String?
+    }
+
+    private val secretBoxPinCipher = object : PinCipher {
+        override fun isEncrypted(stored: String): Boolean = SecretBox.isEncrypted(stored)
+        override fun encrypt(plain: String): String? = SecretBox.encrypt(plain)
+        override fun decrypt(stored: String): String? = SecretBox.decrypt(stored)
+    }
+
+    internal var pinCipher: PinCipher = secretBoxPinCipher
 
     /** Guards the one-shot legacy migration; see [purgeLegacyEntries]. */
     @Volatile
@@ -114,20 +135,54 @@ object ChannelSecurityGuard {
      * Get or generate the 6-digit channel pairing PIN. Single writer for
      * `KEY_CHANNEL_PAIR_PIN` — [io.agents.nailongclaw.utils.KVUtils]'s channel
      * methods delegate here, so both entry points see one stored value.
+     *
+     * Stored encrypted (R5 §5 P3): the PIN is the one credential that unlocks
+     * the LAN console *and* channel pairing, and it sat in MMKV in plaintext
+     * while every bot token went through [SecretBox]. Legacy plaintext values
+     * migrate to encrypted form on first read and keep working meanwhile.
      */
     @Synchronized
     fun getPairPin(): String {
-        var pin = storage.getString(KEY_CHANNEL_PAIR_PIN, "")
-        if (pin.isEmpty()) {
-            pin = (pinRandom.nextInt(900000) + 100000).toString()
-            storage.putString(KEY_CHANNEL_PAIR_PIN, pin)
+        val stored = storage.getString(KEY_CHANNEL_PAIR_PIN, "")
+        if (stored.isEmpty()) {
+            val pin = mintPin()
+            return if (writePin(pin)) pin else ""
         }
-        return pin
+        if (pinCipher.isEncrypted(stored)) {
+            return pinCipher.decrypt(stored) ?: run {
+                // Corrupt ciphertext is unusable either way — mint a fresh one.
+                val pin = mintPin()
+                return if (writePin(pin)) pin else ""
+            }
+        }
+        // Legacy plaintext from before this fix: upgrade the stored form on
+        // first read. The value keeps working whether or not the rewrite
+        // succeeds — refusing to serve it would brick an existing pairing.
+        writePin(stored)
+        return stored
     }
 
     @Synchronized
     fun setPairPin(pin: String) {
-        storage.putString(KEY_CHANNEL_PAIR_PIN, pin.trim())
+        writePin(pin.trim())
+    }
+
+    private fun mintPin(): String = (pinRandom.nextInt(900000) + 100000).toString()
+
+    /**
+     * Fail closed, mirroring [io.agents.nailongclaw.utils.KVUtils]
+     * .putEncryptedString: a keystore that refuses to encrypt must not turn
+     * into "store the PIN in plaintext" — nothing is written and the caller
+     * (authenticate) sees the empty/failing state instead.
+     */
+    private fun writePin(pin: String): Boolean {
+        if (pin.isEmpty()) return false
+        val encrypted = pinCipher.encrypt(pin) ?: run {
+            XLog.e(TAG, "Refused to store PIN: encryption unavailable, nothing written")
+            return false
+        }
+        storage.putString(KEY_CHANNEL_PAIR_PIN, encrypted)
+        return true
     }
 
     /**

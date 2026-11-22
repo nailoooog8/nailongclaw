@@ -48,7 +48,7 @@ import io.agents.nailongclaw.ui.chat.ToolStep
  */
 class WebChatSink(
     private val onRender: (List<WebMessage>) -> Unit,
-    private val onConfirmation: (McpConfirmationRequest?) -> Unit,
+    private val onConfirmation: (McpConfirmationRequest?, String?) -> Unit,
 ) : ChatSink {
 
     /** A message reduced to exactly what the page needs to draw it. */
@@ -228,11 +228,11 @@ class WebChatSink(
      * not touch [messages], so a card cannot be mistaken for transcript
      * content by `snapshotMessages()` / `restore()`.
      */
-    fun showMcpConfirmation(request: McpConfirmationRequest) {
-        onConfirmation(request)
+    fun showMcpConfirmation(request: McpConfirmationRequest, nonce: String) {
+        onConfirmation(request, nonce)
     }
 
     fun hideMcpConfirmation() {
-        onConfirmation(null)
+        onConfirmation(null, null)
     }
 }

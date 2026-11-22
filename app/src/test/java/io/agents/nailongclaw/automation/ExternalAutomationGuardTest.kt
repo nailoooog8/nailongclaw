@@ -123,7 +123,7 @@ class ExternalAutomationGuardTest {
     // ---- Lockout ----
 
     @Test
-    fun `repeated wrong tokens end in a lockout that a correct token cannot ride out`() {
+    fun `repeated wrong tokens end in a lockout, but a correct token is never locked out`() {
         val token = mint()
         val wrong = token.dropLast(4) + "XXXX"
 
@@ -131,23 +131,41 @@ class ExternalAutomationGuardTest {
         repeat(4) { assertEquals("INVALID_TOKEN", (verify(wrong) as ExternalAutomationGuard.Decision.Reject).reason) }
         assertEquals("LOCKED_OUT", (verify(wrong) as ExternalAutomationGuard.Decision.Reject).reason)
 
-        // The correct token is not exempt while the pause is running — this is
-        // what stops an attacker from finishing a brute force after the fact.
-        val paused = verify(token)
-        assertTrue(paused is ExternalAutomationGuard.Decision.Reject)
-        assertEquals("LOCKED_OUT", (paused as ExternalAutomationGuard.Decision.Reject).reason)
-        assertTrue(paused.message.contains("correct token is not exempt"))
+        // R5 §5 P3 fix: guessing is throttled (the pause starts and wrong
+        // tokens keep failing), but a CORRECT token rides through — the old
+        // "correct token is not exempt" policy let any hostile app poison the
+        // shared unattributed bucket and lock legit automation out entirely.
+        assertTrue("correct token must be exempt from the pause", verify(token) is ExternalAutomationGuard.Decision.Allow)
+        // The exempt success reset the bucket (BruteForceGuard semantics: a
+        // genuine success clears the failure count) — a fresh wrong token is a
+        // plain invalid again, counting toward a new pause.
+        assertEquals("INVALID_TOKEN", (verify(wrong) as ExternalAutomationGuard.Decision.Reject).reason)
     }
 
     @Test
-    fun `the pause expires and the correct token works again`() {
+    fun `an empty presented token is refused but does not count toward the lockout`() {
+        val token = mint()
+        // Unlimited empty-token probes must NOT lock the bucket: they can never
+        // be correct, so counting them only enables the shared-bucket DoS.
+        repeat(10) {
+            val d = verify(null)
+            assertEquals("MISSING_TOKEN", (d as ExternalAutomationGuard.Decision.Reject).reason)
+        }
+        assertEquals("still unlocked", "INVALID_TOKEN", (verify(token.dropLast(4) + "XXXX") as ExternalAutomationGuard.Decision.Reject).reason)
+    }
+
+    @Test
+    fun `the pause expires and wrong-token guessing resumes being throttled`() {
         val token = mint()
         val wrong = token.dropLast(4) + "XXXX"
         repeat(5) { verify(wrong) }
-        assertTrue(verify(token) is ExternalAutomationGuard.Decision.Reject)
+        // While paused: wrong refused; correct exempt (R5 §5 P3 fix).
+        assertEquals("LOCKED_OUT", (verify(wrong) as ExternalAutomationGuard.Decision.Reject).reason)
+        assertTrue(verify(token) is ExternalAutomationGuard.Decision.Allow)
 
         now += 31 * 60 * 1000L // past the 30s base backoff
-        assertTrue(verify(token) is ExternalAutomationGuard.Decision.Allow)
+        assertEquals("after expiry the first wrong guess is a plain INVALID again",
+            "INVALID_TOKEN", (verify(wrong) as ExternalAutomationGuard.Decision.Reject).reason)
     }
 
     @Test

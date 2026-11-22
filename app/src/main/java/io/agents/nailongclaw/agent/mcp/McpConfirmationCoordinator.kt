@@ -68,7 +68,7 @@ object McpConfirmationCoordinator {
          * Called on the agent thread, so implementations must marshal to their
          * own UI thread.
          */
-        fun showConfirmation(request: McpConfirmationRequest)
+        fun showConfirmation(request: McpConfirmationRequest, nonce: String)
 
         /**
          * The wait is over; drop the card.
@@ -87,6 +87,19 @@ object McpConfirmationCoordinator {
     )
 
     private val gate = McpConfirmationGate()
+
+    /**
+     * The one-shot nonce for the card currently on screen; guarded by [lock].
+     * Null whenever nothing is waiting — see [submit] for what a stale or
+     * missing nonce means.
+     */
+    private var currentNonce: String? = null
+
+    private fun newNonce(): String {
+        val bytes = ByteArray(16)
+        java.security.SecureRandom().nextBytes(bytes)
+        return bytes.joinToString("") { "%02x".format(it) }
+    }
 
     @Volatile
     private var surface: Surface? = null
@@ -173,9 +186,17 @@ object McpConfirmationCoordinator {
 
         val waiting = gate.pendingRequest() ?: request
         val done = CountDownLatch(1)
+        // R5 §5 P3: every wait gets a one-shot nonce the surface must echo back
+        // with its answer (see [submit]). It stops blind-fire and replayed
+        // decisions — a call that has not seen the current card cannot name its
+        // nonce. What it does NOT do is stop JS that already lives in the page
+        // origin (it can read the card's DOM): that threat is owned upstream by
+        // the R5-01 receiver lockdown and the description sanitizers.
+        val nonce = newNonce()
         synchronized(lock) {
             resolution = null
             latch = done
+            currentNonce = nonce
         }
 
         XLog.e(
@@ -184,7 +205,7 @@ object McpConfirmationCoordinator {
                 "(server=${request.serverName}, timeout=${timeoutMs}ms)"
         )
         try {
-            current?.showConfirmation(waiting)
+            current?.showConfirmation(waiting, nonce)
         } catch (e: Exception) {
             // A surface that cannot draw the card cannot collect an answer.
             XLog.e(TAG, "[mcpConfirm] show failed for '${request.toolName}': ${e.message}", e)
@@ -210,8 +231,20 @@ object McpConfirmationCoordinator {
      * The user answered. Safe to call from any thread, and safe to call when
      * nothing is waiting — a stale tap (a card whose wait already ended) is
      * logged and dropped rather than answering a later request.
+     *
+     * [nonce] must be the one [Surface.showConfirmation] received for the card
+     * the user tapped. A missing or stale nonce is a blind-fire (a call fired
+     * without ever having seen the card) or a replay of an earlier wait's
+     * decision — both are dropped without touching the gate, so 60 s of
+     * "something is pending" is not 60 s of "any decision wins".
      */
-    fun submit(decision: McpConfirmationGate.Decision) {
+    fun submit(decision: McpConfirmationGate.Decision, nonce: String?) {
+        synchronized(lock) {
+            if (nonce == null || nonce != currentNonce) {
+                XLog.e(TAG, "[mcpConfirm] submit($decision) ignored — nonce missing or stale")
+                return
+            }
+        }
         val request = gate.pendingRequest()
         if (request == null) {
             XLog.e(TAG, "[mcpConfirm] submit($decision) ignored — nothing is waiting")
@@ -264,6 +297,9 @@ object McpConfirmationCoordinator {
                 null
             } else {
                 this.resolution = resolution
+                // The wait is over in every branch that gets here — the nonce
+                // dies with it, so a decision replaying it afterwards loses.
+                currentNonce = null
                 latch.also { latch = null }
             }
         }

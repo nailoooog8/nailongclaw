@@ -31,6 +31,7 @@ class KVUtilsChannelSecurityDelegateTest {
     fun setUp() {
         inMemoryStorage = ChannelSecurityGuard.InMemoryStorage()
         ChannelSecurityGuard.storage = inMemoryStorage
+        ChannelSecurityGuard.pinCipher = io.agents.nailongclaw.channel.security.FakePinCipher()
         ChannelSecurityGuard.clearWhitelist()
         ChannelSecurityGuard.resetLegacyPurgeForTesting()
     }
@@ -65,7 +66,11 @@ class KVUtilsChannelSecurityDelegateTest {
         // Stable on re-read, and written into the one shared key the guard
         // also reads — no second generator, no second storage location.
         assertEquals(first, KVUtils.getChannelPairPin())
-        assertEquals(first, inMemoryStorage.getString("KEY_CHANNEL_PAIR_PIN", ""))
+        // At-rest contract (R5 §5): storage holds ciphertext, the guard holds
+        // the decryption. A plaintext value in storage would be the bug.
+        assertTrue(
+            inMemoryStorage.getString("KEY_CHANNEL_PAIR_PIN", "").startsWith("enc:fake:")
+        )
     }
 
     // ---- PIN: write path ----
@@ -74,7 +79,10 @@ class KVUtilsChannelSecurityDelegateTest {
     fun `KVUtils writes the pin through the guard`() {
         KVUtils.setChannelPairPin("123456")
         assertEquals("123456", ChannelSecurityGuard.getPairPin())
-        assertEquals("123456", inMemoryStorage.getString("KEY_CHANNEL_PAIR_PIN", ""))
+        assertTrue(
+            "storage holds ciphertext, not the plaintext pin",
+            inMemoryStorage.getString("KEY_CHANNEL_PAIR_PIN", "").startsWith("enc:fake:")
+        )
     }
 
     // ---- Security toggle ----

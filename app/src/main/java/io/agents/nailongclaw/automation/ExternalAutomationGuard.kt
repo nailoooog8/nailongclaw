@@ -129,20 +129,36 @@ object ExternalAutomationGuard {
         }
 
         val lockKey = lockoutKey(callerPackage)
+
+        // R5 §5 P3 (availability DoS fix): the lockout's job is to slow token
+        // GUESSING, and a request presenting the correct token is not guessing.
+        // Compare first (constant-time) and let a correct token through even
+        // while the bucket is locked — otherwise any hostile app on the device
+        // could poison the shared unattributed bucket with garbage requests and
+        // lock legit automation out for the whole backoff window. Guessing
+        // itself is throttled exactly as before: failures still count and the
+        // pause still starts.
+        if (!presented.isNullOrEmpty() && BruteForceGuard.constantTimeEquals(presented, stored)) {
+            BruteForceGuard.onSuccess(lockKey)
+            return Decision.Allow
+        }
+
         if (BruteForceGuard.isLocked(lockKey)) {
             val seconds = (BruteForceGuard.lockoutRemainingMs(lockKey) + 999) / 1000
             XLog.w(TAG, "Rejected external automation request: LOCKED_OUT (${seconds}s left)")
             return Decision.Reject(
                 "LOCKED_OUT",
                 "Too many failed attempts. External automation is paused for " +
-                    "${seconds}s — a correct token is not exempt from the pause.",
+                    "${seconds}s. The pause ends on its own; a request with the " +
+                    "correct token is never locked out.",
             )
         }
 
-        // A request that sends no token at all is still a failed attempt: an
-        // attacker probing without one gets no free unlimited tries.
+        // An empty presented token can never be correct, so unlimited tries
+        // over it buy an attacker nothing — counting them as failures does not
+        // slow any real guessing, it only lets garbage requests poison the
+        // bucket and lock legit callers out. Not counted (R5 §5 P3 fix).
         if (presented.isNullOrEmpty()) {
-            BruteForceGuard.onFailure(lockKey)
             XLog.w(TAG, "Rejected external automation request: MISSING_TOKEN")
             return Decision.Reject(
                 "MISSING_TOKEN",
@@ -158,7 +174,7 @@ object ExternalAutomationGuard {
                 return Decision.Reject(
                     "LOCKED_OUT",
                     "Too many failed attempts. External automation is paused for " +
-                        "${(lockoutMs + 999) / 1000}s — a correct token is not exempt from the pause.",
+                        "${(lockoutMs + 999) / 1000}s.",
                 )
             }
             XLog.w(TAG, "Rejected external automation request: INVALID_TOKEN")

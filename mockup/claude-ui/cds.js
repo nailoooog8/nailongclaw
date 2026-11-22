@@ -936,7 +936,7 @@
     if (!req) return;
     var destructive = req.risk === 'DESTRUCTIVE';
     var card = turn('turn-assistant',
-      '<div class="mcp-card" id="mcpConfirm">' +
+      '<div class="mcp-card" id="mcpConfirm" data-nonce="' + esc(String(req.nonce || '')) + '">' +
         '<div class="mcp-head">' +
           '<span class="status-dot" data-kind="clay"></span>' +
           '<span>需要你确认</span>' +
@@ -974,7 +974,9 @@
       for (var i = 0; i < buttons.length; i++) { buttons[i].disabled = true; }
       stopConfirmationCountdown();
       if (window.PokeClawChat && window.PokeClawChat.decideMcp) {
-        window.PokeClawChat.decideMcp(decision);
+        // 卡上的一次性 nonce 原样带回——Kotlin 侧对不上号的点击按盲拍丢弃
+        // （R5 §5 P3）。esc 只保证属性注入安全，这里从属性读回的是原值。
+        window.PokeClawChat.decideMcp(decision, card.getAttribute('data-nonce'));
       }
     });
     toBottom(true);

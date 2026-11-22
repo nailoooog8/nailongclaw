@@ -16,6 +16,7 @@ import android.webkit.ConsoleMessage
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
@@ -219,7 +220,7 @@ class ClaudeUiPreviewActivity : BaseActivity() {
     private val sink by lazy {
         WebChatSink(
             onRender = { messages -> publish(messages) },
-            onConfirmation = { request -> publishConfirmation(request) },
+            onConfirmation = { request, nonce -> publishConfirmation(request, nonce) },
         )
     }
 
@@ -421,7 +422,7 @@ class ClaudeUiPreviewActivity : BaseActivity() {
          * coordinator rather than answering a later request.
          */
         @JavascriptInterface
-        fun decideMcp(decision: String?) {
+        fun decideMcp(decision: String?, nonce: String?) {
             val parsed = when (decision?.trim()?.lowercase()) {
                 "allow_once" -> McpConfirmationGate.Decision.ALLOW_ONCE
                 "allow_always" -> McpConfirmationGate.Decision.ALLOW_ALWAYS
@@ -432,7 +433,7 @@ class ClaudeUiPreviewActivity : BaseActivity() {
                 }
             }
             XLog.e(TAG, "[chat] decideMcp($parsed)")
-            McpConfirmationCoordinator.submit(parsed)
+            McpConfirmationCoordinator.submit(parsed, nonce)
         }
 
         /**
@@ -1019,11 +1020,11 @@ class ClaudeUiPreviewActivity : BaseActivity() {
         @Volatile
         override var isForeground: Boolean = false
 
-        override fun showConfirmation(request: McpConfirmationRequest) {
+        override fun showConfirmation(request: McpConfirmationRequest, nonce: String) {
             // The coordinator calls this from the agent thread.
             runOnUiThread {
                 taskFlowController.noteSystem(McpConfirmationGate.pendingNote(request))
-                sink.showMcpConfirmation(request)
+                sink.showMcpConfirmation(request, nonce)
             }
         }
 
@@ -1220,7 +1221,7 @@ class ClaudeUiPreviewActivity : BaseActivity() {
      * `timeoutMs` is what the page counts down from; the coordinator's
      * timeout is the authority, the card only reports it.
      */
-    private fun publishConfirmation(request: McpConfirmationRequest?) {
+    private fun publishConfirmation(request: McpConfirmationRequest?, nonce: String?) {
         if (!::webView.isInitialized) return
         val json = if (request == null) {
             "null"
@@ -1413,13 +1414,13 @@ class ClaudeUiPreviewActivity : BaseActivity() {
                 override fun shouldInterceptRequest(
                     view: WebView,
                     request: WebResourceRequest
-                ) = assetLoader.shouldInterceptRequest(request.url)
+                ): WebResourceResponse? = localOnly(request.url)
 
                 @Suppress("OverridingDeprecatedMember")
                 override fun shouldInterceptRequest(
                     view: WebView,
                     url: String
-                ) = assetLoader.shouldInterceptRequest(Uri.parse(url))
+                ): WebResourceResponse? = localOnly(Uri.parse(url))
 
                 override fun shouldOverrideUrlLoading(
                     view: WebView,
@@ -1926,6 +1927,23 @@ class ClaudeUiPreviewActivity : BaseActivity() {
          */
         private const val MOCKUP_URL =
             "https://appassets.androidplatform.net/assets/claude-ui/index.html"
+    }
+
+    /**
+     * R5 §5 P3: serve the local asset origin, and hand EVERYTHING else an
+     * empty 404. "The page never touches the network" used to be a claim
+     * about the mockup's content; navigation is blocked, but a subresource
+     * — an <img src="https://…"> planted by hostile content or a fetch()
+     * from injected JS — still opened a real socket, because a null from
+     * the loader means "WebView, fetch it yourself". Now non-local origins
+     * never see a socket.
+     */
+    private fun localOnly(url: android.net.Uri): WebResourceResponse? {
+        assetLoader.shouldInterceptRequest(url)?.let { return it }
+        return WebResourceResponse(
+            "text/plain", "utf-8", 404, "Not Found",
+            mapOf(), java.io.ByteArrayInputStream(ByteArray(0)),
+        )
     }
 
     private val assetLoader: WebViewAssetLoader by lazy {

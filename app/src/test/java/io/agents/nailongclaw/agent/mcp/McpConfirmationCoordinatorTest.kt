@@ -26,9 +26,11 @@ class McpConfirmationCoordinatorTest {
     private class FakeSurface(override var isForeground: Boolean = true) :
         McpConfirmationCoordinator.Surface {
         val shown = mutableListOf<McpConfirmationRequest>()
+        val shownNonces = mutableListOf<String>()
         val hidden = mutableListOf<McpConfirmationGate.Verdict>()
-        override fun showConfirmation(request: McpConfirmationRequest) {
+        override fun showConfirmation(request: McpConfirmationRequest, nonce: String) {
             shown += request
+            shownNonces += nonce
         }
         override fun hideConfirmation(verdict: McpConfirmationGate.Verdict) {
             hidden += verdict
@@ -113,7 +115,7 @@ class McpConfirmationCoordinatorTest {
         waitUntil { surface.shown.size == 1 }
         assertTrue(McpConfirmationCoordinator.isAwaiting())
 
-        McpConfirmationCoordinator.submit(McpConfirmationGate.Decision.ALLOW_ONCE)
+        McpConfirmationCoordinator.submit(McpConfirmationGate.Decision.ALLOW_ONCE, surface.shownNonces.last())
         thread.join(5_000)
 
         assertEquals(McpConfirmationGate.Outcome.ALLOW_ONCE, result.get().outcome)
@@ -135,7 +137,7 @@ class McpConfirmationCoordinatorTest {
         }
         waitUntil { surface.shown.size == 1 }
 
-        McpConfirmationCoordinator.submit(McpConfirmationGate.Decision.DENY)
+        McpConfirmationCoordinator.submit(McpConfirmationGate.Decision.DENY, surface.shownNonces.last())
         thread.join(5_000)
 
         assertEquals(McpConfirmationGate.Outcome.DENY_BY_USER, result.get().outcome)
@@ -173,7 +175,7 @@ class McpConfirmationCoordinatorTest {
             first.set(McpConfirmationCoordinator.awaitDecision(request("mcp_t_always")))
         }
         waitUntil { surface.shown.size == 1 }
-        McpConfirmationCoordinator.submit(McpConfirmationGate.Decision.ALLOW_ALWAYS)
+        McpConfirmationCoordinator.submit(McpConfirmationGate.Decision.ALLOW_ALWAYS, surface.shownNonces.last())
         thread.join(5_000)
         assertEquals(McpConfirmationGate.Outcome.ALLOW_ALWAYS, first.get().outcome)
 
@@ -204,7 +206,7 @@ class McpConfirmationCoordinatorTest {
         assertEquals(McpConfirmationGate.Outcome.DENY_TIMED_OUT, first.get().outcome)
 
         // The user's finger lands just after the card was refused.
-        McpConfirmationCoordinator.submit(McpConfirmationGate.Decision.ALLOW_ALWAYS)
+        McpConfirmationCoordinator.submit(McpConfirmationGate.Decision.ALLOW_ALWAYS, surface.shownNonces.last())
 
         val second = AtomicReference<McpConfirmationGate.Verdict>()
         val thread2 = park {
@@ -214,7 +216,7 @@ class McpConfirmationCoordinatorTest {
 
         // Still asking — the stale tap must not have granted anything.
         assertTrue(McpConfirmationCoordinator.isAwaiting())
-        McpConfirmationCoordinator.submit(McpConfirmationGate.Decision.DENY)
+        McpConfirmationCoordinator.submit(McpConfirmationGate.Decision.DENY, surface.shownNonces.last())
         thread2.join(5_000)
         assertEquals(McpConfirmationGate.Outcome.DENY_BY_USER, second.get().outcome)
     }
@@ -254,7 +256,7 @@ class McpConfirmationCoordinatorTest {
         assertFalse(second.allowed)
         assertEquals(1, surface.shown.size)
 
-        McpConfirmationCoordinator.submit(McpConfirmationGate.Decision.DENY)
+        McpConfirmationCoordinator.submit(McpConfirmationGate.Decision.DENY, surface.shownNonces.last())
         thread.join(5_000)
         assertEquals(McpConfirmationGate.Outcome.DENY_BY_USER, first.get().outcome)
     }
@@ -303,12 +305,65 @@ class McpConfirmationCoordinatorTest {
             }
             waitUntil { surface.shown.size == 1 }
 
-            McpConfirmationCoordinator.submit(McpConfirmationGate.Decision.DENY)
+            McpConfirmationCoordinator.submit(McpConfirmationGate.Decision.DENY, surface.shownNonces.last())
             thread.join(5_000)
             assertEquals(McpConfirmationGate.Outcome.DENY_BY_USER, result.get().outcome)
             assertFalse(result.get().allowed)
         } finally {
             McpConfirmationCoordinator.autoAllowProvider = { false }
         }
+    }
+    @Test
+    fun `submit without the current nonce is dropped — blind-fire protection`() {
+        val surface = FakeSurface()
+        McpConfirmationCoordinator.attach(surface)
+        val waiter = Thread {
+            McpConfirmationCoordinator.awaitDecision(request("mcp_blindfire"), timeoutMs = 500)
+        }
+        waiter.start()
+        while (surface.shown.isEmpty()) Thread.sleep(10)
+        val nonce = surface.shownNonces.last()
+
+        // A decision fired without having seen the card: dropped, the wait lives.
+        McpConfirmationCoordinator.submit(McpConfirmationGate.Decision.ALLOW_ONCE, null)
+        McpConfirmationCoordinator.submit(McpConfirmationGate.Decision.ALLOW_ONCE, "deadbeef")
+        Thread.sleep(150)
+        assertTrue("blind-fire must not resolve the wait", waiter.isAlive)
+
+        // The genuine card echo resolves it.
+        McpConfirmationCoordinator.submit(McpConfirmationGate.Decision.ALLOW_ONCE, nonce)
+        waiter.join(2000)
+        assertTrue("the real echo must resolve", waiter.isAlive == false)
+        assertEquals(1, surface.hidden.size)
+    }
+
+    @Test
+    fun `a nonce from a finished wait does not answer the next one`() {
+        val surface = FakeSurface()
+        McpConfirmationCoordinator.attach(surface)
+
+        val first = Thread {
+            McpConfirmationCoordinator.awaitDecision(request("mcp_replay_a"), timeoutMs = 500)
+        }
+        first.start()
+        while (surface.shown.size < 1) Thread.sleep(10)
+        val staleNonce = surface.shownNonces.last()
+        McpConfirmationCoordinator.submit(McpConfirmationGate.Decision.DENY, staleNonce)
+        first.join(2000)
+        assertTrue(first.isAlive == false)
+
+        val second = Thread {
+            McpConfirmationCoordinator.awaitDecision(request("mcp_replay_b"), timeoutMs = 500)
+        }
+        second.start()
+        while (surface.shown.size < 2) Thread.sleep(10)
+        // Replay the FIRST wait's nonce at the second card: dropped.
+        McpConfirmationCoordinator.submit(McpConfirmationGate.Decision.ALLOW_ALWAYS, staleNonce)
+        Thread.sleep(150)
+        assertEquals("replay must not resolve the new wait", 1, surface.hidden.size)
+
+        McpConfirmationCoordinator.submit(McpConfirmationGate.Decision.DENY, surface.shownNonces.last())
+        second.join(2000)
+        McpConfirmationCoordinator.detach(surface)
     }
 }

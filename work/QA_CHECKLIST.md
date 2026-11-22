@@ -2202,6 +2202,18 @@ F5 的残余暴露面是**入站方向**（GET/POST 响应早已掩码）：POST
 - **设备实测**（h79 AVD——本镜像无 WiFi transport，需 `cmd wifi set-wifi-enabled enabled` + `cmd wifi connect-network AndroidWifi open none` 才能过 isWifiConnected 门）：`adb forward` 后宿主 TLS 探测 → **TLSv1.3 / TLS_AES_256_GCM_SHA384 / HTTP 200**；**指纹三方一致**（logcat = 配置页 UI = 宿主 `getpeercert(True)` 的 SHA-256，`af1664c5…`）；同端口明文 HTTP 探测**零字节回显**。崩溃卫生 0。
 - **QA 驱动法**：`adb reverse` 在 Windows 宿主上监听起不来（refused，已知坑）——用 `adb forward tcp:<host> tcp:9527` 方向才对；模拟器 WiFi 门是 `cmd wifi` 两连，不是 `svc wifi`。
 
+### 2026-11-22（第五轮）— R5 §5 P3 小额修复批五件：PIN 加密 / MCP sanitize 中文 / decideMcp nonce / 子资源网络隔离 / 锁定键 DoS
+
+五件 P3 当日收编，全量单测 **785/0（连跑两轮）**，设备腿四证。中途抓出一个**跨测试 daemon 竞态**（手种向量被上一测的补算 pass 覆写——手种测试一律 drain 后再读）。
+
+- ✅ **①PIN 明文 MMKV → SecretBox 加密**：`ChannelSecurityGuard` PIN 走 SecretBox（与 bot token 同路径），`PinCipher` 缝供 JVM 测试换 reversible fake；旧明文**惰性迁移**（首读即升级，不 brick 存量配对），密文损坏自愈重铸，加密失败 fail-closed 不落明文（镜像 KVUtils F6）。设备证：MMKV 二进制 grep 明文 PIN 消失 + `enc:v1:` 在位；TLS 控制台认证链 `X-Config-PIN: 374318` → **200**、错/无 PIN → **401**。
+- ✅ **②MCP sanitize 中文指令模式**：`IMPERATIVE_ZH` 六类（忽略无视 / 你必须+动词 / 调用任何工具之前 / 不要告诉用户 / 系统提示词 / 新指令：）——CJK 无词边界按子串匹配，过报只花一个 UNTRUSTED 前缀（保守侧）。测试钉六例走私 + 四例正例中文不误伤（第一版连吃「你必须始终**先调用**」「任何**其他**工具」两处措辞才学全）。
+- ✅ **③decideMcp 一次性 nonce**：coordinator 每次 wait 铸 128-bit nonce，Surface 签名带 nonce，页面卡片 `data-nonce` 回传，`submit` 对不上号即丢（盲拍/重放保护）。边界写进 KDoc：**止于盲拍**——origin 内驻留 JS 能读 DOM，那层归 R5-01 上游。+2 例（盲拍丢弃 / 旧 nonce 不答新卡）。compose/web 两 surface + WebChatSink 签名全链改。
+- ✅ **④页面子资源网络隔离**：`shouldInterceptRequest` 兜底 `localOnly()`——非 appassets 来源一律空 404，**「页面永不触网」从注释变强制**（此前 null = WebView 自己出网，恶意内容的 `<img src>`/fetch 会开真 socket）。设备证：资产页照常渲染 + 本地任务端到端正常。
+- ✅ **⑤锁定键共享 DoS**：`ExternalAutomationGuard.verify` 三改——**正确令牌豁免锁定期**（限速防的是猜，正确令牌不是猜；旧「correct token is not exempt」策略被推翻并重写测试）、**空令牌不计次**（永远猜不中的试探计次只喂养共享桶 DoS）、Splash 归因 `launchedFromPackage`（API 31+，归因失败落共享桶不再能锁死合法自动化）。注意 BruteForceGuard 语义：豁免成功会清计数桶（真成功语义），测试按新契约钉。
+
+**模拟器坑补记**：ChannelsActivity 的 LAN 行 tap 会盲切（自启状态下 tap=停止）——每次 tap 前先 dump 确认当前态；MMKV 二进制用 root pull 后按字节 grep 验明文。
+
 ### 2026-11-22 — R5 安全修复落地 + 模拟器体验 QA（h79 AVD，API 36，HEAD debug 覆装 vc63 调试包）：R5 四腿全过；抓出并即修两体验缺陷（U1/U3）+ 一通知细节（U4）
 
 R5 报告 `docs/security/SECURITY_AUDIT_R5.md`（§9 修复落地 / §10 本轮 QA）。基线 `45c9e5f` 的五笔修复提交（`215a1c0`→`4df279e`）后 HEAD debug 包 `adb install -r` 覆装（vc34 → vc63，数据保留）。证据 `.auto/r5_shade*.png`、`.auto/r5_test.log`（749/0）。

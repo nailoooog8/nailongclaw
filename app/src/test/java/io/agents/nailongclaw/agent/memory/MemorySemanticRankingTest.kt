@@ -136,6 +136,10 @@ class MemorySemanticRankingTest {
         seedVector(wifi.entry.id, floatArrayOf(1f, 0f, 0f))
         seedVector(coffee.entry.id, floatArrayOf(0f, 0f, 1f))
         MemoryStore.invalidate()
+        // Drain passes a previous test's persist scheduled: a straggler backfill
+        // firing between the hand seeds and the read would overwrite them with
+        // fake-embedder zeros (daemon race, seen once in the full suite).
+        MemoryStore.awaitVectorBackfillForTest()
 
         val briefing = MemoryStore.briefing("WiFi 怎么连")
 
@@ -153,6 +157,10 @@ class MemorySemanticRankingTest {
         MemoryStore.embedderOverride = fake
         seedVector(coffee.entry.id, floatArrayOf(0f, 0f, 1f))
         MemoryStore.invalidate()
+        // Drain passes a previous test's persist scheduled: a straggler backfill
+        // firing between the hand seeds and the read would overwrite them with
+        // fake-embedder zeros (daemon race, seen once in the full suite).
+        MemoryStore.awaitVectorBackfillForTest()
 
         assertTrue(MemoryStore.recall("WiFi 怎么连").isEmpty())
     }
@@ -173,6 +181,10 @@ class MemorySemanticRankingTest {
         seedVector(coffee.entry.id, floatArrayOf(1f, 0f, 0f))          // cosine 1.00 with the query
         seedVector(running.entry.id, floatArrayOf(0.8f, 0.6f, 0f))     // cosine 0.80 — 0.20 behind
         MemoryStore.invalidate()
+        // Drain passes a previous test's persist scheduled: a straggler backfill
+        // firing between the hand seeds and the read would overwrite them with
+        // fake-embedder zeros (daemon race, seen once in the full suite).
+        MemoryStore.awaitVectorBackfillForTest()
 
         val hits = MemoryStore.recall("WiFi 怎么连")
 
@@ -188,6 +200,10 @@ class MemorySemanticRankingTest {
         seedVector(coffee.entry.id, floatArrayOf(1f, 0f, 0f))          // cosine 1.00
         seedVector(running.entry.id, floatArrayOf(0.95f, 0.3122f, 0f)) // cosine 0.95 — 0.05 behind
         MemoryStore.invalidate()
+        // Drain passes a previous test's persist scheduled: a straggler backfill
+        // firing between the hand seeds and the read would overwrite them with
+        // fake-embedder zeros (daemon race, seen once in the full suite).
+        MemoryStore.awaitVectorBackfillForTest()
 
         val hits = MemoryStore.recall("WiFi 怎么连")
 
@@ -205,6 +221,10 @@ class MemorySemanticRankingTest {
         rememberAndStore("用户每周跑步三次，在早上执行")
         MemoryStore.embedderOverride = fake
         MemoryStore.invalidate()
+        // Drain passes a previous test's persist scheduled: a straggler backfill
+        // firing between the hand seeds and the read would overwrite them with
+        // fake-embedder zeros (daemon race, seen once in the full suite).
+        MemoryStore.awaitVectorBackfillForTest()
 
         val hits = MemoryStore.recall("跑步")
         assertEquals(1, hits.size)
@@ -248,6 +268,10 @@ class MemorySemanticRankingTest {
         MemoryStore.embedderOverride = fake
         seedVector(original.entry.id, floatArrayOf(1f, 0f, 0f))
         MemoryStore.invalidate()
+        // Drain passes a previous test's persist scheduled: a straggler backfill
+        // firing between the hand seeds and the read would overwrite them with
+        // fake-embedder zeros (daemon race, seen once in the full suite).
+        MemoryStore.awaitVectorBackfillForTest()
 
         // The UI-edit / agent re-save path: overlapping content merges into
         // the existing entry, keeping its id but replacing its text.

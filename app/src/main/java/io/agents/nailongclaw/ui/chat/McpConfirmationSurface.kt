@@ -43,7 +43,11 @@ class McpConfirmationSurface(
 
     private var dialog: io.agents.nailongclaw.widget.CdsDialog.Handle? = null
 
-    override fun showConfirmation(request: McpConfirmationRequest) {
+    /** The one-shot nonce of the card currently on screen — see [answer]. */
+    private var activeNonce: String? = null
+
+    override fun showConfirmation(request: McpConfirmationRequest, nonce: String) {
+        activeNonce = nonce
         // The coordinator calls this from the agent thread; a dialog may only
         // be built on the UI thread.
         main.post {
@@ -90,7 +94,8 @@ class McpConfirmationSurface(
     }
 
     private fun answer(decision: McpConfirmationGate.Decision) {
-        McpConfirmationCoordinator.submit(decision)
+        McpConfirmationCoordinator.submit(decision, activeNonce)
+        activeNonce = null
         // The coordinator calls hideConfirmation back, which dismisses; this
         // is the belt to that braces for a submit that found nothing waiting.
         dismissDialog()

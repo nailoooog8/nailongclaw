@@ -25,13 +25,17 @@ class WebChatSinkTest {
     private var last: List<WebChatSink.WebMessage> = emptyList()
     private var renders = 0
     private var lastConfirmation: Any? = "untouched"
+    private var lastNonce: String? = null
 
     private fun sink() = WebChatSink(
         onRender = { messages ->
             last = messages
             renders++
         },
-        onConfirmation = { request -> lastConfirmation = request },
+        onConfirmation = { request, nonce ->
+            lastConfirmation = request
+            lastNonce = nonce
+        },
     )
 
     private fun typing() =
@@ -468,11 +472,12 @@ class WebChatSinkTest {
             description = "Echoes text back",
             paramsPreview = "text = hello",
         )
-        s.showMcpConfirmation(request)
+        s.showMcpConfirmation(request, "nonce-1")
 
         // Its own channel, so the page can draw it after a full feed redraw
         // instead of being wiped by it.
         assertEquals(request, lastConfirmation)
+        assertEquals("the nonce must travel with the request", "nonce-1", lastNonce)
         // ...and it must never enter the transcript: a card that is still
         // waiting cannot be persisted, and a restored one would have no task
         // behind it to answer it.

@@ -32,6 +32,7 @@ class ChannelPairingListModelTest {
     fun setUp() {
         inMemoryStorage = InMemoryStorage()
         ChannelSecurityGuard.storage = inMemoryStorage
+        ChannelSecurityGuard.pinCipher = FakePinCipher()
         ChannelSecurityGuard.setSecurityEnabled(true)
         ChannelSecurityGuard.setPairPin("123456")
         ChannelSecurityGuard.clearWhitelist()

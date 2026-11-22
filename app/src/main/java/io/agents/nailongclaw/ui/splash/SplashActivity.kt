@@ -69,7 +69,12 @@ class SplashActivity : BaseActivity() {
      */
     private fun isLauncherTaskAllowed(intent: Intent?): Boolean {
         val token = intent?.getStringExtra(ExternalAutomationGuard.EXTRA_TOKEN)
-        val allowed = ExternalAutomationGuard.verify(token) is ExternalAutomationGuard.Decision.Allow
+        // Attribute the failure counter to the actual launcher caller when the
+        // platform can name it (R5 §5 P3): unattributed failures share one
+        // bucket, so garbage requests from a hostile app must not tax the
+        // bucket a legit automation tool draws from.
+        val caller = if (android.os.Build.VERSION.SDK_INT >= 31) launchedFromPackage else null
+        val allowed = ExternalAutomationGuard.verify(token, caller) is ExternalAutomationGuard.Decision.Allow
         return allowed && KVUtils.isExternalAutomationEnabled()
     }
 

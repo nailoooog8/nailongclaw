@@ -19,6 +19,7 @@ class ChannelSecurityGuardTest {
     fun setUp() {
         inMemoryStorage = ChannelSecurityGuard.InMemoryStorage()
         ChannelSecurityGuard.storage = inMemoryStorage
+        ChannelSecurityGuard.pinCipher = io.agents.nailongclaw.channel.security.FakePinCipher()
         ChannelSecurityGuard.setSecurityEnabled(true)
         ChannelSecurityGuard.setPairPin("123456")
         ChannelSecurityGuard.clearWhitelist()
@@ -35,6 +36,47 @@ class ChannelSecurityGuardTest {
     @Test
     fun `initial state has security enabled and valid pair pin`() {
         assertTrue(ChannelSecurityGuard.isSecurityEnabled())
+        val pin = ChannelSecurityGuard.getPairPin()
+        assertEquals(6, pin.length)
+        assertTrue(pin.all { it.isDigit() })
+    }
+
+    @Test
+    fun `pin is stored encrypted, never plaintext`() {
+        // setPairPin("123456") ran in setUp; whatever hit storage must not be
+        // the plaintext value.
+        val stored = inMemoryStorage.getString("KEY_CHANNEL_PAIR_PIN", "")
+        assertTrue("PIN must be encrypted at rest", stored.startsWith("enc:fake:"))
+        assertFalse(stored.contains("123456"))
+        assertEquals("123456", ChannelSecurityGuard.getPairPin())
+    }
+
+    @Test
+    fun `legacy plaintext pin migrates to encrypted on first read`() {
+        inMemoryStorage.putString("KEY_CHANNEL_PAIR_PIN", "654321")
+        assertEquals("the legacy value keeps working", "654321", ChannelSecurityGuard.getPairPin())
+        assertTrue(
+            "and the stored form was upgraded",
+            inMemoryStorage.getString("KEY_CHANNEL_PAIR_PIN", "").startsWith("enc:fake:")
+        )
+    }
+
+    @Test
+    fun `encryption failure writes nothing instead of plaintext`() {
+        ChannelSecurityGuard.pinCipher = object : ChannelSecurityGuard.PinCipher {
+            override fun isEncrypted(stored: String) = false
+            override fun encrypt(plain: String): String? = null
+            override fun decrypt(stored: String): String? = null
+        }
+        inMemoryStorage.putString("KEY_CHANNEL_PAIR_PIN", "")
+        val pin = ChannelSecurityGuard.getPairPin()
+        assertEquals("no ciphertext → no minted value served", "", pin)
+        assertEquals("and nothing hit storage", "", inMemoryStorage.getString("KEY_CHANNEL_PAIR_PIN", ""))
+    }
+
+    @Test
+    fun `corrupt ciphertext self-heals with a fresh minted pin`() {
+        inMemoryStorage.putString("KEY_CHANNEL_PAIR_PIN", "enc:fake:nonexistent")
         val pin = ChannelSecurityGuard.getPairPin()
         assertEquals(6, pin.length)
         assertTrue(pin.all { it.isDigit() })
