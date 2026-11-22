@@ -1377,8 +1377,8 @@ When in doubt, rerun the smaller bundle first, then expand only if something dri
   - **f. ROTATES_WITH_CONTENT 几何**：影子屏开一个会转横屏的应用（视频全屏）→ 对影子屏节点 tap，落点仍在预期元素上（坐标空间随显示旋转没错位）。若错位，回退该旗标并记录。⏳ **2026-11-15 模拟器部分**：`FLAG_ROTATES_WITH_CONTENT` 在 DisplayDeviceInfo 确认在列；几何 tap 测试需可旋转横屏的 app，模拟器缺样本，真机补。
   - **g. 死循环硬闸**：构造或复现「同屏同动作连续 4 次」（如同一节点反复 tap 无变化）→ 任务以 `Task stopped: the same action on the same screen repeated 4 times in a row (dead loop)` 终止，而不是跑到 maxIterations。⏳ **2026-11-15**：模拟器无可用 LLM（本地 Gemma 8192 上下文被工具声明吃满、无云端密钥）不可端到端构造；LoopHistory/isStuckInLoop 已由 6 例单测钉死，端到端待云端真机。
   - **h. 提速计时**：同一云端任务改造前后各跑一次，对比每轮工具执行耗时（日志时间戳 / Share Debug Report）：`open_app` 不再付 3×500ms（无弹窗时应 ~0.6s 级），动作轮不再有固定 500ms 硬睡，`scroll_to_find` 每轮不再拉两次整树。
-- [ ] **H79. 记忆库语义检索 + litertlm 0.18.0 升级批（2026-11-13，代码就绪+单测绿，真机待验）[RELEASE-OK]** [LOGCAT-DEBUG 部分用 Share Debug Report 读]。两个风险叠在一批：**litertlm 0.10.0→0.18.0 是本地 LLM 链路的九版本跳升，还外挂了 Kotlin 2.4.0（`android.builtInKotlin=false` + `android.newDsl=false` 两个 AGP 绕过旗）**；语义检索本身默认关、失败自动降级。子项：
-  - **a. 升级回归（最重要，先做）**：本地模式端到端一轮——模型页下载/选 gemma `.litertlm` → 发一条消息 → 本地生成正常返回（不是崩溃/不是空回复）。GPU 回退路径也要碰到：`LocalModelRuntime.acquireSharedEngine` 先试 GPU 失败落 CPU 的设备上，确认日志有 fallback 且任务完成。**release 构建单独装一次**（R8 对新 Kotlin 元数据 + litertlm JNI 的裁剪是未知区）。
+- [ ] **H79. 记忆库语义检索 + litertlm 0.18.0 升级批（2026-11-13 落地；2026-11-22 并入 main 后模拟器首验：c/d/e/g 过、a 判 FAIL——0.18 回喂跳解析必坏，见当日第二轮 changelog；b 模型下载/续传与 release 构建腿未做）[RELEASE-OK]** [LOGCAT-DEBUG 部分用 Share Debug Report 读]。两个风险叠在一批：**litertlm 0.10.0→0.18.0 是本地 LLM 链路的九版本跳升，还外挂了 Kotlin 2.4.0（`android.builtInKotlin=false` + `android.newDsl=false` 两个 AGP 绕过旗）**；语义检索本身默认关、失败自动降级。子项：
+  - **a. 升级回归（最重要，先做）——❌ 2026-11-22 模拟器 FAIL**：本地生成正常返回（非崩溃/空回复）成立，但 toolResult 回喂 hop 模型产出镜像反写闭合标记、0.18 SDK 拒收、错误串成答案（复现 ×3）。修复方向见当日 changelog；修好后本子项重开。原本要做的：GPU 回退路径也要碰到：`LocalModelRuntime.acquireSharedEngine` 先试 GPU 失败落 CPU 的设备上，确认日志有 fallback 且任务完成。**release 构建单独装一次**（R8 对新 Kotlin 元数据 + litertlm JNI 的裁剪是未知区）。
   - **b. 模型下载**：设置 → 功能 → 记忆库 → 开「语义检索」→ 模型行点下载（157MB）→ 进度走到 100%、行变「已下载」、页脚出现「语义检索已开启（N/M 条已索引）」。中途杀掉 app 再进 → 续传不重头（`.downloading` 临时文件在）。
   - **c. 后台补算**：下载完成后等页脚计数到 M（或点「重建向量索引」）→ Share Debug Report 里找 `Backfilling N memory vector(s)`；`adb shell ls` 外部文件目录见 `memory_vectors.json` 与 `memories.json` 同目录。
   - **d. 换述召回（本批的意义）**：造一对记忆——库里存「用户的无线网络名称是TPLINK」，问「上次 WiFi 怎么配的」→ 简报/`memory_recall` 把该条排上来。对照：同一条在**关闭**语义检索时问同样问题 → 召回不到（词法零共享二元组）。这一对是 H79 的核心判据。
@@ -2165,6 +2165,20 @@ adb logcat -d | grep "opened with the task ledger requested"
 ## QA Debug Changelog
 
 Format: `[date] [status] [test-id] description`
+
+### 2026-11-22（第二轮）— 语义检索并入 main 的模拟器验证轮（h79 AVD，HEAD `b8f54dd` debug 覆装）：H79 四腿过、**H79-a 判 FAIL（litertlm 0.18 回喂跳必坏）**、U2 过、两个新发现
+
+语义检索五笔（`d097176`→`129353b`）并入 main 后首验。JVM 门禁 762/0 不代表设备面——本轮专验设备。存量盘点：embedding/E2B 双模型、`memory_vectors.json`、记忆条目（TPLINK 夹具）全部跨升级幸存；a11y 被升级清 null（已知行为），全限定名重绑。证据 `.auto/h79_semantic_build.log`、`.auto/h79_task_records*.json`、`.auto/qa_u2_sched_attempt.png`。
+
+- ❌ **H79-a 判 FAIL — litertlm 0.10.0→0.18.0 的 toolResult 回喂 hop 解析必坏（复现 ×3，全同型）**：iter=1 用户消息→工具调用解析正常（`get_screen_info` 提取成功、结果回喂），iter=2 模型产出闭合标记镜像反写 `<|tool_call>call:tap_node{node_id="n8"}<tool_call|>`（正常应为对称标记），0.18 SDK 报 `INVALID_ARGUMENT: Failed to parse tool calls from code block`，LocalLlmClient 兜底抽取未救回 → 错误串原样成为最终答案（账本 `COMPLETED` + answer="Failed to call nativeSendMessage…"，answerLen=83 三次全同）。11-21 同款任务在 main 0.10.0 上 iter=2 成功——**0.18 特有回归，随语义检索并入 main 而进入主干**。修向：①查 0.18 工具调用模板/解析器对 E2B 权重的适配（迭代产物 `litert-community` 可能有配套新权重或 parser 配置）；②LocalLlmClient 兜底抽取加镜像标记容错；③引擎解析失败不该把 SDK 错误串当 answer 交付（应走诚实失败路径）。**本地多轮 agent 任务在 0.18 上不可用**——本地模式聊天/单轮任务不受影响。
+- ✅ **H79-c PASS**：设置页「重建向量索引 1 / 1」+ 页脚「语义检索已开启（1/1 条已索引）」——sidecar 按条目 id 对账，跨升级覆盖安装后直接匹配（无需重建）。
+- ✅ **H79-d PASS（本批核心判据）**：`memory_recall` 直连驱动（DebugTaskReceiver `--es tool` 零 LLM）——查询「how was my wifi configured」与记忆原文「users wireless network name is TPLINK」**零词法重叠**（`matches()` 子串包含逐 token 核过），仍召回该条（cosine ≥ SEMANTIC_FLOOR 支路命中，`hits` 4→5 计数可查）；对照：**关闭开关后同查询 → 「记忆库里没有匹配…的内容」**，词法脱靶实锤语义支路是换述召回的承重墙。
+- ⚠️ **新发现（P2 落 BACKLOG）— SEMANTIC_FLOOR=0.30 在真模型分布下不构成准入**：无关查询「favorite movie genre of my sister」「recipe for chocolate cake」全部 cosine ≥ 0.30 召回 WiFi 记忆（tags 空无词法污染）。MEMORY_DESIGN 假设无关对 0.1–0.3，实测分布更高——recall 变整库召回（`take(limit)` 兜底），排序仍按分数（相对序有意义），但 recall 工具结果全量返回 top-N 是噪声。校准靠 BACKLOG 既有 contrast-set 评测项（配对集实测分布再定地板/或按查询自归一）。
+- ✅ **H79-e 部分 PASS（开关腿）**：关 → 嵌入模型/重建行收起、词法行为、零崩；再开 → 「1 / 1」直接回来（向量缓存幸存，无需重建）。**删模型腿跳过**（sidecar 重侧载代价高，留真机轮）。
+- ✅ **H79-g PASS**：导出并分享 → ChooserActivity 拉起 + `memories-export.md` 落盘只含正文（`# 记忆库导出 / ## 事实 / - users wireless…`）；`memories.json` 全条目核过无向量字段——store 与导出双确认。
+- ✅ **U2 PASS**：种子 JSON 移走 + 重启 → 定时页空态（LOCAL 态）读「**本地模型没带定时工具——切到云端模型后**，在聊天里说…」，不再引导必被拒路径（`.auto/qa_u2_sched_attempt.png`）；云端态分支无钥匙不可驱动（代码分支覆盖，`readModelCatalog` 失败回落旧文案）。种子文件已还原。
+- ✅ **崩溃卫生**：exit-info 仅 FORCE STOP（我）+ PACKAGE UPDATED（装机），零崩。
+- [DRIVE] **直连工具驱动法（零 LLM，绕开 0.18 回喂 bug）**：`adb shell "am broadcast -a io.agents.nailongclaw.DEBUG_TASK -n io.agents.nailongclaw/.debug.DebugTaskReceiver --es tool memory_recall --es params_json '{\"query\":\"…\"}'"`——整条命令包一层双引号 + 内层 `{\"…\"}`（直接 `--es params_json '{"query":"…"}'` 会被两层 shell 剥掉内引号，JSON 解析报 Unterminated object）。结果正文在 `Debug tool success` 后续多行（grep -A6 才看得全，R5 围栏掩正文单行 grep 会被骗）。
 
 ### 2026-11-22 — R5 安全修复落地 + 模拟器体验 QA（h79 AVD，API 36，HEAD debug 覆装 vc63 调试包）：R5 四腿全过；抓出并即修两体验缺陷（U1/U3）+ 一通知细节（U4）
 
