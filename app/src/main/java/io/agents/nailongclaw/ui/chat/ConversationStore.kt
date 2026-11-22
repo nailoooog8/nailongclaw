@@ -89,7 +89,7 @@ class ConversationStore(
     }
 
     fun deleteConversation(target: ChatHistoryManager.ConversationSummary): Boolean {
-        return ChatHistoryManager.delete(target.file)
+        return ChatHistoryManager.delete(context, target.file)
     }
 
     private fun persistCurrentConversationId() {

@@ -46,13 +46,29 @@ class ToolRiskPolicyTest {
 
     @Test
     fun `irreversible tools are destructive tier`() {
-        for (name in listOf("make_call", "system_key")) {
+        for (name in listOf("make_call", "system_key", "find_and_tap")) {
             assertEquals(
                 "$name should be DESTRUCTIVE",
                 ToolRiskPolicy.Risk.DESTRUCTIVE,
                 ToolRiskPolicy.riskOf(name),
             )
         }
+    }
+
+    @Test
+    fun `find_and_tap cannot ride the read only ceiling (R5-02)`() {
+        // R5-02 regression pin: find & tap used to sit in READ_ONLY_TOOLS,
+        // which let an unattended scheduled task — or any remote channel —
+        // click through dialogs. Its worst case is exactly tap's; the tier
+        // must follow the action, not the scroll it happens to include.
+        assertTrue(ToolRiskPolicy.isBlockedForChannel("find_and_tap", Channel.SCHEDULED))
+        assertTrue(ToolRiskPolicy.isBlockedForChannel("find_and_tap", Channel.EXTERNAL))
+        assertTrue(ToolRiskPolicy.isBlockedForChannel("find_and_tap", Channel.TELEGRAM))
+        // Local keeps it: the built-in dismiss-popup skill taps by hand.
+        assertFalse(ToolRiskPolicy.isBlockedForChannel("find_and_tap", Channel.LOCAL))
+        // The observation half stays available unattended — that's the point
+        // of the ceiling's useful half.
+        assertFalse(ToolRiskPolicy.isBlockedForChannel("scroll_to_find", Channel.SCHEDULED))
     }
 
     @Test

@@ -538,6 +538,23 @@ object ChatHistoryManager {
 
     /**
      * Delete a conversation.
+     *
+     * R5-08: the SQLite index rows (full message bodies, keyed by the
+     * frontmatter id — never the filename) used to survive the delete, so a
+     * "deleted" conversation stayed recoverable from pokeclaw.db and hit in
+     * search(). Both delete paths — Compose sidebar and Web face — funnel
+     * through here, so clearing the index at this one point covers both. The
+     * id is read before the file goes, and the index clear is best-effort:
+     * the file deletion, which is what the UI reports on, stays authoritative.
      */
-    fun delete(file: File): Boolean = file.delete()
+    fun delete(context: android.content.Context, file: File): Boolean {
+        val id = frontmatterId(file)
+        val deleted = file.delete()
+        if (deleted && id.isNotEmpty()) {
+            try {
+                ChatDatabase(context).deleteConversation(id)
+            } catch (_: Exception) { /* index failure is non-fatal */ }
+        }
+        return deleted
+    }
 }

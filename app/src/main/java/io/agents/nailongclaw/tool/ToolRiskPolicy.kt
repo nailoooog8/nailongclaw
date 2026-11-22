@@ -105,6 +105,12 @@ object ToolRiskPolicy {
     private val DESTRUCTIVE_TOOLS: Set<String> = setOf(
         "make_call",
         "system_key",
+        // R5-02: find & tap is a tap — the same "a keypress can approve a
+        // system dialog nothing saw" worst case as the tools above. It used
+        // to sit in READ_ONLY_TOOLS, which let an unattended scheduled task
+        // click through dialogs; scroll_to_find (the observation half) stays
+        // read-only, but the moment the element gets tapped the tier ends.
+        "find_and_tap",
     )
 
     /**
@@ -122,8 +128,10 @@ object ToolRiskPolicy {
         "get_device_info",
         "get_installed_apps",
         "take_screenshot",
+        // Locates an element by scrolling and returns its info: the scroll is
+        // navigation, not an action on an element, so it stays observation.
+        // Its tap-combining sibling find_and_tap is DESTRUCTIVE above.
         "scroll_to_find",
-        "find_and_tap",
         "read_conversation",
         "search_app_in_store",
         "kb_read",

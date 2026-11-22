@@ -566,7 +566,7 @@ class ClaudeUiPreviewActivity : BaseActivity() {
             if (id.isNullOrBlank()) return false
             val match = ChatHistoryManager.listConversations(this@ClaudeUiPreviewActivity)
                 .firstOrNull { it.id == id } ?: return false
-            if (!ChatHistoryManager.delete(match.file)) return false
+            if (!ChatHistoryManager.delete(this@ClaudeUiPreviewActivity, match.file)) return false
             runOnUiThread {
                 val wasOpen = id == currentConversationId
                 if (wasOpen) {
@@ -1627,9 +1627,14 @@ class ClaudeUiPreviewActivity : BaseActivity() {
         // 列表或详情。
         ScheduledTaskStore.addSink(scheduleLedgerSink)
 
-        // Registered at runtime rather than declared in the manifest: a
-        // manifest receiver here would have to be exported to be reachable by
-        // adb, which would hand any app on the device a way to drive this page.
+        // Registered at runtime rather than declared in the manifest, and
+        // registered NOT_EXPORTED (R5-01): SET_ACCENT's key is interpolated
+        // into evaluateJavascript, so any app able to deliver this broadcast
+        // could inject script into the bridge origin. RECEIVER_EXPORTED did
+        // exactly that — the opposite of what the old comment claimed. adb
+        // cannot reach a NOT_EXPORTED receiver either, and QA_CHECKLIST H13
+        // records that broadcast channel never worked on the QA device, so
+        // nothing observable is lost.
         qaReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 when (intent?.action) {
@@ -1643,7 +1648,7 @@ class ClaudeUiPreviewActivity : BaseActivity() {
             addAction(ACTION_DUMP)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(qaReceiver, filter, Context.RECEIVER_EXPORTED)
+            registerReceiver(qaReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
         } else {
             @Suppress("UnspecifiedRegisterReceiverFlag")
             registerReceiver(qaReceiver, filter)
@@ -1661,10 +1666,16 @@ class ClaudeUiPreviewActivity : BaseActivity() {
      */
     @Suppress("unused")
     fun setAccentForQa(key: String) {
+        // R5-01 second half: the key rides into a JS string literal, so it is
+        // whitelisted before interpolation instead of escaped after the fact.
+        // Valid keys (cds.js data-theme-key) are lowercase with optional
+        // hyphens — "clay-bright" is the widest legal shape; anything else is
+        // dropped, which also keeps the payload out of the log line below.
+        if (!key.matches(Regex("^[a-z][a-z-]*$"))) return
         val js = "window.__cds && window.__cds.setAccent('$key');" +
             "'dispatched';"
         webView.evaluateJavascript(js) { value ->
-            XLog.e(TAG, "setAccent($key) -> $value")
+            XLog.e(TAG, "setAccent dispatched -> $value")
             dumpStorage()
         }
     }
