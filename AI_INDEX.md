@@ -24,6 +24,7 @@ This is the repo map for coding agents. Keep canonical information in existing f
 | `app/src/test/` | JVM/unit regression tests |
 | `work/` | Working ledgers: `QA_CHECKLIST.md` (QA methodology, release gate, test cases, debug changelog) + `BACKLOG.md` (prioritized bugs, features, QA gaps, ideas) |
 | `scripts/` | QA and automation scripts |
+| `.auto/` | QA 运行时产物：**证据按轮分批入库**（BACKLOG/QA_CHECKLIST 引用到的截图与门禁日志）；构建草稿与中间失败日志可清；**敏感内容（配对令牌/密钥/MMKV 转储）打码或删除后才入库**——入库前先看图 |
 | `.github/workflows/` | Build + unit tests, CLA/DCO check, emulator-matrix QA, Firebase Test Lab, signed release |
 | `docs/` | GitHub Pages site and public site assets |
 | `docs/design/` | Design docs: `MEMORY_BANK.md` (how the memory bank works: retention curve, suppression fingerprints, contradiction detection, optional on-device semantic ranking (EmbeddingGemma), file format), `MEMORY_DESIGN.md` (why the memory bank is built this way: community survey, rejected alternatives, known gaps — §2 records the 2026-11-13 reversal of the no-vector-retrieval decision), `ARCHITECTURE_DECISIONS.md`, `WEB_SEARCH_DESIGN.md`, `SKILL_FORMAT.md`, `MCP_INTEGRATION_PLAN.md`, `ARCHITECTURE_RECONSTRUCTION.md` |
