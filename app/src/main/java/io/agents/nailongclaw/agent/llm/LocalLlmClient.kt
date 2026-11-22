@@ -192,15 +192,22 @@ class LocalLlmClient(private val config: AgentConfig) : LlmClient {
                     try {
                         lastResponse = conv.sendMessage(msg.singleText())
                     } catch (e: Exception) {
-                        // LiteRT-LM SDK may fail to parse tool calls with standard quotes.
-                        // Extract raw model output from error message and parse ourselves.
+                        // LiteRT-LM SDK may fail to parse the model's own tool call and
+                        // throw instead of returning it. Salvage the raw output and let
+                        // our own parser handle it; never hand the SDK error to the user
+                        // as an answer.
                         val errorMsg = e.message ?: ""
                         if (errorMsg.contains("Failed to parse tool calls") && errorMsg.contains("tool_call")) {
-                            XLog.w(TAG, "SDK tool call parse failed, extracting from error: ${errorMsg.take(200)}")
-                            // Extract the raw output between "from response: " and the next error description
-                            val rawOutput = errorMsg.substringAfter("from response: ").substringBefore("code block:")
-                                .ifEmpty { errorMsg.substringAfter("from response: ") }
-                            lastResponse = rawOutput.trim()
+                            val salvaged = salvageRawOutputFromParseError(errorMsg)
+                            if (salvaged != null) {
+                                XLog.w(TAG, "SDK tool call parse failed, salvaged raw output: ${salvaged.take(200)}")
+                                lastResponse = salvaged
+                            } else {
+                                throw RuntimeException(
+                                    "Local model emitted an unparseable tool call and no raw output was recoverable " +
+                                        "(SDK: ${errorMsg.take(160)})", e
+                                )
+                            }
                         } else {
                             throw e
                         }
@@ -217,12 +224,21 @@ class LocalLlmClient(private val config: AgentConfig) : LlmClient {
                     try {
                         lastResponse = conv.sendMessage(toolResultText)
                     } catch (e: Exception) {
+                        // Same salvage path as the user-message hop — 0.18.0's parser
+                        // rejects the model's mirrored close marker on the toolResult
+                        // turn in particular (H79-a, reproduced ×3).
                         val errorMsg = e.message ?: ""
                         if (errorMsg.contains("Failed to parse tool calls") && errorMsg.contains("tool_call")) {
-                            XLog.w(TAG, "SDK tool call parse failed on toolResult, extracting: ${errorMsg.take(200)}")
-                            val rawOutput = errorMsg.substringAfter("from response: ").substringBefore("code block:")
-                                .ifEmpty { errorMsg.substringAfter("from response: ") }
-                            lastResponse = rawOutput.trim()
+                            val salvaged = salvageRawOutputFromParseError(errorMsg)
+                            if (salvaged != null) {
+                                XLog.w(TAG, "SDK tool call parse failed on toolResult, salvaged raw output: ${salvaged.take(200)}")
+                                lastResponse = salvaged
+                            } else {
+                                throw RuntimeException(
+                                    "Local model emitted an unparseable tool call and no raw output was recoverable " +
+                                        "(SDK: ${errorMsg.take(160)})", e
+                                )
+                            }
                         } else {
                             throw e
                         }
@@ -311,6 +327,36 @@ class LocalLlmClient(private val config: AgentConfig) : LlmClient {
     }
 
     /**
+     * Salvages the raw model output when the LiteRT-LM SDK fails to parse its own
+     * tool call and throws instead of returning it. Error shapes seen in the wild:
+     *
+     *  - 0.10.x: "…Failed to parse tool calls from response: <raw output>"
+     *  - 0.18.x: two lines —
+     *      "…Failed to parse tool calls from code block: call:name{…}"
+     *      "full response: <|tool_call>call:name{…}<tool_call|>"
+     *
+     * The mirrored close marker (`<tool_call|>`) is what trips 0.18's parser; our
+     * own [extractToolCalls] handles that format (GEMMA4_NATIVE_PATTERN), so the
+     * raw output — or the bare code block, re-wrapped in the markers — goes back
+     * through the normal parse pipeline.
+     *
+     * Returns null when nothing salvageable is found: callers must treat that as a
+     * task failure, never hand the SDK's error string to the user as an answer.
+     * (The old `substringAfter("from response: ").substringBefore("code block:")`
+     * chain did exactly that on 0.18 — with no "from response: " in the message it
+     * fell through to the whole message, then cut at "code block:", leaving the
+     * 83-char error prefix "Failed to call nativeSendMessage: …" as the answer.)
+     */
+    internal fun salvageRawOutputFromParseError(errorMsg: String): String? {
+        errorMsg.substringAfter("full response: ", "").trim().takeIf { it.isNotEmpty() }?.let { return it }
+        errorMsg.substringAfter("from response: ", "").trim().takeIf { it.isNotEmpty() }?.let { return it }
+        errorMsg.substringAfter("from code block: ", "").trim().takeIf { it.isNotEmpty() }?.let {
+            return "<|tool_call>$it<tool_call|>"
+        }
+        return null
+    }
+
+    /**
      * Extract tool calls from model output.
      *
      * Gemma 4 uses special tokens for function calling. The format may be:
@@ -320,7 +366,7 @@ class LocalLlmClient(private val config: AgentConfig) : LlmClient {
      *
      * This parser tries multiple patterns.
      */
-    private fun extractToolCalls(text: String): List<ToolExecutionRequest> {
+    internal fun extractToolCalls(text: String): List<ToolExecutionRequest> {
         val calls = mutableListOf<ToolExecutionRequest>()
 
         // Pattern 1: Standard <tool_call>{"name":...,"arguments":{...}}</tool_call>
