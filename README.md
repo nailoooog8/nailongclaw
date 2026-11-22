@@ -40,7 +40,7 @@ Google 的移动 agent 永远是 Pixel-first 的；Samsung 的 Galaxy AI 战略�
 | **语义记忆检索** | 端上 EmbeddingGemma 混合打分，记忆召回按相关度排序 |
 | **独立发行** | 自有名称、图标、签名密钥与 applicationId，issue / 更新检查均指向本仓库 |
 
-### 安全审计（R1–R4，四轮）
+### 安全审计（R1–R5，五轮）
 
 | 轮次 | 日期 | 形态 | 结果 |
 |---|---|---|---|
@@ -48,12 +48,13 @@ Google 的移动 agent 永远是 Pixel-first 的；Samsung 的 Galaxy AI 战略�
 | R2 | 2026-10-16 | 红队（v0.8.1 基线） | F1–F10；Telegram 按 user id 授权、远程来源禁用高危工具等随 v0.8.2 落地 |
 | R3 | 2026-10-25 | 攻防推演 | 外部自动化门控（R3-01 P0）→ `ExternalAutomationGuard` 配对令牌 + 加密落盘 + 爆破锁定落地 |
 | R4 | 2026-10-27 | 红蓝合报 | R4-B1 屏幕内容数据条款 + R4-R1 配对令牌门控，均已提交 |
+| R5 | 2026-11-22 | 五域并行走查（R4 后 +11k 行新面：影子屏 / Web 桥 / 白名单 UI / 通知）+ 模拟器体验 QA | R4 修复无回归；新发现 P1×2 / P2×7 / P3 一批——13 项同日修复落地（QA 广播注入面、find_and_tap 误分级、阻塞截图外发、DirectIntent 渠道门等），模拟器 QA 再抓出定时意图劫持与拒答播报两缺陷即修 |
 
 同时证伪了三条假设：SnakeYAML 反序列化（实测 2.2 版已禁用全局标签）、Debug 接收器暴露（有 `BuildConfig.DEBUG` 闸门）、记忆库召回注入（已有围栏防护）。
 
-四份报告在 [`docs/security/`](docs/security/)，逐条用例与方法论见各文。**边界声明不变：代码已修复 ≠ 真机 E2E 已验证**——SEC 系列与 R4 正向路径的真机执行仍在欠账（见 [`work/QA_CHECKLIST.md`](work/QA_CHECKLIST.md)），请勿将代码修复等同于已通过安全测试。当前仍开放的高优项：F3 逐调用方签名白名单、F5 LAN 控制台 cleartext（部分已修）。
+五份报告在 [`docs/security/`](docs/security/)，逐条用例与方法论见各文。**边界声明不变：代码已修复 ≠ 真机 E2E 已验证**——SEC 系列与 R4 正向路径的真机执行仍在欠账（见 [`work/QA_CHECKLIST.md`](work/QA_CHECKLIST.md)），请勿将代码修复等同于已通过安全测试。当前仍开放的高优项：F3 逐调用方签名白名单、F5 LAN 控制台 cleartext（部分已修）；R5 挂账（R3-06/08/09/10b、本地无 schedule_task 的空态文案错位等）见 R5 报告 §7/§10。
 
-单测基线 746/0（`./gradlew testDebugUnitTest`）。
+单测基线 749/0（`./gradlew testDebugUnitTest`）。
 
 发现新漏洞请走[私有漏洞上报](https://github.com/nailoooog8/nailongclaw/security/advisories/new)，**不要开公开 issue**——修复落地前 issue 里的细节对所有人可见。报告范围、响应预期与转上游的边界见 [`SECURITY.md`](SECURITY.md)。
 
@@ -158,7 +159,7 @@ cd nailongclaw
 | [`docs/design/MEMORY_BANK.md`](docs/design/MEMORY_BANK.md) | 记忆库设计 |
 | [`docs/design/SKILL_FORMAT.md`](docs/design/SKILL_FORMAT.md) | 技能配方格式 |
 | [`docs/ops/OEM_COVERAGE_TIERS.md`](docs/ops/OEM_COVERAGE_TIERS.md) | 各 OEM 测试覆盖层级 |
-| [`docs/security/`](docs/security/) | R1–R4 安全审计报告（红队 / 攻防推演 / 红蓝合报） |
+| [`docs/security/`](docs/security/) | R1–R5 安全审计报告（红队 / 攻防推演 / 红蓝合报 / 五域走查） |
 | [`docs/ops/AI_AGENT_PLAYBOOK.md`](docs/ops/AI_AGENT_PLAYBOOK.md) | 内部操作手册（构建 / 发布 / QA 驱动） |
 | [`work/QA_CHECKLIST.md`](work/QA_CHECKLIST.md) | E2E 用例库（含安全红队段） |
 | [`work/BACKLOG.md`](work/BACKLOG.md) | 功能与缺陷优先级 |

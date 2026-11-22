@@ -100,6 +100,20 @@ Priority: `P0` = blocks users, fix now. `P1` = next up. `P2` = when we get to it
 - [ ] **P3 · F5 / R3-08 / R3-09 / R3-10（死权限已删）** cleartext LAN 自签 TLS+指纹固定；UpdateChecker 展示发布哈希；签名口令移出 local.properties 明文；删死权限 REQUEST_INSTALL_PACKAGES、评估 JitPack 依赖。
 - [x] ~~**P3 · 构建** `.pcfp` 构建指纹 asset 从未进过包：AAPT 不打包点开头的文件（10-27 debug、11-07 release 两个包双确认），且仓库里没有任何代码读取它——构建任务写而不读的死重。修：改名非点开头的文件名（或改 BuildConfig 注入）+ 诊断面真正展示，或整段删除。~~ — **FIXED 2026-11-19 晚**：走的是「整段删除资产 + BuildConfig 真有读者」。`injectBuildFingerprint` 任务、`preBuild` 依赖、`.gitignore` 条目、本地 `.pcfp` 全删；`BuildConfig.BUILD_FINGERPRINT` 现在有三个读者（关于页「构建指纹」行 / 调试报告 summary.txt / GitHub issue body）。查案发现连 BuildConfig 字段本身当时也是零读者。详见上方 2026-11-19 晚 P3 段。
 
+### Security — round 5 (2026-11-22, `docs/security/SECURITY_AUDIT_R5.md`)
+
+> 五域并行走查（外部入口 / WebView 桥 / 影子屏 / 数据·网络·密钥 / 工具面），基线 `45c9e5f` 对比 `c713b6d`（R4 修复轮）。**R4 全部修复无回归**；§8 第 1–3 组 13 项同日修复（`215a1c0`→`4df279e` 五笔）+ 模拟器体验 QA 两轮三修（`f819fd2`/`05e32d9`），全量单测 749/0。行为取舍与驱动方法见 R5 §9/§10。
+
+- [x] **P1 · R5-01 — 已修 2026-11-22** 主界面 QA 广播接收器 `RECEIVER_EXPORTED` 注册 + SET_ACCENT 的 key 未转义拼 `evaluateJavascript` → 任意 app 注 JS 进桥面 origin，全桥接管（关确认门 / 自动批 MCP / 驱动任务 / 读账本外传）。旧注释声称防导出、行为恰好相反。修：`RECEIVER_NOT_EXPORTED`（QA_CHECKLIST H13 记录该通道 QA 机从未生效，零代价）+ key 白名单 `^[a-z][a-z-]*$`（须含连字符，`clay-bright` 是合法 key）+ 日志不回显。模拟器负路径复验：合法 key 广播不再送达。
+- [x] **P1 · R5-02 — 已修 2026-11-22** `find_and_tap`（滚动+点击合体动作）混在 READ_ONLY_TOOLS → SCHEDULED/EXTERNAL 无人值守可点击，凿穿天花板承诺。修：显式进 DESTRUCTIVE_TOOLS（与 `tap` 的 fail-closed 归级一致）；`scroll_to_find` 留 READ_ONLY 并写明理由；`ToolRiskPolicyTest` 分级回归钉。
+- [x] **P2 ×5 — 已修 2026-11-22** R5-03 阻塞分支自动截真屏外发远程渠道（全仓唯一位图外送路径，不经风险门；已删，文案通知保留）；R5-05 MCP 错误文本过 `ContextFence`；R5-06 DirectIntent 过渠道门（parse 动作恒非 READ_ONLY → 无人值守全拒）；R5-07 AgentConfig 数据条款枚举补 `shadow_get_screen_info`；R5-08 删除会话按 **frontmatter id** 清 SQLite 消息正文索引（`ChatHistoryManager.delete(context,file)`，两个调用方改签名；此前 `deleteConversation` 全仓零调用）。模拟器验证：删除三方同删（sqlite3 前后对照）、SCHEDULED 拨号拒且不拉拨号盘。
+- [x] **P3 顺手批 — 已修 2026-11-22** 空 PIN `authenticate` fail-closed（`ConfigServer`）；autoAllow 对 DESTRUCTIVE 仍出卡（与确认门不变量对齐，+2 单测）；通知文本过 `scrubText` + 渠道显式 `setLockscreenVisibility(PRIVATE)`；失败原文过 `scrubText` 三处（UI/转录/账本）；日志脱敏（senderId→`redactId`、记忆/答案/任务正文→长度）。
+- [x] **U1（模拟器 QA，存量缺陷）— 已修 `f819fd2`** Tier 1 `CALL_PATTERN` 无锚定，「schedule a task … call 1234567」当场直接拨号、调度意图静默丢弃（实测复现：拨号盘拉起、账本 COMPLETED）。`route()` 在 parse 前对 schedule/定时 加 AgentLoop 守卫；alarm/timer 关键词不含这两词（快路不受影响）；纯 `call N` LOCAL 直连复测照常。
+- [x] **U3（模拟器 QA，R5-06 引入的呈现缺陷）— 已修 `f819fd2`** 拒答发 `TaskEvent.Completed` 被定时分发器播报成「Scheduled task done Blocked: …」——锁屏上拒绝读成成功（通知栏截图实锤）。改 `TaskEvent.Failed(reason)`：账本 FAILED 行 + 「Scheduled task failed」标题，同一拒答文案。
+- [x] **U4（模拟器 QA）— 已修 `05e32d9`** 拒答文案带裸 `android.intent.action.DIAL`（DirectIntent 丢了 TaskParser 已算好的用户动词 → `Route.DirectIntent` 加 `action`）；started 通知键 recordId / outcome 键 task.id 两 id 堆叠（started 改 `fired.id`，outcome 同 id 替换）。复测：单条通知读「Scheduled task failed — Tool 'call' is blocked…」。
+- [ ] **P3 · U2** 定时页空态文案引导「在聊天里说…就会落到这里」，但 LOCAL 无 `schedule_task`（`LocalToolAllowlist.TRIMMED_EXAMPLES` 既有取舍，本地模型实测自认无此工具）——文案按 provider 区分或注明仅云端可用。
+- [ ] **维持原判 / 待排期** F3 签名白名单（等 Tasker 迁移决策）、F5 自签 TLS、R3-06 verification-metadata、R3-08/09、R3-10b JitPack；R5 §5 其余 P3（PIN 明文 MMKV、截图 cache 残留、decideMcp nonce、MCP sanitize 只识英文、看门狗 null fail-open、锁定键共享 DoS、页面子资源网络隔离等）——逐条证据见 R5 §5。
+
 ## Memory bank (see `docs/design/MEMORY_DESIGN.md` for the rationale behind each call)
 
 - [x] ~~**P1** Memory export cannot be shared off-device~~ ✅ 2026-10-17. `file_paths.xml` now declares `<external-files-path path="." />` + `<files-path path="." />`, and the export action routes through `FileProvider` + `ACTION_SEND`. Verified on device (QA AA1/AA2/AA3/AA5): share sheet opens, empty bank neither crashes nor writes a stray file, cancelling returns to `MemoryActivity`. `MemoryStore` has an injectable `clock`, so the suggested unit tests below are straightforward. Menu retitled 导出为 Markdown → 导出并分享. Still open from the original item: a lossless `exportJson()` — Markdown is for humans, machine re-import needs JSON.

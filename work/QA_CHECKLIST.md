@@ -2157,6 +2157,23 @@ adb logcat -d | grep "opened with the task ledger requested"
 
 Format: `[date] [status] [test-id] description`
 
+### 2026-11-22 — R5 安全修复落地 + 模拟器体验 QA（h79 AVD，API 36，HEAD debug 覆装 vc63 调试包）：R5 四腿全过；抓出并即修两体验缺陷（U1/U3）+ 一通知细节（U4）
+
+R5 报告 `docs/security/SECURITY_AUDIT_R5.md`（§9 修复落地 / §10 本轮 QA）。基线 `45c9e5f` 的五笔修复提交（`215a1c0`→`4df279e`）后 HEAD debug 包 `adb install -r` 覆装（vc34 → vc63，数据保留）。证据 `.auto/r5_shade*.png`、`.auto/r5_test.log`（749/0）。
+
+- ✅ **R5-01 负路径**：`am broadcast -a io.agents.nailongclaw.SET_ACCENT --es key sage`（**合法 key**）→ 无 `setAccent` 日志、页面无变化——NOT_EXPORTED 后 adb 广播不再送达接收器（H13 记录的「广播通道在 QA 机从未生效」与此一致）；注入门实关。
+- ✅ **R5-08 删除清索引**：抽屉 →「second」行 删除对话 → 确认卡（有「整段历史…找不回来」警示）→ 删除 → `sqlite3 pokeclaw.db` 前后对照：conversations/messages 行与 `preview_*.md` 文件**三方同删**；桥日志 `[chat] deleteConversation -> preview_… (wasOpen: false)`。修前 DB 行是存活的（`deleteConversation` 零调用）。
+- ✅ **R5-06 SCHEDULED 拨号拒**：种子任务（见下方驱动法）`taskText="call 1234567"` → `DirectIntent refused for Scheduled`，**拨号盘未拉起**，账本 FAILED，通知「Scheduled task failed」。
+- ✅ **LOCAL 直连 parity（过修防线）**：纯「call 9876543」→ Tier 1 照常 `Dialing 9876543`，拨号盘拉起——U1 守卫未误伤确定性路由。
+- 🐛→✅ **U1（存量缺陷，抓出即修 `f819fd2`）**：CALL_PATTERN `(?:call|phone|ring|dial)\s+(.+)` 无锚定——「schedule a task 2 minutes from now - task text:call 1234567」在 Tier 1 **当场拨号**（拨号盘实拉起、账本 COMPLETED "Dialing 1234567"），「2 minutes from now」被静默丢弃。修：`route()` parse 前对 schedule/定时 加 AgentLoop 守卫；复验同句式走 `Scheduling intent detected, skipping Tier 1`。
+- 🐛→✅ **U3（R5-06 引入的呈现缺陷，抓出即修 `f819fd2`）**：拒答原发 `TaskEvent.Completed` → 通知栏「Scheduled task **done** Blocked: Dialing 1234567」（`.auto/r5_shade.png`）——拒绝读成成功。修：发 `TaskEvent.Failed(reason)`；复验通知读「Scheduled task **failed**」（`.auto/r5_shade2.png`）。
+- 🐛→✅ **U4（通知细节，`05e32d9`）**：拒答文案带裸 `android.intent.action.DIAL`（DirectIntent 丢 TaskParser 用户动词）+ started/outcome 两 id 堆叠（started 键 recordId、outcome 键 task.id）。修后单条通知读「Scheduled task failed — Tool '**call**' is blocked…」（`.auto/r5_shade3.png`）。
+- ⚠️ **U2 挂账（BACKLOG P3）**：本地模型（Gemma 4 E2B）对「schedule a task…」实答「I do not have a tool that allows me to schedule」——`schedule_task` 在 LocalToolAllowlist.TRIMMED_EXAMPLES（既有取舍），但定时页空态文案仍引导「在聊天里说…」；文案按 provider 区分，未动。
+
+**驱动方法（本轮沉淀，定时火点腿免 LLM）**：`{"tasks":[{"id":"r5-qa-N","taskText":"call 1234567","createdAt":<now>000,"fireAtMillis":<(now+3600)*1000>,"status":"SCHEDULED"}]}` 写 `/sdcard/Android/data/io.agents.nailongclaw/files/scheduled_tasks.json` → `am force-stop` → push → 重启装载 → `adb root` 后 `am broadcast -n io.agents.nailongclaw/.task.TaskAlarmReceiver -a io.agents.nailongclaw.SCHEDULED_TASK_FIRE --es scheduled_task_id <id>` 走真实 fireNow。**fireAt 必须写未来**——过去值会在启动 reconcile 被判 MISSED（诚实文案「missed: the device was off」），FIRE 广播对 MISSED 静默跳过。注意：`bash` 里 `$FIRE` 变量忘赋值会把 fireAtMillis 写成 0（本轮踩过）。
+
+**模拟器新坑（h79/API 36，2026-11-22）**：①**抽屉开着时 WebView 侧栏节点有真 bounds**（关闭时全 `[0,0][0,0]`，与 vivo 笔记的「WebView 读不到」互补——先开抽屉再 dump）；②抽屉宽约 756px，x>756 的点击落在遮罩上会**关抽屉**（连点坐标链时第二步点到空气，序列断掉——每步 fresh dump，别复用上一步坐标）；③确认弹窗「删除」在右「取消」在左，bounds 取自当次 dump（第一次按惯性点到取消）；④`cmd statusbar expand-notifications` 之后必须 `collapse`，否则后续 `input tap/text` 全打在 shade 上；⑤`am broadcast` 对 `exported=false` 接收器需 **adb root**（本镜像 `adb root` 直接可用）。
+
 ### 2026-11-21（夜）— v0.9.1 真机补验轮（vivo V2502DA，release 构建 vc65）：安装/升级、云端 E2E、EXTERNAL 令牌腿、影子屏真机判决；一修正一缺陷
 
 release 构建 `NAILongClaw_v0.9.1_20261121_222835.apk`（vc65）升级安装；证据 `.auto/qa1121_vivo_*.png` 六张。当日无第三方 logcat（vivo），证据以账本/截图/dumpsys 为准。
