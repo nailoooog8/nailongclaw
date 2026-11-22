@@ -1014,6 +1014,45 @@ object MemoryStore {
         }
     }
 
+    /**
+     * Writes the bank as machine-round-trippable JSON — the counterpart to
+     * [exportMarkdown], which is a human-readable share that keeps only
+     * content/tags/pinned. This one keeps every field a future import
+     * (BACKLOG P2) needs to restore the bank honestly: retention state
+     * (`hits`/`lastUsedAt`), the temporal chain (`validAt`/`invalidAt`/
+     * `supersedes`/`supersededBy`), graph links (`relatedIds`/`conflictsWith`),
+     * and the forgetting-suppression fingerprints (import must carry them, or
+     * a fact deleted on this device gets re-learned on the next one).
+     *
+     * Vectors are deliberately absent: they are a device-local cache keyed by
+     * embedder fingerprint and recomputed by the backfill daemon — carrying
+     * them would tie the export to one model version.
+     *
+     * @return the file, or null when there is nothing to export / the write
+     *         failed. Both branches toast, never silently produce nothing.
+     */
+    @JvmStatic
+    fun exportJson(): File? {
+        val entries = all()
+        val suppression = suppressions()
+        if (entries.isEmpty() && suppression.isEmpty()) return null
+        return try {
+            val file = File(storageDir(), "memories-export.json")
+            val payload = linkedMapOf(
+                "version" to 1,
+                "exportedAt" to clock(),
+                "entries" to entries,
+                "suppressions" to suppression,
+            )
+            file.writeText(gson.toJson(payload))
+            XLog.i(TAG, "Exported ${entries.size} memories + ${suppression.size} suppression(s) to ${file.absolutePath}")
+            file
+        } catch (e: Exception) {
+            XLog.e(TAG, "JSON export failed", e)
+            null
+        }
+    }
+
     // ── Prompt integration ────────────────────────────────────────────────────
 
     /**

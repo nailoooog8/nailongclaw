@@ -2214,6 +2214,14 @@ F5 的残余暴露面是**入站方向**（GET/POST 响应早已掩码）：POST
 
 **模拟器坑补记**：ChannelsActivity 的 LAN 行 tap 会盲切（自启状态下 tap=停止）——每次 tap 前先 dump 确认当前态；MMKV 二进制用 root pull 后按字节 grep 验明文。
 
+### 2026-11-22（第六轮）— 记忆库无损 exportJson（BACKLOG P1 收编）：全字段 + 抑制指纹、无向量；设备导出 15 字段全落
+
+Markdown 导出是人读分享件（只有正文/标签/置顶），损失留存状态（hits/lastUsedAt）、时效链（validAt/invalidAt/supersedes/supersededBy）、关联（relatedIds/conflictsWith）。新 `MemoryStore.exportJson()`：`{version:1, exportedAt, entries:[全字段], suppressions:[MemorySimilarity.Trace]}`——抑制指纹随行（将来导入不带它 = A 机删过的事实在 B 机被重新学回）。**向量有意不导**：设备本地缓存、按 embedder 指纹重算，导出绑死模型版本是错的。MemoryActivity 新「导出 JSON（无损）」行，与 Markdown 行共用 FileProvider 分享链（页内硬编码中文，随现有风格，无 string 资源改动）。
+
+- ✅ **JVM 4 例**（MemoryExportJsonTest）：富条目全字段（顶替链 3 条 id 计数）/ 抑制指纹随行 / 无向量键 / 空库不导。中途学一课：`deleteByContent` 有 3 字符下限守卫，「邮箱」两字被拒——测试改「邮箱是」。
+- ✅ **设备实测**（h79，8 条账本）：UI 点「导出 JSON（无损）」→ ChooserActivity 弹起 → `memories-export.json` 落盘 3587B → pull 解析 **version=1 / entries=8 / 15 字段全在**（conflictsWith/content/createdAt/hits/id/invalidAt/kind/lastUsedAt/pinned/relatedIds/supersededBy/supersedes/tags/updatedAt/validAt）/ 零向量键。崩溃卫生 0。
+- [NOTE] **将来导入（P2）吃这个格式**，不变量三条已在 BACKLOG P2 写明：hits/lastUsedAt 必须**重置**（留存状态是设备本地的强化，继承它们会伪造熟悉度）、pinned **随行**（用户显式决定）、抑制指纹**随行**；content-hash id 在导入改写后不存活，relatedIds/conflictsWith/supersedes/supersededBy 必须**重映射**。
+
 ### 2026-11-22 — R5 安全修复落地 + 模拟器体验 QA（h79 AVD，API 36，HEAD debug 覆装 vc63 调试包）：R5 四腿全过；抓出并即修两体验缺陷（U1/U3）+ 一通知细节（U4）
 
 R5 报告 `docs/security/SECURITY_AUDIT_R5.md`（§9 修复落地 / §10 本轮 QA）。基线 `45c9e5f` 的五笔修复提交（`215a1c0`→`4df279e`）后 HEAD debug 包 `adb install -r` 覆装（vc34 → vc63，数据保留）。证据 `.auto/r5_shade*.png`、`.auto/r5_test.log`（749/0）。

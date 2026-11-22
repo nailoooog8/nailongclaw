@@ -16,6 +16,7 @@ import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.FileProvider
+import java.io.File
 import io.agents.nailongclaw.R
 import io.agents.nailongclaw.agent.memory.EmbeddingModelManager
 import io.agents.nailongclaw.agent.memory.MemoryEntry
@@ -356,6 +357,21 @@ class MemoryActivity : BaseActivity() {
         }
 
         actionsGroup.addMenuItem(
+            leadingIcon = android.R.drawable.ic_menu_upload,
+            // 无损导出（BACKLOG P1）：Markdown 那份是人读的分享件，只带
+            // 正文/标签/置顶；这份把留存状态、时效链、关联、抑制指纹全带
+            // 上，是将来「导入」功能的往返格式。向量不带——设备本地缓存，
+            // 按 embedder 指纹重算。
+            title = "导出 JSON（无损）",
+            onClick = { exportJsonAndShare() },
+            showDivider = true
+        ).apply {
+            setTitleColor(cds.textPrimary)
+            setLeadingIconColor(cds.textPrimary)
+            setTrailingIconColor(cds.textMuted)
+        }
+
+        actionsGroup.addMenuItem(
             leadingIcon = android.R.drawable.ic_menu_save,
             // Says "分享" because that is what it now does. The old title
             // promised an export and delivered a Toast with a filesystem path
@@ -471,6 +487,15 @@ class MemoryActivity : BaseActivity() {
      */
     private fun exportAndShare() {
         val file = MemoryStore.exportMarkdown()
+        shareExported(file, "text/markdown", "NailongClaw 记忆库导出（人读版，正文/标签/置顶）")
+    }
+
+    private fun exportJsonAndShare() {
+        val file = MemoryStore.exportJson()
+        shareExported(file, "application/json", "NailongClaw 记忆库导出（无损，全字段 + 抑制指纹）")
+    }
+
+    private fun shareExported(file: File?, mime: String, subject: String) {
         if (file == null) {
             Toast.makeText(this, "没有可导出的记忆", Toast.LENGTH_SHORT).show()
             return
@@ -485,8 +510,8 @@ class MemoryActivity : BaseActivity() {
             return
         }
         val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/markdown"
-            putExtra(Intent.EXTRA_SUBJECT, "NailongClaw 记忆库导出")
+            type = mime
+            putExtra(Intent.EXTRA_SUBJECT, subject)
             putExtra(Intent.EXTRA_TEXT, "NailongClaw 记忆库导出，共 ${MemoryStore.count()} 条。")
             putExtra(Intent.EXTRA_STREAM, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
