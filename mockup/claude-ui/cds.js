@@ -2243,14 +2243,32 @@
     return box;
   }
 
+  /* U2（BACKLOG P3）：本地模型没有 schedule_task（LocalToolAllowlist 裁剪，
+     PipelineRouter 对定时意图也只送 agent loop——本地会说没有这个工具）。
+     旧空态让本地用户「在聊天里说…」，说了必然被拒。活动模型是本地时空态
+     改指向云端；读不到目录（无桥/解析失败）保持旧文案，别多承诺。 */
+  function activeModelKind() {
+    var b = bridge();
+    if (b && b.readModelCatalog) {
+      try {
+        var data = JSON.parse(b.readModelCatalog() || 'null');
+        if (data && data.active && data.active.kind) return String(data.active.kind);
+      } catch (e) { console.warn('[cds] readModelCatalog (active kind) failed:', e); }
+    }
+    return null;
+  }
+
   function renderScheduleList(tasks, degraded) {
     schedulesBody.textContent = '';
     updateSchedulesBadge(tasks);
     if (degraded) schedulesBody.appendChild(buildSchedulesNote());
     if (!tasks.length) {
+      var isLocal = activeModelKind() === 'local';
       schedulesBody.appendChild(buildEmptyState(
         '还没有定时任务',
-        '在聊天里说「每天早上七点半看我今天的日历」，任务就会落到这里——到点自动跑，排队、错过、取消都写在明面上。'
+        isLocal
+          ? '本地模型没带定时工具——切到云端模型后，在聊天里说「每天早上七点半看我今天的日历」，任务就会落到这里：到点自动跑，排队、错过、取消都写在明面上。'
+          : '在聊天里说「每天早上七点半看我今天的日历」，任务就会落到这里——到点自动跑，排队、错过、取消都写在明面上。'
       ));
       return;
     }

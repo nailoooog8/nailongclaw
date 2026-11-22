@@ -111,7 +111,7 @@ Priority: `P0` = blocks users, fix now. `P1` = next up. `P2` = when we get to it
 - [x] **U1（模拟器 QA，存量缺陷）— 已修 `f819fd2`** Tier 1 `CALL_PATTERN` 无锚定，「schedule a task … call 1234567」当场直接拨号、调度意图静默丢弃（实测复现：拨号盘拉起、账本 COMPLETED）。`route()` 在 parse 前对 schedule/定时 加 AgentLoop 守卫；alarm/timer 关键词不含这两词（快路不受影响）；纯 `call N` LOCAL 直连复测照常。
 - [x] **U3（模拟器 QA，R5-06 引入的呈现缺陷）— 已修 `f819fd2`** 拒答发 `TaskEvent.Completed` 被定时分发器播报成「Scheduled task done Blocked: …」——锁屏上拒绝读成成功（通知栏截图实锤）。改 `TaskEvent.Failed(reason)`：账本 FAILED 行 + 「Scheduled task failed」标题，同一拒答文案。
 - [x] **U4（模拟器 QA）— 已修 `05e32d9`** 拒答文案带裸 `android.intent.action.DIAL`（DirectIntent 丢了 TaskParser 已算好的用户动词 → `Route.DirectIntent` 加 `action`）；started 通知键 recordId / outcome 键 task.id 两 id 堆叠（started 改 `fired.id`，outcome 同 id 替换）。复测：单条通知读「Scheduled task failed — Tool 'call' is blocked…」。
-- [ ] **P3 · U2** 定时页空态文案引导「在聊天里说…就会落到这里」，但 LOCAL 无 `schedule_task`（`LocalToolAllowlist.TRIMMED_EXAMPLES` 既有取舍，本地模型实测自认无此工具）——文案按 provider 区分或注明仅云端可用。
+- [x] **P3 · U2 — 已修 2026-11-22** 定时页空态文案引导「在聊天里说…就会落到这里」，但 LOCAL 无 `schedule_task`（`LocalToolAllowlist.TRIMMED_EXAMPLES` 既有取舍，本地模型实测自认无此工具）。修：`cds.js` 空态按活动模型区分——`readModelCatalog` 的 `active.kind === 'local'` 时改指「切到云端模型后…」，云端/读不到目录（无桥/解析失败）保持旧文案不多承诺；mockup→assets 由 `syncClaudeUiMockup`（preBuild）带走。机上验证随下一轮模拟器 QA（本地态看空态文案 + 云端态对照）。
 - [ ] **维持原判 / 待排期** F3 签名白名单（等 Tasker 迁移决策）、F5 自签 TLS、R3-06 verification-metadata、R3-08/09、R3-10b JitPack；R5 §5 其余 P3（PIN 明文 MMKV、截图 cache 残留、decideMcp nonce、MCP sanitize 只识英文、看门狗 null fail-open、锁定键共享 DoS、页面子资源网络隔离等）——逐条证据见 R5 §5。
 
 ## Memory bank (see `docs/design/MEMORY_DESIGN.md` for the rationale behind each call)
